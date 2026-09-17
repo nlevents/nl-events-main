@@ -1,0 +1,154 @@
+/* ============================================================
+   Auth (Login / OTP) + Account section styles.
+   Reuses existing tokens/classes (.btn, .form-group, .form-error)
+   from style.css — only new, section-specific rules live here.
+   ============================================================ */
+
+.auth-card{
+  background:var(--surface);
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-m);
+  box-shadow:var(--shadow);
+  padding:32px 28px;
+}
+
+.auth-demo-banner{
+  display:flex; align-items:center; gap:8px;
+  background:var(--surface-secondary);
+  border:1px solid var(--border);
+  color:var(--text-secondary);
+  font-size:12.5px;
+  border-radius:var(--radius-s);
+  padding:10px 12px;
+  margin-bottom:20px;
+}
+.auth-demo-banner svg{ width:15px; height:15px; flex:none; color:var(--accent); }
+.auth-demo-banner code{ background:transparent; }
+
+.auth-fineprint{ font-size:12px; color:var(--text-secondary); text-align:center; margin-top:14px; }
+
+.auth-otp-lead{ font-size:14px; color:var(--text-secondary); margin-bottom:18px; }
+.auth-otp-lead b{ color:var(--text-primary); }
+
+.link-btn{
+  background:none; border:0; padding:0; margin:0;
+  color:var(--accent); font-weight:700; font-size:inherit;
+  cursor:pointer; text-decoration:underline; text-underline-offset:2px;
+}
+.link-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+.otp-input-group{ display:flex; gap:10px; justify-content:center; }
+.otp-box{
+  width:44px; height:52px;
+  text-align:center;
+  font-size:20px; font-weight:700;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius-s);
+  background:var(--background);
+  color:var(--text-primary);
+}
+.otp-box:focus{ outline:none; border-color:var(--accent); }
+
+.auth-resend{ text-align:center; margin-top:16px; font-size:13px; color:var(--text-secondary); }
+
+.auth-success{ text-align:center; padding:20px 0; }
+.auth-success svg{ width:32px; height:32px; color:#2f8f5b; margin-bottom:10px; }
+
+/* ---------------- Account dashboard ---------------- */
+
+.account-shell{
+  display:grid;
+  grid-template-columns:230px 1fr;
+  gap:32px;
+  align-items:start;
+}
+@media (max-width:860px){
+  .account-shell{ grid-template-columns:1fr; }
+}
+
+.account-sidebar{
+  background:var(--surface);
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-m);
+  padding:20px;
+  position:sticky; top:90px;
+}
+@media (max-width:860px){ .account-sidebar{ position:static; } }
+
+.account-sidebar-head{ display:flex; align-items:center; gap:12px; margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--border-soft); }
+.account-avatar{
+  width:42px; height:42px; border-radius:50%;
+  background:var(--surface-secondary);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--accent); flex:none;
+}
+.account-avatar svg{ width:20px; height:20px; }
+.account-name{ font-weight:700; font-size:14px; }
+.account-phone{ font-size:12.5px; color:var(--text-secondary); }
+
+.account-nav{ display:flex; flex-direction:column; gap:2px; }
+.account-nav-link{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:var(--radius-s);
+  font-size:13.5px; font-weight:600; color:var(--text-secondary);
+  text-decoration:none; border:0; background:none; cursor:pointer; text-align:left;
+  width:100%;
+}
+.account-nav-link svg{ width:17px; height:17px; flex:none; }
+.account-nav-link:hover{ background:var(--surface-secondary); color:var(--text-primary); }
+.account-nav-link.active{ background:var(--surface-secondary); color:var(--accent-strong); }
+.account-logout{ margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft); color:#c05a4a; }
+
+.account-panel{
+  background:var(--surface);
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-m);
+  padding:28px;
+  min-height:320px;
+}
+.account-panel-title{ font-size:20px; margin-bottom:6px; }
+.account-panel-sub{ font-size:13.5px; color:var(--text-secondary); margin-bottom:22px; }
+
+.account-info-grid{ display:flex; flex-direction:column; border-top:1px solid var(--border-soft); }
+.account-info-row{
+  display:flex; justify-content:space-between; gap:16px;
+  padding:14px 0; border-bottom:1px solid var(--border-soft);
+  font-size:13.5px;
+}
+.account-info-row span{ color:var(--text-secondary); }
+.account-cta-row{ display:flex; gap:12px; margin-top:24px; flex-wrap:wrap; }
+
+.account-tabs{ display:flex; gap:6px; margin-bottom:22px; border-bottom:1px solid var(--border-soft); }
+.account-tab{
+  background:none; border:0; cursor:pointer;
+  padding:10px 4px; margin-right:18px;
+  font-size:13.5px; font-weight:700; color:var(--text-secondary);
+  border-bottom:2px solid transparent;
+}
+.account-tab.active{ color:var(--accent-strong); border-bottom-color:var(--accent); }
+
+.account-loading, .account-empty{ text-align:center; padding:40px 10px; color:var(--text-secondary); }
+.account-empty .btn{ margin-top:14px; }
+
+.booking-history-list{ display:flex; flex-direction:column; gap:14px; }
+.booking-history-card{ border:1px solid var(--border-soft); border-radius:var(--radius-s); padding:16px; }
+.booking-history-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+.booking-ref{ font-weight:700; font-size:14px; }
+.booking-history-items{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; }
+.booking-history-items li{ display:flex; justify-content:space-between; gap:10px; font-size:13px; }
+
+.form-success{ color:#2f8f5b; font-size:13px; line-height:1.5; }
+
+/* ---------------- Google-only customer authentication ---------------- */
+.google-auth-content{ text-align:center; }
+.google-auth-icon{
+  width:52px; height:52px; margin:0 auto 16px;
+  border:1px solid var(--border-soft);
+  border-radius:50%; background:var(--background);
+  display:flex; align-items:center; justify-content:center;
+}
+.google-auth-icon svg{ width:24px; height:24px; }
+.google-auth-content h2{ font-size:20px; margin:0 0 8px; }
+.google-auth-copy{ font-size:13.5px; line-height:1.55; color:var(--text-secondary); margin:0 auto 22px; max-width:330px; }
+.google-signin-btn{ display:flex; align-items:center; justify-content:center; gap:10px; }
+.google-signin-btn svg{ flex:none; width:18px; height:18px; background:#fff; border-radius:50%; padding:1px; box-sizing:content-box; }

@@ -1,0 +1,87 @@
+/* ===========================================================
+   NEXT LEVEL EVENTS — Responsive rules
+   Mobile-first base lives in style.css; this file scales up.
+   =========================================================== */
+
+/* Small phones fine-tune */
+@media (max-width:374px){
+  .container{ padding:0 16px; }
+  .type-grid{ gap:8px; }
+}
+
+/* Tablet — 600px+ */
+@media (min-width:600px){
+  .type-grid{ grid-template-columns:repeat(3,1fr); }
+  .type-card:nth-child(1),.type-card:nth-child(4){ grid-column:span 1; aspect-ratio:3/4; }
+  .pkg-grid{ grid-template-columns:repeat(2,1fr); }
+  .why-grid{ grid-template-columns:repeat(2,1fr); }
+  .why-item{ border-right:1px solid var(--border-soft); padding-right:20px; }
+  .why-item:nth-child(2n){ border-right:none; padding-right:0; }
+  .footer-cols{ grid-template-columns:repeat(3,1fr); }
+  .stat-row{ padding:44px 0; }
+  .event-type-grid{ grid-template-columns:repeat(3,1fr); }
+  .gal-grid{ grid-template-columns:repeat(3,1fr); }
+}
+
+/* Desktop — 900px+ (content/grids scale up here; the header itself keeps
+   the compact tablet chrome a little longer — see the 1180px block below —
+   because the full wordmark + nav links + search bar need the extra room
+   to avoid overlapping/overflowing) */
+@media (min-width:900px){
+  .hero{ min-height:88vh; }
+  .hero-content{ padding-bottom:80px; }
+
+  .section{ padding:110px 0; }
+  .section-tight{ padding:70px 0; }
+  .section-head{ flex-direction:row; align-items:flex-end; justify-content:space-between; }
+
+  .type-grid{ grid-template-columns:repeat(6,1fr); gap:14px; }
+  .type-card:nth-child(1),.type-card:nth-child(4){ grid-column:span 2; }
+
+  .pkg-grid{ grid-template-columns:repeat(3,1fr); gap:26px; }
+
+  .why-grid{ grid-template-columns:repeat(4,1fr); }
+  .why-item{ flex-direction:column; gap:16px; }
+  .why-item:not(:nth-child(4n)){ border-right:1px solid var(--border-soft); padding-right:20px; }
+  .why-item:nth-child(4n){ border-right:none; padding-right:0; }
+
+  .footer-top{ flex-direction:row; justify-content:space-between; }
+  .footer-brand{ max-width:320px; }
+  .footer-cols{ flex:1; margin-left:60px; }
+  .footer-bottom{ flex-direction:row; justify-content:space-between; }
+
+  .service-item{ grid-template-columns:1.1fr 1fr; gap:50px; }
+  .service-item:nth-child(even) .s-media{ order:1; }
+
+  .process-row{ flex-direction:row; }
+  .process-step{ flex-direction:column; border-bottom:none; border-right:1px solid var(--border-soft); padding:0 22px; }
+  .process-step:last-child{ border-right:none; }
+  .process-step:first-child{ padding-left:0; }
+
+  .form-row-2{ grid-template-columns:1fr 1fr; }
+
+  .gal-grid{ grid-template-columns:repeat(4,1fr); }
+
+  .stat-row{ padding:60px 0; }
+
+  .bottom-cta{ display:none; }
+
+  #packageDetailsGrid{ grid-template-columns:1.3fr .8fr; align-items:start; }
+  .summary-box{ position:sticky; top:calc(var(--nav-h) + 16px); }
+
+  .about-story-grid{ grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
+  .contact-grid{ grid-template-columns:.9fr 1.1fr; gap:60px; }
+}
+
+@media (min-width:1180px){
+  .hero h1{ font-size:96px; }
+
+  /* Full desktop nav switch. Kept at this wider breakpoint (rather than
+     900px) because the wordmark + city select + nav links + search bar +
+     cart/CTA don't all fit in the 900–1179px range without crowding or
+     overflowing — the compact tablet header handles that range instead. */
+  :root{ --nav-h:76px; }
+  .nav-links{ display:flex; }
+  .hamburger{ display:none; }
+  .nav-cta{ display:inline-flex; }
+}

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /booking-success
+Disallow: /admin
+
+Sitemap: https://nextlevelevents.in/sitemap.xml

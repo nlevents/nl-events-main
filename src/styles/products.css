@@ -1,0 +1,93 @@
+/* ===========================================================
+   PRODUCTS PAGE — Flipkart-inspired banner, category rail & spotlight grid
+   Uses the same design tokens as style.css (colors, radius, fonts).
+   =========================================================== */
+
+.fk-products-page{ padding-top:8px; }
+
+/* ---------- Banner slider ---------- */
+.fk-banner{
+  position:relative; overflow:hidden; border-radius:var(--radius-m);
+  border:1px solid var(--border-soft); margin:0 0 28px;
+}
+.fk-banner-track{ display:flex; transition:transform .5s ease; }
+.fk-banner-slide{
+  flex:0 0 100%; display:flex; align-items:center; justify-content:space-between; gap:16px;
+  min-height:180px; padding:24px 28px; text-decoration:none; color:var(--text-primary);
+}
+.fk-banner-copy{ max-width:60%; }
+.fk-banner-eyebrow{
+  display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--accent); margin-bottom:6px;
+}
+.fk-banner-copy h3{ font-size:clamp(20px,3.4vw,30px); line-height:1.15; margin:0 0 6px; }
+.fk-banner-copy p{ color:var(--text-secondary); font-size:14px; margin:0; }
+.fk-banner-media{ flex:0 0 auto; width:34%; max-width:220px; }
+.fk-banner-media img{ width:100%; height:auto; display:block; border-radius:var(--radius-s); object-fit:cover; }
+.fk-banner-arrow{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:2;
+  width:36px; height:36px; border-radius:50%; border:1px solid var(--border-soft);
+  background:var(--surface); color:var(--text-primary); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; box-shadow:var(--shadow);
+}
+.fk-banner-arrow svg{ width:18px; height:18px; }
+.fk-banner-prev{ left:10px; }
+.fk-banner-next{ right:10px; }
+.fk-banner-dots{ position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px; z-index:2; }
+.fk-banner-dot{ width:7px; height:7px; border-radius:50%; border:0; background:var(--border); cursor:pointer; padding:0; }
+.fk-banner-dot.active{ background:var(--accent); width:18px; border-radius:4px; }
+@media (max-width:640px){
+  .fk-banner-slide{ min-height:150px; padding:18px; }
+  .fk-banner-copy{ max-width:56%; }
+  .fk-banner-media{ width:38%; }
+}
+
+/* ---------- Category icon row ---------- */
+.fk-cat-row{
+  display:flex; gap:22px; overflow-x:auto; padding:6px 2px 22px; margin-bottom:6px;
+  border-bottom:1px solid var(--border-soft); scrollbar-width:none;
+}
+.fk-cat-row::-webkit-scrollbar{ display:none; }
+.fk-cat-item{
+  flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:8px;
+  width:76px; text-decoration:none; color:var(--text-primary); font-size:12px; font-weight:600; text-align:center;
+}
+.fk-cat-icon{
+  width:56px; height:56px; border-radius:50%; overflow:hidden; border:1px solid var(--border-soft);
+  background:var(--surface); display:block; transition:transform .25s ease;
+}
+.fk-cat-icon img{ width:100%; height:100%; object-fit:cover; }
+.fk-cat-item:hover .fk-cat-icon{ transform:translateY(-3px); border-color:var(--accent); }
+
+/* ---------- Section headers ---------- */
+.fk-section-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:30px 0 16px; }
+.fk-section-head h2{ font-size:21px; }
+.fk-section-head--filters{ flex-wrap:wrap; }
+.fk-filters{ display:flex; gap:8px; flex-wrap:wrap; }
+.fk-filters select{
+  padding:9px 12px; font-size:12.5px; font-weight:600; border-radius:var(--radius-s);
+  border:1px solid var(--border-soft); background:var(--surface); color:var(--text-primary); cursor:pointer;
+}
+
+/* ---------- "On everybody's list" spotlight grid ---------- */
+.fk-spot-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+.fk-spot-card{ display:flex; flex-direction:column; gap:10px; text-decoration:none; color:var(--text-primary); }
+.fk-spot-pic{
+  position:relative; display:block; aspect-ratio:1/1; border-radius:var(--radius-m); overflow:hidden;
+  border:1px solid var(--border-soft); background:var(--surface);
+}
+.fk-spot-pic img{ width:100%; height:100%; object-fit:cover; transition:transform .5s ease; }
+.fk-spot-card:hover .fk-spot-pic img{ transform:scale(1.05); }
+.fk-spot-pill{
+  position:absolute; left:10px; bottom:10px; padding:5px 10px; border-radius:999px;
+  font-size:11px; font-weight:800; letter-spacing:.02em; color:#fff;
+  background:linear-gradient(120deg,var(--accent),#7c3aed);
+}
+.fk-spot-cap{ display:flex; flex-direction:column; gap:2px; padding:0 2px; }
+.fk-spot-cap em{ font-style:normal; font-size:12px; color:var(--text-secondary); }
+.fk-spot-cap b{ font-size:14.5px; }
+
+.fk-empty{ color:var(--text-secondary); padding:24px 0; }
+
+@media (min-width:640px){ .fk-spot-grid{ grid-template-columns:repeat(4,1fr); } }
+@media (min-width:960px){ .fk-cat-row{ gap:30px; } }

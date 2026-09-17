@@ -1,0 +1,340 @@
+/* ===========================================================
+   Chatbot — premium event-planning assistant
+   Launcher, panel, guided-option chips, product cards, bubbles.
+   =========================================================== */
+
+/* ---------- Desktop floating launcher ---------- */
+/* Hidden below 1180px — the bottom-nav (its own "Assistant" button) is used
+   on mobile/tablet instead; see the media rule in shop.css that hides
+   .bottom-nav above 1180px. */
+.chat-launcher{
+  display:none;
+  position:fixed; z-index:240; right:22px; bottom:22px;
+  width:60px; height:60px; border-radius:50%;
+  align-items:center; justify-content:center;
+  background:transparent;
+  color:var(--accent-contrast); border:0; padding:0;
+  box-shadow:0 16px 34px -10px rgba(3,21,45,.4), 0 4px 14px rgba(3,21,45,.2);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease;
+  animation:chatLauncherIn .5s cubic-bezier(.34,1.56,.64,1);
+}
+.chat-launcher-ring{
+  position:absolute; inset:-6px; border-radius:50%;
+  border:1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  animation:chatRingPulse 2.8s ease-out infinite;
+  pointer-events:none;
+}
+.chat-launcher-icon{ display:flex; z-index:1; width:100%; height:100%; border-radius:50%; }
+.chat-launcher-icon svg{ width:27px; height:27px; }
+.chat-launcher-sparkle{
+  position:absolute; top:-3px; right:-2px; width:17px; height:17px;
+  display:flex; align-items:center; justify-content:center; border-radius:50%;
+  background:var(--surface); color:var(--accent); box-shadow:0 2px 6px rgba(3,21,45,.25);
+  animation:chatSparkleTwinkle 3.4s ease-in-out infinite;
+}
+.chat-launcher-sparkle svg{ width:10px; height:10px; }
+.chat-launcher:hover{ transform:translateY(-3px) scale(1.03); box-shadow:0 20px 40px -10px rgba(3,21,45,.45); }
+.chat-launcher:active{ transform:scale(.94); }
+.chat-launcher.is-active .chat-launcher-ring{ animation-play-state:paused; opacity:0; }
+@media (min-width:1180px){
+  .chat-launcher{ display:flex; }
+}
+@media (prefers-reduced-motion: reduce){
+  .chat-launcher, .chat-launcher-ring, .chat-launcher-sparkle{ animation:none; }
+}
+
+@keyframes chatLauncherIn{
+  0%{ transform:scale(0) rotate(-25deg); opacity:0; }
+  100%{ transform:scale(1) rotate(0); opacity:1; }
+}
+@keyframes chatRingPulse{
+  0%{ transform:scale(1); opacity:.55; }
+  75%{ transform:scale(1.35); opacity:0; }
+  100%{ transform:scale(1.35); opacity:0; }
+}
+@keyframes chatSparkleTwinkle{
+  0%, 100%{ transform:scale(1); opacity:1; }
+  50%{ transform:scale(1.25); opacity:.7; }
+}
+
+/* ---------- Panel shell ---------- */
+.chat-backdrop{
+  position:fixed; inset:0; z-index:460; background:rgba(3,21,45,.55);
+  display:flex; align-items:flex-end; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .3s ease;
+}
+.chat-backdrop.is-open{ opacity:1; pointer-events:auto; }
+
+.chat-panel{
+  background:var(--surface); width:100%; max-width:430px;
+  border-radius:22px 22px 0 0;
+  border:1px solid var(--border-soft); border-bottom:none;
+  display:flex; flex-direction:column;
+  height:min(82vh, 660px);
+  transform:translateY(30px); transition:transform .35s cubic-bezier(.7,0,.2,1);
+  overflow:hidden;
+}
+.chat-backdrop.is-open .chat-panel{ transform:translateY(0); }
+
+@media (min-width:1180px){
+  .chat-backdrop{ align-items:flex-end; justify-content:flex-end; padding:0 22px 96px 0; background:transparent; }
+  .chat-panel{
+    border-radius:22px; border-bottom:1px solid var(--border-soft);
+    height:min(74vh, 620px);
+    box-shadow:0 32px 64px -18px rgba(3,21,45,.42), 0 8px 26px rgba(3,21,45,.16);
+  }
+}
+
+/* ---------- Header ---------- */
+.chat-head{
+  display:flex; flex-direction:column; flex-shrink:0;
+  border-bottom:1px solid var(--border-soft);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface));
+}
+.chat-head-row{
+  display:flex; align-items:center; gap:10px;
+  padding:14px 12px 13px;
+}
+.chat-head-avatar{
+  width:38px; height:38px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(155deg, var(--accent-strong), var(--accent)); color:var(--accent-contrast);
+}
+.chat-head-avatar svg{ width:21px; height:21px; }
+.chat-head-title{ display:flex; flex-direction:column; flex:1; min-width:0; }
+.chat-head-title strong{ font-size:14.5px; color:var(--text-primary); display:flex; align-items:center; gap:4px; }
+.chat-head-sparkle{ font-size:12px; }
+.chat-head-title span{ font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:5px; }
+.chat-head-dot{
+  width:6px; height:6px; border-radius:50%; background:#3fbf6a; display:inline-block;
+  box-shadow:0 0 0 0 rgba(63,191,106,.6); animation:chatDotPulse 2s ease-in-out infinite;
+}
+@keyframes chatDotPulse{
+  0%,100%{ box-shadow:0 0 0 0 rgba(63,191,106,.5); }
+  50%{ box-shadow:0 0 0 3px rgba(63,191,106,0); }
+}
+.chat-head-btn{
+  width:32px; height:32px; border-radius:50%; border:0; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent; color:var(--text-secondary);
+  transition:background .15s ease, color .15s ease, transform .15s ease;
+}
+.chat-head-btn svg{ width:16px; height:16px; }
+.chat-head-btn:hover{ background:color-mix(in srgb, var(--accent) 12%, transparent); color:var(--accent); }
+.chat-head-btn:active{ transform:scale(.9); }
+.chat-head-close svg{ width:15px; height:15px; }
+
+/* ---------- Guided-flow progress bar ---------- */
+.chat-progress{ display:flex; gap:5px; padding:0 14px 12px; }
+.chat-progress-seg{
+  flex:1; height:4px; border-radius:999px;
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+  overflow:hidden; position:relative;
+}
+.chat-progress-seg.is-filled{ background:var(--accent); }
+.chat-progress-seg.is-filled::after{
+  content:""; position:absolute; inset:0; border-radius:999px;
+  animation:chatProgressIn .35s ease both;
+}
+
+/* ---------- Brand-gold "genie" avatar (launcher, header, bottom nav, bubbles) ----------
+   One fixed, on-brand gold gradient + a crisp vector sparkle (Icon "sparkle"),
+   reused everywhere via .chat-genie-blob / .chat-genie-icon at four sizes
+   (default / --sm / --xs). Deliberately NOT the ✨ emoji glyph: emoji glyphs
+   render as a different picture per OS/browser (Android vs Windows vs
+   iOS/macOS), which is what made the mark look like "a different logo"
+   between the bottom nav, the opened chat, and the desktop launcher. An SVG
+   renders pixel-identical everywhere, so the same badge now looks the same
+   on every screen and every platform. */
+.chat-genie-blob{
+  position:relative; width:100%; height:100%; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  background:linear-gradient(155deg, var(--accent-strong), var(--accent) 55%, #e9c876);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
+}
+.chat-genie-blob::before{
+  content:""; position:absolute; inset:-30%;
+  background:conic-gradient(from 0deg, rgba(255,255,255,.32), transparent 30%, transparent 70%, rgba(255,255,255,.2));
+  animation:chatGenieSpin 7s linear infinite;
+  mix-blend-mode:overlay;
+}
+.chat-genie-icon{
+  position:relative; z-index:1; width:52%; height:52%;
+  color:var(--accent-contrast);
+  filter:drop-shadow(0 1px 2px rgba(3,21,45,.35));
+  animation:chatGenieTwinkle 2.6s ease-in-out infinite;
+}
+.chat-genie-icon svg{ width:100%; height:100%; display:block; }
+.chat-head-avatar--genie{ background:none; }
+.chat-genie-blob--sm{ width:22px; height:22px; }
+@keyframes chatGenieSpin{
+  from{ transform:rotate(0deg); }
+  to{ transform:rotate(360deg); }
+}
+@keyframes chatGenieTwinkle{
+  0%,100%{ transform:scale(1); opacity:1; }
+  50%{ transform:scale(1.1); opacity:.85; }
+}
+@keyframes chatProgressIn{
+  0%{ transform:scaleX(0); transform-origin:left; }
+  100%{ transform:scaleX(1); transform-origin:left; }
+}
+@media (prefers-reduced-motion: reduce){
+  .chat-genie-blob::before, .chat-genie-icon{ animation:none; }
+}
+
+/* ---------- Messages ---------- */
+.chat-messages{
+  flex:1; overflow-y:auto; padding:16px 14px 10px; display:flex; flex-direction:column; gap:14px;
+  background:color-mix(in srgb, var(--surface-secondary) 45%, transparent);
+  scroll-behavior:smooth;
+}
+
+.chat-row{ display:flex; gap:8px; align-items:flex-start; }
+.chat-row--user{ justify-content:flex-end; }
+.chat-row--enter{ animation:chatRowIn .32s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes chatRowIn{
+  0%{ opacity:0; transform:translateY(8px); }
+  100%{ opacity:1; transform:translateY(0); }
+}
+@media (prefers-reduced-motion: reduce){
+  .chat-row--enter{ animation:none; }
+}
+
+.chat-avatar{
+  width:27px; height:27px; border-radius:50%; flex-shrink:0; margin-top:2px;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(155deg, var(--accent-strong), var(--accent)); color:var(--accent-contrast);
+}
+.chat-avatar svg{ width:15px; height:15px; }
+.chat-avatar--genie{ background:none; }
+.chat-genie-blob--xs{ width:100%; height:100%; }
+
+.chat-bubble-wrap{ display:flex; flex-direction:column; gap:9px; max-width:86%; }
+.chat-row--user .chat-bubble-wrap{ max-width:82%; }
+
+.chat-bubble{
+  padding:10px 13px; border-radius:16px; font-size:13.5px; line-height:1.5;
+}
+.chat-bubble p{ margin:0; white-space:pre-wrap; }
+.chat-bubble--question p{ font-size:15px; font-weight:700; line-height:1.3; }
+.chat-bubble p + p{ margin-top:6px; }
+.chat-bubble-eyebrow{
+  display:block; font-size:11.5px; font-weight:600;
+  color:var(--accent); margin-bottom:3px;
+}
+.chat-bubble--bot{
+  background:var(--surface); border:1px solid var(--border-soft);
+  color:var(--text-primary); border-bottom-left-radius:4px;
+  box-shadow:0 1px 2px rgba(3,21,45,.04);
+}
+.chat-bubble--user{
+  background:linear-gradient(155deg, var(--accent-strong), var(--accent)); color:var(--accent-contrast);
+  border-bottom-right-radius:4px;
+}
+
+.chat-typing{ display:flex; gap:4px; align-items:center; padding:12px 14px; }
+.chat-typing span{
+  width:6px; height:6px; border-radius:50%; background:var(--text-secondary);
+  opacity:.5; animation:chatTyping 1s ease-in-out infinite;
+}
+.chat-typing span:nth-child(2){ animation-delay:.15s; }
+.chat-typing span:nth-child(3){ animation-delay:.3s; }
+@keyframes chatTyping{
+  0%, 60%, 100%{ transform:translateY(0); opacity:.5; }
+  30%{ transform:translateY(-3px); opacity:1; }
+}
+
+/* ---------- Guided options (quick replies) ---------- */
+.chat-options{ display:flex; flex-wrap:wrap; gap:7px; }
+.chat-opt{
+  display:inline-flex; align-items:center; padding:7px 13px; border-radius:999px;
+  border:1.3px solid var(--accent); color:var(--accent); font-size:12.3px; font-weight:600;
+  background:color-mix(in srgb, var(--accent) 6%, transparent);
+  transition:background .15s ease, color .15s ease, transform .12s ease, box-shadow .15s ease;
+  white-space:nowrap; cursor:pointer;
+}
+.chat-opt:hover{ background:var(--accent); color:var(--accent-contrast); box-shadow:0 4px 12px -4px color-mix(in srgb, var(--accent) 60%, transparent); }
+.chat-opt:active{ transform:scale(.96); }
+.chat-opt--wa{ border-color:#25D366; color:#128c4a; background:rgba(37,211,102,.08); }
+.chat-opt--wa:hover{ background:#25D366; color:#fff; }
+
+/* Grid layout used for Step 1–3 guided options (emoji tiles, 2 columns) —
+   mirrors the "pick a card" pattern used by conversational planners. */
+.chat-options--grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%;
+}
+.chat-opt--tile{
+  display:flex; align-items:center; gap:8px; justify-content:flex-start;
+  padding:10px 12px; border-radius:14px; white-space:normal; text-align:left;
+  border:1.3px solid var(--border-soft); background:var(--surface); color:var(--text-primary);
+  font-size:12.8px; font-weight:600;
+}
+.chat-opt--tile:hover{
+  border-color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color:var(--text-primary); box-shadow:0 4px 12px -6px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.chat-opt-emoji{ font-size:17px; line-height:1; flex-shrink:0; }
+.chat-opt-label{ line-height:1.25; }
+
+.chat-skip{
+  align-self:center; margin-top:2px; border:0; background:none; cursor:pointer;
+  font-size:12px; font-weight:600; color:var(--text-secondary);
+  transition:color .15s ease;
+}
+.chat-skip:hover{ color:var(--accent); text-decoration:underline; }
+
+/* ---------- Product recommendation cards ---------- */
+.chat-products{
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px;
+}
+.chat-product{
+  display:flex; flex-direction:column; border-radius:12px; overflow:hidden;
+  border:1px solid var(--border-soft); background:var(--surface);
+  transition:transform .15s ease, box-shadow .15s ease; color:inherit;
+}
+.chat-product:hover{ transform:translateY(-2px); box-shadow:0 10px 22px -12px rgba(3,21,45,.35); }
+.chat-product-img{ position:relative; display:block; aspect-ratio:4/3; background:var(--surface-secondary); overflow:hidden; }
+.chat-product-img img{ width:100%; height:100%; object-fit:cover; display:block; }
+.chat-product-badge{
+  position:absolute; top:5px; left:5px; padding:2px 6px; border-radius:999px;
+  background:var(--accent); color:var(--accent-contrast); font-size:9px; font-weight:700;
+}
+.chat-product-info{ padding:7px 8px 9px; display:flex; flex-direction:column; gap:2px; }
+.chat-product-name{ font-size:11.5px; font-weight:600; line-height:1.3; color:var(--text-primary); }
+.chat-product-price{ font-size:12px; font-weight:700; color:var(--accent-strong); display:flex; align-items:baseline; gap:5px; }
+.chat-product-strike{ font-size:10px; font-weight:500; color:var(--text-secondary); text-decoration:line-through; }
+
+/* ---------- Input row ---------- */
+.chat-input-row{
+  display:flex; align-items:center; gap:8px; padding:12px; border-top:1px solid var(--border-soft);
+  flex-shrink:0; background:var(--surface);
+}
+.chat-input{
+  flex:1; border:1px solid var(--border-soft); border-radius:999px; padding:10px 16px;
+  background:var(--surface-secondary); color:var(--text-primary); font-size:13.5px;
+}
+.chat-input:focus{ outline:none; border-color:var(--accent); }
+.chat-send-btn{
+  width:38px; height:38px; border-radius:50%; border:0; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(155deg, var(--accent-strong), var(--accent)); color:var(--accent-contrast);
+  transition:opacity .15s ease, transform .15s ease;
+}
+.chat-send-btn svg{ width:17px; height:17px; }
+.chat-send-btn:disabled{ opacity:.4; cursor:default; }
+.chat-send-btn:not(:disabled):active{ transform:scale(.92); }
+
+/* The chatbot's bottom-nav entry is a <button>, unlike its sibling <Link>s —
+   reset only the button chrome (background/border), not typography: the
+   global `button{ font-family:inherit }` rule plus .bottom-nav-link's own
+   font-size/weight already match the other nav items exactly. Using the
+   `font` shorthand here would silently reset font-size/weight too and make
+   this label render at a different size than the rest. */
+.bottom-nav-link[type="button"]{ background:transparent; border:0; }
+
+@media (max-width:400px){
+  .chat-products{ grid-template-columns:1fr 1fr; }
+  .chat-panel{ max-width:100%; height:100dvh; border-radius:0; }
+  .chat-backdrop{ align-items:stretch; }
+}
