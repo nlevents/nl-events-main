@@ -75,7 +75,7 @@ export default function AdminInquiries() {
   useEffect(() => { refresh(); const timer = setInterval(refresh, 15000); return () => clearInterval(timer); }, []);
 
   const inquiries = useMemo(() => records.filter((r) => r.source === "contact"), [records]);
-  const leads = useMemo(() => records.filter((r) => r.source !== "contact" && r.source !== "booking"), [records]);
+  const leads = useMemo(() => records.filter((r) => r.source !== "contact" && r.source !== "booking" && r.source !== "landing"), [records]);
   const bookings = useMemo(() => records.filter((r) => r.source === "booking"), [records]);
   const visible = tab === "inquiries" ? inquiries : tab === "leads" ? leads : bookings;
   const filtered = tab === "leads" && stage !== "all" ? visible.filter((r) => r.status === stage) : visible;

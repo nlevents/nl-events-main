@@ -26,6 +26,7 @@ const NAV_GROUPS = [
     title: "Sales & Bookings",
     items: [
       { to: "/admin/inquiries", label: "CRM", icon: "user" },
+      { to: "/admin/landing-inquiries", label: "Landing Inquiries", icon: "send" },
       { to: "/admin/availability", label: "Calendar & Blackout", icon: "calendar" },
       { to: "/admin/coupons", label: "Coupons & Promos", icon: "percent" },
       { to: "/admin/clients", label: "Clients", icon: "user" },

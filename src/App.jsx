@@ -10,6 +10,7 @@ import { AdminAuthProvider } from "./context/AdminAuthContext";
 
 // Route-level code splitting: each page is fetched only when visited,
 // keeping the initial JS payload small.
+const Landing = lazy(() => import("./pages/Landing"));
 const Home = lazy(() => import("./pages/Home"));
 const Services = lazy(() => import("./pages/Services"));
 const Products = lazy(() => import("./pages/Products"));
@@ -43,6 +44,7 @@ const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons"));
 const AdminAddons = lazy(() => import("./pages/admin/AdminAddons"));
 const AdminAvailability = lazy(() => import("./pages/admin/AdminAvailability"));
 const AdminInquiries = lazy(() => import("./pages/admin/AdminInquiries"));
+const AdminLandingInquiries = lazy(() => import("./pages/admin/AdminLandingInquiries"));
 const AdminClients = lazy(() => import("./pages/admin/AdminClients"));
 const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
 const AdminInvoiceForm = lazy(() => import("./pages/admin/AdminInvoiceForm"));
@@ -78,6 +80,7 @@ export default function App() {
                     <Route path="addons/products/:id/edit" element={<AdminProductForm />} />
                     <Route path="availability" element={<AdminAvailability />} />
                     <Route path="inquiries" element={<AdminInquiries />} />
+                    <Route path="landing-inquiries" element={<AdminLandingInquiries />} />
                     <Route path="clients" element={<AdminClients />} />
                     <Route path="invoices" element={<AdminInvoices />} />
                     <Route path="invoices/new" element={<AdminInvoiceForm />} />
@@ -85,6 +88,7 @@ export default function App() {
                     <Route path="invoices/:id/edit" element={<AdminInvoiceForm />} />
                     <Route path="settings" element={<AdminSettings />} />
                   </Route>
+                  <Route path="/landing" element={<Landing />} />
                   <Route element={<Layout />}>
                     <Route path="/" element={<Home />} />
                     <Route path="/services" element={<Services />} />

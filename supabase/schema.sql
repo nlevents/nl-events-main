@@ -76,7 +76,8 @@ create table if not exists public.inquiries (
   id uuid primary key default gen_random_uuid(),
   name text not null default '',
   phone text not null default '',
-  email text not null default '', -- legacy field; public inquiry form no longer collects email
+  email text not null default '',
+  whatsapp_number text not null default '',
   city text not null default '',
   event_type text not null default '',
   event_date date null,
@@ -151,6 +152,7 @@ create index if not exists booking_notifications_status_idx on public.booking_no
 alter table public.booking_notifications enable row level security;
 
 -- Inquiry CRM fields and accounting linkage for the final inquiry flow.
+alter table public.inquiries add column if not exists whatsapp_number text not null default '';
 alter table public.inquiries add column if not exists event_time text not null default '';
 alter table public.inquiries add column if not exists event_venue text not null default '';
 alter table public.inquiries add column if not exists event_location text not null default '';

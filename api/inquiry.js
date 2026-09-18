@@ -3,7 +3,8 @@ import { notifyInquiry } from "./bookingNotifications.js";
 import { rateLimit, isHoneypotTriggered } from "../shared/utils/security.js";
 
 function clean(value, max) { return String(value ?? "").trim().slice(0, max); }
-const EVENT_TYPES = new Set(["Wedding", "Birthday", "Corporate", "Festive Events", "Others", "Birthday Party", "Wedding Ceremony", "Reception", "Anniversary", "Baby Shower", "Naming Ceremony", "Corporate Event", "Custom Celebration"]);
+const EVENT_TYPES = new Set(["Wedding", "Birthday", "Corporate", "Festive Events", "Others", "Birthday Party", "Wedding Ceremony", "Reception", "Anniversary", "Baby Shower", "Naming Ceremony", "Corporate Event", "Custom Celebration", "Birthday / Kitty Party", "Haldi / Mehendi / Sangeet", "Private Party", "Other"]);
+const LANDING_EVENT_TYPES = new Set(["Wedding", "Birthday / Kitty Party", "Corporate Event", "Haldi / Mehendi / Sangeet", "Anniversary", "Private Party", "Other"]);
 const STAGE = "new_lead";
 
 export default async function handler(req, res) {
@@ -21,6 +22,7 @@ export default async function handler(req, res) {
     const eventType = clean(body.eventType, 80);
     const eventDate = clean(body.eventDate, 10);
     const eventTime = clean(body.eventTime, 80);
+    const whatsapp = clean(body.whatsapp, 20);
     const eventVenue = clean(body.eventVenue, 160);
     const eventLocation = clean(body.eventLocation, 120);
     const guestCount = clean(body.guestCount, 60);
@@ -28,11 +30,15 @@ export default async function handler(req, res) {
     const source = clean(body.source, 30);
     const requestId = clean(body.requestId, 100);
     const isContact = source === "contact";
+    const isLanding = source === "landing";
 
-    if (!name || !/^\+?[0-9\s()\-.]{7,20}$/.test(phone) || !message) {
+    if (!name || !/^\+?[0-9\s()\-.]{7,20}$/.test(phone) || (!isLanding && !message)) {
       return res.status(400).json({ ok: false, error: "Please complete the required fields." });
     }
-    if (!isContact && (!EVENT_TYPES.has(eventType) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !eventLocation || !guestCount)) {
+    if (isLanding && (!LANDING_EVENT_TYPES.has(eventType) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !eventLocation || !guestCount)) {
+      return res.status(400).json({ ok: false, error: "Please complete all required inquiry details." });
+    }
+    if (!isContact && !isLanding && (!EVENT_TYPES.has(eventType) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !eventLocation || !guestCount)) {
       return res.status(400).json({ ok: false, error: "Please complete all required inquiry details." });
     }
 
@@ -55,7 +61,8 @@ export default async function handler(req, res) {
       body: {
         name,
         phone,
-        email: "",
+        email: clean(body.email, 160),
+        whatsapp_number: whatsapp,
         city: eventLocation,
         event_type: eventType || "General Inquiry",
         event_date: eventDate || null,
@@ -67,7 +74,7 @@ export default async function handler(req, res) {
         message,
         status: STAGE,
         admin_notes: "",
-        source: isContact ? "contact" : "inquiry",
+        source: isContact ? "contact" : isLanding ? "landing" : "inquiry",
         request_id: requestId || null,
       },
     });
