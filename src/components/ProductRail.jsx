@@ -44,11 +44,11 @@ export default function ProductRail({ title, viewAllHref, items, tone }) {
   return (
     <section className={"shop-section" + (tone === "surface" ? "" : "")} style={tone === "surface" ? { background: "var(--surface)" } : undefined}>
       <div className="container">
-        <div className="shop-head reveal">
+        <div className="shop-head">
           <h2>{title}</h2>
           {viewAllHref ? <Link to={viewAllHref}>See all</Link> : null}
         </div>
-        <div className="rail reveal">
+        <div className="rail">
           {canPrev && (
             <button type="button" className="rail-arrow rail-arrow-prev" aria-label="Scroll left" onClick={() => scrollBy(-1)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" /></svg>

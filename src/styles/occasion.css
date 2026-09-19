@@ -44,7 +44,7 @@
 
 /* ---------- Subcategory / theme cards ---------- */
 .occ-cat-grid{
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:18px;
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;
 }
 .occ-cat-card{
   display:flex; flex-direction:column; border:1px solid var(--border-soft); border-radius:var(--radius-m);
@@ -81,9 +81,9 @@
   background:var(--surface); color:var(--accent); box-shadow:0 2px 6px rgba(0,0,0,.15);
 }
 .occ-addon-icon svg{ width:16px; height:16px; }
-.occ-addon-body{ padding:14px 16px 16px; display:flex; flex-direction:column; gap:5px; }
-.occ-addon-body h4{ font-size:16.5px; font-family:var(--font-display); font-weight:500; }
-.occ-addon-body p{ color:var(--text-secondary); font-size:13px; line-height:1.5; }
+.occ-addon-body{ padding:10px 10px 12px; display:flex; flex-direction:column; gap:5px; }
+.occ-addon-body h4{ font-size:13px; line-height:1.35; font-family:var(--font-display); font-weight:600; }
+.occ-addon-body p{ color:var(--text-secondary); font-size:11.5px; line-height:1.4; }
 .occ-addon-price{
   margin-top:4px; font-size:12.5px; font-weight:700; letter-spacing:.02em; color:var(--accent);
 }
@@ -115,14 +115,20 @@
 
 /* ---------- Product listing cards ---------- */
 .occ-prod-grid{
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:20px;
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;
+}
+@media (min-width:600px) and (max-width:899px){
+  .occ-prod-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+}
+@media (min-width:900px){
+  .occ-prod-grid{ grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
 }
 .occ-prod-card{
   display:flex; flex-direction:column; border:1px solid var(--border-soft); border-radius:var(--radius-m);
   overflow:hidden; background:var(--surface); transition:border-color .3s ease, transform .3s ease;
 }
 .occ-prod-card:hover{ border-color:var(--border); transform:translateY(-2px); }
-.occ-prod-media{ position:relative; aspect-ratio:4/3; overflow:hidden; }
+.occ-prod-media{ position:relative; aspect-ratio:1.08/1; overflow:hidden; }
 .occ-prod-media img{ width:100%; height:100%; object-fit:cover; transition:transform .6s ease; }
 .occ-prod-card:hover .occ-prod-media img{ transform:scale(1.06); }
 .occ-prod-tag{
@@ -131,12 +137,12 @@
   color:var(--text-primary); font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
   padding:5px 10px; border-radius:30px; border:1px solid var(--border-soft);
 }
-.occ-prod-body{ padding:14px 16px 18px; display:flex; flex-direction:column; gap:6px; }
-.occ-prod-body h4{ font-size:15.5px; font-family:var(--font-display); font-weight:500; }
-.occ-prod-body p{ color:var(--text-secondary); font-size:13px; line-height:1.45; min-height:2.6em; }
+.occ-prod-body{ padding:10px 10px 12px; display:flex; flex-direction:column; gap:5px; }
+.occ-prod-body h4{ font-size:13px; line-height:1.35; font-family:var(--font-display); font-weight:600; }
+.occ-prod-body p{ color:var(--text-secondary); font-size:11.5px; line-height:1.4; min-height:2.6em; }
 .occ-prod-price{ display:flex; align-items:baseline; gap:8px; margin-top:4px; flex-wrap:wrap; }
-.occ-prod-price b{ font-family:var(--font-display); font-size:17px; color:var(--accent); }
-.occ-prod-price s{ font-size:12.5px; color:var(--text-secondary); opacity:.7; }
+.occ-prod-price b{ font-family:var(--font-display); font-size:14px; color:var(--accent); }
+.occ-prod-price s{ font-size:11px; color:var(--text-secondary); opacity:.7; }
 
 .occ-hero .hero-content p{ max-width:60ch; }
 
@@ -167,11 +173,149 @@
 .occ-prod-rating-badge svg{ width:11px; height:11px; }
 .occ-prod-reviews{ font-size:12px; color:var(--text-secondary); }
 .occ-prod-off{ font-size:12.5px; font-weight:700; color:#1a7f3c; }
-.occ-prod-avail{ font-size:12px; font-weight:600; color:var(--text-secondary); }
+.occ-prod-avail{ font-size:10.5px; font-weight:600; color:var(--text-secondary); }
 .occ-prod-avail.ok{ color:#1a7f3c; }
 .occ-prod-avail.limited{ color:#b8790a; }
 .occ-prod-actions{ display:flex; gap:8px; margin-top:8px; }
-.occ-prod-actions .occ-btn-sm{ flex:1; text-align:center; padding:9px 10px; font-size:12.5px; }
+.occ-prod-actions .occ-btn-sm{ flex:1; text-align:center; padding:7px 7px; font-size:11px; }
+
+
+/* ---------- Occasion listing marketplace card (reference layout) ---------- */
+.occ-prod-card--market{
+  border:1px solid #e9edf2;
+  border-radius:20px;
+  box-shadow:0 2px 10px rgba(15,23,42,.07);
+  transform:none;
+  background:#fff;
+}
+.occ-prod-card--market:hover{
+  border-color:#e1e6ec;
+  transform:translateY(-1px);
+  box-shadow:0 4px 14px rgba(15,23,42,.09);
+}
+.occ-prod-card--market .occ-prod-media{
+  aspect-ratio:1 / 1;
+  background:#f5f6f8;
+}
+.occ-prod-card--market .occ-prod-media img{
+  transition:none;
+}
+.occ-prod-card--market:hover .occ-prod-media img{
+  transform:none;
+}
+.occ-prod-card--market .occ-prod-body{
+  padding:14px 15px 16px;
+  gap:7px;
+}
+.occ-prod-card--market .occ-prod-title-link{
+  display:block;
+}
+.occ-prod-card--market .occ-prod-body h4{
+  font-family:var(--font-body);
+  font-size:16px;
+  line-height:1.35;
+  font-weight:600;
+  color:#172033;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  min-height:2.7em;
+}
+.occ-prod-card--market .occ-prod-rating{
+  gap:8px;
+}
+.occ-prod-card--market .occ-prod-rating-badge{
+  background:#0caf4b;
+  font-size:13px;
+  line-height:1;
+  padding:4px 8px;
+  border-radius:6px;
+}
+.occ-prod-card--market .occ-prod-rating-badge svg{
+  width:11px;
+  height:11px;
+}
+.occ-prod-card--market .occ-prod-reviews{
+  font-size:13px;
+  color:#7a8494;
+}
+.occ-prod-card--market .occ-prod-price{
+  margin-top:2px;
+  gap:8px;
+  flex-wrap:nowrap;
+  align-items:center;
+}
+.occ-prod-card--market .occ-prod-price b{
+  font-family:var(--font-body);
+  font-size:20px;
+  line-height:1.15;
+  color:#172033;
+  font-weight:700;
+  white-space:nowrap;
+}
+.occ-prod-card--market .occ-prod-price s{
+  font-size:13px;
+  color:#8b93a0;
+  white-space:nowrap;
+}
+.occ-prod-card--market .occ-prod-off{
+  margin-left:auto;
+  background:#edf9f1;
+  color:#0a9843;
+  font-size:12px;
+  line-height:1;
+  font-weight:700;
+  padding:7px 9px;
+  border-radius:7px;
+  white-space:nowrap;
+}
+.occ-prod-card--market .occ-prod-avail,
+.occ-prod-card--market .occ-prod-actions{
+  display:none;
+}
+.occ-prod-card--market .occ-prod-quick{
+  display:none;
+}
+.occ-prod-card--market .occ-prod-discount{
+  display:none;
+}
+
+@media (max-width:599px){
+  .occ-prod-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+  }
+  .occ-prod-card--market{
+    border-radius:18px;
+  }
+  .occ-prod-card--market .occ-prod-body{
+    padding:11px 10px 12px;
+    gap:6px;
+  }
+  .occ-prod-card--market .occ-prod-body h4{
+    font-size:15px;
+    line-height:1.32;
+    min-height:2.64em;
+  }
+  .occ-prod-card--market .occ-prod-rating-badge{
+    font-size:12px;
+    padding:4px 7px;
+  }
+  .occ-prod-card--market .occ-prod-reviews{
+    font-size:12px;
+  }
+  .occ-prod-card--market .occ-prod-price b{
+    font-size:18px;
+  }
+  .occ-prod-card--market .occ-prod-price s{
+    font-size:12px;
+  }
+  .occ-prod-card--market .occ-prod-off{
+    font-size:11px;
+    padding:6px 7px;
+  }
+}
 
 /* ---------- Listing controls: sort + filters ---------- */
 .listing-controls{ margin-bottom:24px; }
@@ -205,7 +349,6 @@
 @media (min-width:900px){
   .occ-tile-grid{ grid-template-columns:repeat(3,1fr); }
   .occ-cat-grid{ grid-template-columns:repeat(4,1fr); }
-  .occ-prod-grid{ grid-template-columns:repeat(3,1fr); }
 }
 
 /* ===========================================================

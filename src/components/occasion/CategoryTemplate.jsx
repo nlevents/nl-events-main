@@ -6,7 +6,6 @@ import Breadcrumb from "./Breadcrumb";
 import CategoryCard from "./CategoryCard";
 import ProductCard from "./ProductCard";
 import OccasionQuickLinks from "./OccasionQuickLinks";
-import VenueRail, { getVenueForProduct } from "./VenueRail";
 import EventAddons from "./EventAddons";
 import HeroImageCarousel from "../HeroImageCarousel";
 import ListingControls from "./ListingControls";
@@ -29,13 +28,12 @@ export default function CategoryTemplate({ node, trail }) {
   const [priceFilter, setPriceFilter] = useState("all");
   const [cityOnly, setCityOnly] = useState(false);
   const [topRatedOnly, setTopRatedOnly] = useState(false);
-  const [venue, setVenue] = useState("all");
 
   usePageMeta(
     node.label + " — Shop by Occasion — Next Level Events",
     node.description || (node.label + " decor and packages from Next Level Events."),
   );
-  useReveal([node.slug, sortKey, priceFilter, cityOnly, topRatedOnly, venue]);
+  useReveal([node.slug, sortKey, priceFilter, cityOnly, topRatedOnly]);
 
   const crumbs = useMemo(() => {
     const items = [{ label: "Shop by Occasion", href: "/shop-by-occasion" }];
@@ -79,10 +77,6 @@ export default function CategoryTemplate({ node, trail }) {
 
   const visibleProducts = useMemo(() => {
     let list = products;
-    if (venue !== "all") list = list.filter((p) => {
-      const v = getVenueForProduct(p);
-      return v === venue || v === "all";
-    });
     if (priceFilter !== "all") {
       const bucket = PRICE_BUCKETS.find((b) => b.key === priceFilter);
       if (bucket) list = list.filter((p) => p.price >= bucket.min && p.price < bucket.max);
@@ -90,16 +84,13 @@ export default function CategoryTemplate({ node, trail }) {
     if (cityOnly) list = list.filter((p) => isAvailableInCity(p, city));
     if (topRatedOnly) list = list.filter((p) => (p.rating || 0) >= 4.7);
     return sortProducts(list, sortKey);
-  }, [products, priceFilter, cityOnly, topRatedOnly, sortKey, city, venue]);
+  }, [products, priceFilter, cityOnly, topRatedOnly, sortKey, city]);
 
   function resetFilters() {
     setPriceFilter("all");
     setCityOnly(false);
     setTopRatedOnly(false);
-    setVenue("all");
   }
-
-  const venueLabel = ({ home: "Home", banquet: "Banquet", resort: "Resort", rooftop: "Rooftop", "pool-area": "Pool Area", lawn: "Lawn", all: "All Venues" })[venue] || "All Venues";
 
   const filterDescriptors = useMemo(() => {
     const list = [];
@@ -155,12 +146,14 @@ export default function CategoryTemplate({ node, trail }) {
 
         <OccasionQuickLinks title={node.label + " Decoration Themes"} items={quickLinks} node={node} trail={trail} />
 
-        <VenueRail products={products} activeVenue={venue} onVenueChange={setVenue} imageFallback={node.image || node.heroImg} />
+        {!node.addonOnly && (
+          <EventAddons title="Add-ons Categories" occasionLabel={node.label} items={addonItems} />
+        )}
 
         {products.length > 0 && (
           <div className="occ-block">
             <div className="section-head reveal">
-              <h2>{venue === "all" ? (children.length > 0 ? "Featured Packages" : "Packages & Setups") : venueLabel + " Packages"}</h2>
+              <h2>{children.length > 0 ? "Featured Packages" : "Packages & Setups"}</h2>
               <p>{visibleProducts.length} option{visibleProducts.length === 1 ? "" : "s"} for {node.label.toLowerCase()}, fully customisable.</p>
             </div>
 
@@ -174,7 +167,7 @@ export default function CategoryTemplate({ node, trail }) {
 
             <div className="occ-prod-grid reveal">
               {visibleProducts.map((p) => (
-                <ProductCard key={p.slug} product={p} href={pathFor(p.__trail)} />
+                <ProductCard key={p.slug} product={p} href={pathFor(p.__trail)} variant="occasion-market" />
               ))}
             </div>
             {visibleProducts.length === 0 && (
@@ -205,10 +198,6 @@ export default function CategoryTemplate({ node, trail }) {
         <div className="reveal" style={{ marginTop: 32 }}>
           <Link to="/book-event" className="btn btn-primary">Enquire About {node.label}</Link>
         </div>
-
-        {!node.addonOnly && (
-          <EventAddons title="Popular Add-ons" occasionLabel={node.label} items={addonItems} />
-        )}
 
       </section>
     </>
