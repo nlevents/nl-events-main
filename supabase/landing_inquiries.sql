@@ -32,3 +32,9 @@ where table_schema = 'public'
   and table_name = 'inquiries'
   and column_name in ('whatsapp_number', 'source', 'lead_source', 'source_type')
 order by column_name;
+
+-- CRM functional fields
+alter table public.inquiries add column if not exists next_follow_up timestamptz null;
+alter table public.inquiries add column if not exists assigned_to_name text not null default '';
+create index if not exists inquiries_next_follow_up_idx on public.inquiries(next_follow_up);
+create index if not exists inquiries_source_idx on public.inquiries(source);

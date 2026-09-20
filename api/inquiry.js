@@ -6,6 +6,18 @@ function clean(value, max) { return String(value ?? "").trim().slice(0, max); }
 const EVENT_TYPES = new Set(["Wedding", "Birthday", "Corporate", "Festive Events", "Others", "Birthday Party", "Wedding Ceremony", "Reception", "Anniversary", "Baby Shower", "Naming Ceremony", "Corporate Event", "Custom Celebration", "Birthday / Kitty Party", "Haldi / Mehendi / Sangeet", "Private Party", "Other"]);
 const LANDING_EVENT_TYPES = new Set(["Wedding", "Birthday / Kitty Party", "Corporate Event", "Haldi / Mehendi / Sangeet", "Anniversary", "Private Party", "Other"]);
 const STAGE = "new_lead";
+const SOURCE_DETAILS = {
+  landing: "Landing Page",
+  contact: "Inquiry Form",
+  inquiry: "Inquiry Form",
+  website: "Website",
+  crm: "CRM",
+  product: "Product Page",
+};
+function detectSourceDetail(value) {
+  const raw = clean(value, 120);
+  return SOURCE_DETAILS[raw.toLowerCase()] || raw || "Inquiry Form";
+}
 const LEAD_SOURCES = new Set([
   "Website", "Meta Ads", "Google Ads", "Organic Social", "Google Organic",
   "WhatsApp", "Referral", "Venue", "Vendor", "Direct", "Repeat Client", "Other",
@@ -120,7 +132,7 @@ export default async function handler(req, res) {
         message,
         status: STAGE,
         admin_notes: "",
-        source: isContact ? "contact" : isLanding ? "landing" : "inquiry",
+        source: sourceDetail,
         lead_source: leadSource,
         source_type: "AUTO",
         request_id: requestId || null,

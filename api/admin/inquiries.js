@@ -11,6 +11,12 @@ function clean(value, max = 1000) { return String(value ?? "").trim().slice(0, m
 function normalizePhone(value) { return clean(value, 40).replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); }
 function normalizeEmail(value) { return clean(value, 160).toLowerCase(); }
 function isValidSource(value) { return LEAD_SOURCES.includes(value); }
+function cleanSource(value) { return clean(value, 120); }
+const SOURCE_DETAIL_ALIASES = { landing: "Landing Page", contact: "Inquiry Form", inquiry: "Inquiry Form", manual: "CRM", website: "Website", booking: "Booking" };
+function displaySource(value) {
+  const raw = cleanSource(value);
+  return SOURCE_DETAIL_ALIASES[raw.toLowerCase()] || raw;
+}
 
 async function auth(req, res) {
   const result = await requireAdmin(process.env, req.headers?.authorization);
@@ -46,7 +52,11 @@ export default async function handler(req, res) {
       const bookings = await db.query("bookings?select=*&order=created_at.desc", { method: "GET" });
       const bookingById = new Map((bookings || []).map((b) => [b.id, b]));
       const rows = (inquiries || []).map((row) => ({ ...row, booking: row.booking_id ? bookingById.get(row.booking_id) || null : null }));
-      return res.status(200).json({ ok: true, inquiries: rows, bookings: bookings || [], leadSources: LEAD_SOURCES });
+      const sourceDetails = Array.from(new Set([
+        "Landing Page", "Inquiry Form", "Product Page", "CRM", "Website", "Other",
+        ...(rows || []).map((row) => displaySource(row.source)).filter(Boolean),
+      ]));
+      return res.status(200).json({ ok: true, inquiries: rows, bookings: bookings || [], leadSources: LEAD_SOURCES, sourceDetails });
     }
 
     if (req.method === "POST") {
@@ -61,8 +71,9 @@ export default async function handler(req, res) {
       const budget = clean(body.budget, 80);
       const message = clean(body.message, 2000);
       const leadSource = clean(body.leadSource, 40);
+      const source = cleanSource(body.source || body.sourceDetail || "CRM");
 
-      if (!name || !/^\+?[0-9\s()\-.]{7,20}$/.test(phone) || !eventType || !eventLocation || !isValidSource(leadSource)) {
+      if (!name || !/^\+?[0-9\s()\-.]{7,20}$/.test(phone) || !eventType || !eventLocation || !source || !isValidSource(leadSource)) {
         return res.status(400).json({ ok: false, error: "Please complete the required lead fields." });
       }
       if (!EVENT_TYPES.includes(eventType)) return res.status(400).json({ ok: false, error: "Invalid event type." });
@@ -89,9 +100,11 @@ export default async function handler(req, res) {
           message,
           status: "new_lead",
           admin_notes: "",
-          source: "manual",
+          source,
           lead_source: leadSource,
           source_type: "MANUAL",
+          next_follow_up: clean(body.nextFollowUp, 80) || null,
+          assigned_to_name: clean(body.assignedTo, 120),
           request_id: null,
         },
       });
@@ -117,6 +130,27 @@ export default async function handler(req, res) {
         if (!isValidSource(leadSource)) return res.status(400).json({ ok: false, error: "Invalid lead source." });
         patch.lead_source = leadSource;
         patch.source_type = "MANUAL";
+      }
+      if (body.source !== undefined || body.sourceDetail !== undefined) {
+        const source = cleanSource(body.source ?? body.sourceDetail);
+        if (!source) return res.status(400).json({ ok: false, error: "Source is required." });
+        patch.source = source;
+        patch.source_type = "MANUAL";
+      }
+      const editableFields = {
+        name: 80, phone: 20, email: 160, whatsapp: 20, eventType: 80, eventDate: 10,
+        eventTime: 80, eventVenue: 160, eventLocation: 120, guestCount: 60, budget: 80,
+        message: 2000, assignedTo: 120, nextFollowUp: 80,
+      };
+      for (const [field, max] of Object.entries(editableFields)) {
+        if (body[field] === undefined) continue;
+        const value = clean(body[field], max);
+        const column = {
+          whatsapp: "whatsapp_number", eventType: "event_type", eventDate: "event_date",
+          eventTime: "event_time", eventVenue: "event_venue", eventLocation: "event_location",
+          guestCount: "guest_count", assignedTo: "assigned_to_name", nextFollowUp: "next_follow_up",
+        }[field] || field;
+        patch[column] = field === "eventDate" || field === "nextFollowUp" ? (value || null) : value;
       }
       patch.updated_at = new Date().toISOString();
       const rows = await db.query(`inquiries?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: patch });

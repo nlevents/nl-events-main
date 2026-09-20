@@ -163,6 +163,10 @@ alter table public.inquiries add column if not exists source text not null defau
 alter table public.inquiries add column if not exists lead_source text not null default 'Website';
 alter table public.inquiries add column if not exists source_type text not null default 'AUTO';
 alter table public.inquiries add column if not exists booking_id uuid null references public.bookings(id) on delete set null;
+alter table public.inquiries add column if not exists next_follow_up timestamptz null;
+alter table public.inquiries add column if not exists assigned_to_name text not null default '';
+create index if not exists inquiries_next_follow_up_idx on public.inquiries(next_follow_up);
+
 
 -- Unified lead-source attribution. The legacy source column continues to identify
 -- the originating application view; lead_source/source_type are the CRM attribution fields.
