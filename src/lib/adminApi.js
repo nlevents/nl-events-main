@@ -33,6 +33,10 @@ export async function updateAdminInquiry(id, patch) {
   return adminFetch("/admin/inquiries", { method: "PATCH", body: { id, ...patch } });
 }
 
+export async function createAdminInquiry(payload) {
+  return adminFetch("/admin/inquiries", { method: "POST", body: payload });
+}
+
 export async function deleteAdminInquiry(id) {
   return adminFetch("/admin/inquiries", { method: "DELETE", body: { id } });
 }

@@ -44,7 +44,6 @@ const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons"));
 const AdminAddons = lazy(() => import("./pages/admin/AdminAddons"));
 const AdminAvailability = lazy(() => import("./pages/admin/AdminAvailability"));
 const AdminInquiries = lazy(() => import("./pages/admin/AdminInquiries"));
-const AdminLandingInquiries = lazy(() => import("./pages/admin/AdminLandingInquiries"));
 const AdminClients = lazy(() => import("./pages/admin/AdminClients"));
 const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
 const AdminInvoiceForm = lazy(() => import("./pages/admin/AdminInvoiceForm"));
@@ -80,7 +79,6 @@ export default function App() {
                     <Route path="addons/products/:id/edit" element={<AdminProductForm />} />
                     <Route path="availability" element={<AdminAvailability />} />
                     <Route path="inquiries" element={<AdminInquiries />} />
-                    <Route path="landing-inquiries" element={<AdminLandingInquiries />} />
                     <Route path="clients" element={<AdminClients />} />
                     <Route path="invoices" element={<AdminInvoices />} />
                     <Route path="invoices/new" element={<AdminInvoiceForm />} />

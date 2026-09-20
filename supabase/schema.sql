@@ -160,7 +160,23 @@ alter table public.inquiries add column if not exists quotation_id text not null
 alter table public.inquiries add column if not exists invoice_id text not null default '';
 alter table public.inquiries add column if not exists payment_status text not null default 'pending';
 alter table public.inquiries add column if not exists source text not null default 'inquiry';
+alter table public.inquiries add column if not exists lead_source text not null default 'Website';
+alter table public.inquiries add column if not exists source_type text not null default 'AUTO';
 alter table public.inquiries add column if not exists booking_id uuid null references public.bookings(id) on delete set null;
+
+-- Unified lead-source attribution. The legacy source column continues to identify
+-- the originating application view; lead_source/source_type are the CRM attribution fields.
+update public.inquiries set lead_source = case
+  when lower(source) in ('landing','contact','inquiry') then 'Website'
+  when source = 'booking' then 'Website'
+  else 'Website'
+end where lead_source is null or lead_source = '';
+update public.inquiries set source_type = 'AUTO' where source_type is null or source_type = '';
+alter table public.inquiries drop constraint if exists inquiries_lead_source_check;
+alter table public.inquiries add constraint inquiries_lead_source_check check (lead_source in ('Website','Meta Ads','Google Ads','Organic Social','Google Organic','WhatsApp','Referral','Venue','Vendor','Direct','Repeat Client','Other'));
+alter table public.inquiries drop constraint if exists inquiries_source_type_check;
+alter table public.inquiries add constraint inquiries_source_type_check check (source_type in ('AUTO','MANUAL'));
+create index if not exists inquiries_lead_source_idx on public.inquiries(lead_source);
 create unique index if not exists inquiries_booking_id_unique on public.inquiries(booking_id) where booking_id is not null;
 
 -- New CRM stages: New Lead -> Discovery Call -> Meeting Scheduled -> Quotation Sent -> Deal Closed.

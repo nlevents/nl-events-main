@@ -6,6 +6,34 @@ function clean(value, max) { return String(value ?? "").trim().slice(0, max); }
 const EVENT_TYPES = new Set(["Wedding", "Birthday", "Corporate", "Festive Events", "Others", "Birthday Party", "Wedding Ceremony", "Reception", "Anniversary", "Baby Shower", "Naming Ceremony", "Corporate Event", "Custom Celebration", "Birthday / Kitty Party", "Haldi / Mehendi / Sangeet", "Private Party", "Other"]);
 const LANDING_EVENT_TYPES = new Set(["Wedding", "Birthday / Kitty Party", "Corporate Event", "Haldi / Mehendi / Sangeet", "Anniversary", "Private Party", "Other"]);
 const STAGE = "new_lead";
+const LEAD_SOURCES = new Set([
+  "Website", "Meta Ads", "Google Ads", "Organic Social", "Google Organic",
+  "WhatsApp", "Referral", "Venue", "Vendor", "Direct", "Repeat Client", "Other",
+]);
+const SOURCE_ALIASES = {
+  landing: "Website",
+  contact: "Website",
+  inquiry: "Website",
+  website: "Website",
+  website_form: "Website",
+  meta_ads: "Meta Ads",
+  google_ads: "Google Ads",
+  organic_social: "Organic Social",
+  google_organic: "Google Organic",
+  whatsapp: "WhatsApp",
+  referral: "Referral",
+  venue: "Venue",
+  vendor: "Vendor",
+  direct: "Direct",
+  repeat_client: "Repeat Client",
+  other: "Other",
+};
+function detectLeadSource(value) {
+  const raw = clean(value, 40);
+  return LEAD_SOURCES.has(raw) ? raw : SOURCE_ALIASES[raw.toLowerCase()] || "Website";
+}
+function normalizePhone(value) { return clean(value, 40).replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); }
+function normalizeEmail(value) { return clean(value, 160).toLowerCase(); }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -28,6 +56,7 @@ export default async function handler(req, res) {
     const guestCount = clean(body.guestCount, 60);
     const message = clean(body.message, 2000);
     const source = clean(body.source, 30);
+    const leadSource = detectLeadSource(body.leadSource || source);
     const requestId = clean(body.requestId, 100);
     const isContact = source === "contact";
     const isLanding = source === "landing";
@@ -56,6 +85,23 @@ export default async function handler(req, res) {
       if (existing?.[0]) return res.status(200).json({ ok: true, data: existing[0], duplicate: true });
     }
 
+    // A single enquiry can arrive through more than one connected channel.
+    // Reuse the existing lead when the core enquiry identity matches.
+    const normalizedPhone = normalizePhone(phone);
+    const normalizedEmail = normalizeEmail(body.email);
+    if (normalizedPhone || normalizedEmail) {
+      const recent = await db.query("inquiries?select=*&order=created_at.desc&limit=500", { method: "GET" });
+      const duplicate = (recent || []).find((row) => {
+        if (row.source === "booking") return false;
+        if (eventType && row.event_type && row.event_type !== eventType) return false;
+        if (eventDate && row.event_date && row.event_date !== eventDate) return false;
+        const rowPhone = normalizePhone(row.phone);
+        const rowEmail = normalizeEmail(row.email);
+        return (normalizedPhone && rowPhone && normalizedPhone === rowPhone) || (normalizedEmail && rowEmail && normalizedEmail === rowEmail);
+      });
+      if (duplicate) return res.status(200).json({ ok: true, data: duplicate, duplicate: true });
+    }
+
     const rows = await db.query("inquiries", {
       method: "POST",
       body: {
@@ -75,6 +121,8 @@ export default async function handler(req, res) {
         status: STAGE,
         admin_notes: "",
         source: isContact ? "contact" : isLanding ? "landing" : "inquiry",
+        lead_source: leadSource,
+        source_type: "AUTO",
         request_id: requestId || null,
       },
     });

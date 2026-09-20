@@ -13,6 +13,68 @@ const EVENT_TYPES = [
 
 const STEP_LABELS = ["Event Type", "Event Details", "Contact", "Review"];
 
+function AnalogTimePicker({ value, onChange, onClose }) {
+  const parsed = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const [hour, setHour] = useState(parsed ? Number(parsed[1]) : 7);
+  const [minute, setMinute] = useState(parsed ? Number(parsed[2]) : 0);
+  const [period, setPeriod] = useState(parsed ? parsed[3].toUpperCase() : "PM");
+  const [mode, setMode] = useState("hour");
+
+  const commit = (nextHour = hour, nextMinute = minute, nextPeriod = period) => {
+    onChange(`${nextHour}:${String(nextMinute).padStart(2, "0")} ${nextPeriod}`);
+  };
+
+  const chooseHour = (h) => {
+    setHour(h);
+    setMode("minute");
+  };
+
+  const chooseMinute = (m) => {
+    setMinute(m);
+    commit(hour, m, period);
+    setMode("hour");
+  };
+
+  return (
+    <div className="analog-time-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="analog-time-picker" role="dialog" aria-modal="true" aria-labelledby="analog-time-title" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="analog-time-header">
+          <div>
+            <span className="analog-time-kicker">Select event time</span>
+            <strong id="analog-time-title">{hour}:{String(minute).padStart(2, "0")} {period}</strong>
+          </div>
+          <div className="analog-time-periods">
+            {['AM', 'PM'].map((p) => (
+              <button key={p} type="button" className={period === p ? "active" : ""} onClick={() => { setPeriod(p); commit(hour, minute, p); }}>{p}</button>
+            ))}
+          </div>
+        </div>
+        <div className="analog-clock" aria-label={mode === "hour" ? "Select hour" : "Select minutes"}>
+          <div className="analog-clock-face">
+            <div className={"analog-clock-hand " + (mode === "hour" ? "hour-hand" : "minute-hand")} style={{ transform: `translate(-50%, -100%) rotate(${mode === "hour" ? ((hour % 12) * 30 + minute * 0.5) : minute * 6}deg)` }} />
+            <div className="analog-clock-center" />
+            {Array.from({ length: 12 }, (_, i) => {
+              const n = mode === "hour" ? (i === 0 ? 12 : i) : i * 5;
+              const angle = (i * 30 - 90) * Math.PI / 180;
+              const radius = 38;
+              const left = 50 + (Math.cos(angle) * radius / 100) * 100;
+              const top = 50 + (Math.sin(angle) * radius / 100) * 100;
+              const selected = mode === "hour" ? n === hour : n === minute;
+              return (
+                <button key={n} type="button" className={"analog-clock-number" + (selected ? " selected" : "")} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => mode === "hour" ? chooseHour(n) : chooseMinute(n)}>{String(n).padStart(2, "0")}</button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="analog-time-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" onClick={() => { commit(); onClose(); }}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BookEvent() {
   usePageMeta("Inquiry — Next Level Events", "Tell Next Level Events about your upcoming event and our team will get in touch within 24 hours.");
   const formRef = useRef(null);
@@ -21,6 +83,7 @@ export default function BookEvent() {
   const [eventType, setEventType] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [eventVenue, setEventVenue] = useState("");
   const [eventLocation, setEventLocation] = useState("");
   const [guestCount, setGuestCount] = useState("");
@@ -137,7 +200,7 @@ export default function BookEvent() {
             <h2 style={{ fontSize: 22, marginBottom: 18 }}>Event Details</h2>
             <div className="form-row-2">
               <div className="form-group"><label htmlFor="eventDate">Event Date</label><input type="date" id="eventDate" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />{errors.eventDate && <p className="form-error">{errors.eventDate}</p>}</div>
-              <div className="form-group"><label htmlFor="eventTime">Event Time <span className="form-optional">(optional)</span></label><input type="text" id="eventTime" maxLength={80} placeholder="e.g. 7 PM – 11 PM (optional)" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />{errors.eventTime && <p className="form-error">{errors.eventTime}</p>}</div>
+              <div className="form-group"><label htmlFor="eventTime">Event Time <span className="form-optional">(optional)</span></label><button type="button" id="eventTime" className={"analog-time-input" + (!eventTime ? " placeholder" : "")} onClick={() => setShowTimePicker(true)} aria-haspopup="dialog" aria-expanded={showTimePicker}>{eventTime || "Select event time"}<span aria-hidden="true">◷</span></button>{errors.eventTime && <p className="form-error">{errors.eventTime}</p>}</div>
             </div>
             <div className="form-group"><label htmlFor="eventVenue">Venue / Address <span className="form-optional">(optional)</span></label><input type="text" id="eventVenue" maxLength={160} placeholder="Venue / hall / hotel / home (optional)" value={eventVenue} onChange={(e) => setEventVenue(e.target.value)} />{errors.eventVenue && <p className="form-error">{errors.eventVenue}</p>}</div>
             <div className="form-row-2">
@@ -175,14 +238,25 @@ export default function BookEvent() {
         </form>
       </section>
 
+      {showTimePicker && (
+        <AnalogTimePicker value={eventTime} onChange={setEventTime} onClose={() => setShowTimePicker(false)} />
+      )}
+
       {success && (
-        <div className="admin-modal-backdrop" role="presentation">
-          <div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="inquiry-success-title">
-            <div style={{ fontSize: 38, marginBottom: 8 }}>✓</div>
-            <h2 id="inquiry-success-title">Inquiry Submitted Successfully</h2>
-            <p className="admin-hint" style={{ marginTop: 8 }}>Our team will connect with you within 24 hours.</p>
-            <div className="admin-modal-actions" style={{ justifyContent: "center", marginTop: 20 }}>
-              <Link className="btn btn-primary" to="/">Done</Link>
+        <div className="admin-modal-backdrop inquiry-success-backdrop" role="presentation">
+          <div className="inquiry-success-modal" role="dialog" aria-modal="true" aria-labelledby="inquiry-success-title">
+            <div className="inquiry-success-burst" aria-hidden="true">
+              <span /><span /><span /><span /><span /><span /><span /><span />
+            </div>
+            <div className="inquiry-success-check" aria-hidden="true">
+              <svg viewBox="0 0 52 52" fill="none">
+                <path d="M14 27.5 22 35l16-18" />
+              </svg>
+            </div>
+            <h2 id="inquiry-success-title">Payment Successful!</h2>
+            <p>Your payment has been completed successfully.</p>
+            <div className="inquiry-success-actions">
+              <Link className="btn" to="/">Done</Link>
             </div>
           </div>
         </div>

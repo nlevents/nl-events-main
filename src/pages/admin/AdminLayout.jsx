@@ -26,7 +26,6 @@ const NAV_GROUPS = [
     title: "Sales & Bookings",
     items: [
       { to: "/admin/inquiries", label: "CRM", icon: "user" },
-      { to: "/admin/landing-inquiries", label: "Landing Inquiries", icon: "send" },
       { to: "/admin/availability", label: "Calendar & Blackout", icon: "calendar" },
       { to: "/admin/coupons", label: "Coupons & Promos", icon: "percent" },
       { to: "/admin/clients", label: "Clients", icon: "user" },
@@ -64,7 +63,7 @@ export default function AdminLayout() {
   const renderNavContent = () => (
     <>
       <div className="admin-sidebar-brand">
-        Next Level <span>Admin</span>
+        {isCrm ? <img src="/assets/images/landing/nle-logo.png" alt="Next Level Events" /> : <>Next Level <span>Admin</span></>}
       </div>
       <nav className="admin-nav">
         {NAV_GROUPS.map((group) => (
@@ -101,8 +100,10 @@ export default function AdminLayout() {
     </>
   );
 
+  const isCrm = location.pathname === "/admin/inquiries";
+
   return (
-    <div className="admin-shell">
+    <div className={`admin-shell ${isCrm ? "crm-shell" : ""}`}>
       {/* Mobile Top App Bar (Visible on phones <= 900px) */}
       <header className="admin-mobile-header">
         <button
