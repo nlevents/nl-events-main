@@ -1,9 +1,9 @@
 import { requireAdmin } from "../../shared/auth/supabaseAuth.js";
 import { getServerSupabase } from "../../shared/supabase/serverClient.js";
 
-const STAGES = ["new_lead", "discovery_call", "meeting_scheduled", "quotation_sent", "deal_closed", "lost", "junk"];
+const STAGES = ["new_lead", "contacted", "discovery_call", "meeting_scheduled", "quotation_sent", "negotiation", "deal_closed", "lost", "junk"];
 const LEAD_SOURCES = [
-  "Website", "Meta Ads", "Google Ads", "Organic Social", "Google Organic",
+  "Website", "Meta Ads", "Google Ads", "Google Search", "Instagram", "Facebook", "LinkedIn", "Organic Social", "Google Organic",
   "WhatsApp", "Referral", "Venue", "Vendor", "Direct", "Repeat Client", "Other",
 ];
 const EVENT_TYPES = ["Wedding", "Birthday", "Corporate", "Festive Events", "Others", "Birthday Party", "Wedding Ceremony", "Reception", "Anniversary", "Baby Shower", "Naming Ceremony", "Corporate Event", "Custom Celebration", "Birthday / Kitty Party", "Haldi / Mehendi / Sangeet", "Private Party", "Other"];
@@ -72,8 +72,9 @@ export default async function handler(req, res) {
       const message = clean(body.message, 2000);
       const leadSource = clean(body.leadSource, 40);
       const source = cleanSource(body.source || body.sourceDetail || "CRM");
+      const status = clean(body.status || "new_lead", 40);
 
-      if (!name || !/^\+?[0-9\s()\-.]{7,20}$/.test(phone) || !eventType || !eventLocation || !source || !isValidSource(leadSource)) {
+      if (!name || !/^\+?[0-9\s()\-.]{7,20}$/.test(phone) || !eventType || !eventLocation || !source || !isValidSource(leadSource) || !STAGES.includes(status)) {
         return res.status(400).json({ ok: false, error: "Please complete the required lead fields." });
       }
       if (!EVENT_TYPES.includes(eventType)) return res.status(400).json({ ok: false, error: "Invalid event type." });
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
           guest_count: guestCount,
           budget,
           message,
-          status: "new_lead",
+          status,
           admin_notes: "",
           source,
           lead_source: leadSource,

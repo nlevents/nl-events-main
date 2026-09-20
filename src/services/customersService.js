@@ -7,12 +7,31 @@ function createRequestId() {
 }
 
 export async function submitInquiry(inquiryData) {
-  const res = await fetch(`${API_BASE}/inquiry`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ requestId: createRequestId(), website: "", ...inquiryData }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) throw new Error(data.error || "Unable to send your enquiry.");
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/inquiry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ requestId: createRequestId(), website: "", ...inquiryData }),
+    });
+  } catch (error) {
+    throw new Error("The inquiry service is unreachable. Please check the server/API connection and try again.");
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  let data = {};
+  if (contentType.includes("application/json")) {
+    data = await res.json().catch(() => ({}));
+  } else {
+    // Vite/Vercel can return an HTML error page when an API route is missing.
+    // Convert that into a useful message instead of hiding it behind the same
+    // generic submission error.
+    const text = await res.text().catch(() => "");
+    if (text && !res.ok) data = { error: `Inquiry service returned HTTP ${res.status}.` };
+  }
+
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || `Unable to send your enquiry (HTTP ${res.status}).`);
+  }
   return data;
 }

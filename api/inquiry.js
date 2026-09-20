@@ -68,6 +68,7 @@ export default async function handler(req, res) {
     const guestCount = clean(body.guestCount, 60);
     const message = clean(body.message, 2000);
     const source = clean(body.source, 30);
+    const sourceDetail = detectSourceDetail(source);
     const leadSource = detectLeadSource(body.leadSource || source);
     const requestId = clean(body.requestId, 100);
     const isContact = source === "contact";
@@ -114,34 +115,97 @@ export default async function handler(req, res) {
       if (duplicate) return res.status(200).json({ ok: true, data: duplicate, duplicate: true });
     }
 
-    const rows = await db.query("inquiries", {
-      method: "POST",
-      body: {
-        name,
-        phone,
-        email: clean(body.email, 160),
-        whatsapp_number: whatsapp,
-        city: eventLocation,
-        event_type: eventType || "General Inquiry",
-        event_date: eventDate || null,
-        event_time: eventTime,
-        event_venue: eventVenue,
-        event_location: eventLocation,
-        guest_count: guestCount,
-        budget: "",
-        message,
-        status: STAGE,
-        admin_notes: "",
-        source: sourceDetail,
-        lead_source: leadSource,
-        source_type: "AUTO",
-        request_id: requestId || null,
+    const inquiryPayload = {
+      name,
+      phone,
+      email: clean(body.email, 160),
+      whatsapp_number: whatsapp,
+      city: eventLocation,
+      event_type: eventType || "General Inquiry",
+      event_date: eventDate || null,
+      event_time: eventTime,
+      event_venue: eventVenue,
+      event_location: eventLocation,
+      guest_count: guestCount,
+      budget: "",
+      message,
+      status: STAGE,
+      admin_notes: "",
+      source: sourceDetail,
+      lead_source: leadSource,
+      source_type: "AUTO",
+      request_id: requestId || null,
+    };
+
+    let rows;
+    let insertError = null;
+
+    // Try the complete CRM schema first. If a deployment is missing one or
+    // more optional migration columns, progressively fall back to payloads
+    // that only use columns from the base inquiries table. This makes the
+    // public inquiry endpoint resilient to partially migrated Supabase
+    // projects instead of returning the generic 500 error.
+    const insertAttempts = [
+      inquiryPayload,
+      {
+        name: inquiryPayload.name,
+        phone: inquiryPayload.phone,
+        email: inquiryPayload.email,
+        whatsapp_number: inquiryPayload.whatsapp_number,
+        city: inquiryPayload.city,
+        event_type: inquiryPayload.event_type,
+        event_date: inquiryPayload.event_date,
+        event_time: inquiryPayload.event_time,
+        event_venue: inquiryPayload.event_venue,
+        event_location: inquiryPayload.event_location,
+        guest_count: inquiryPayload.guest_count,
+        budget: inquiryPayload.budget,
+        message: inquiryPayload.message,
+        status: inquiryPayload.status,
+        admin_notes: inquiryPayload.admin_notes,
+        request_id: inquiryPayload.request_id,
       },
-    });
+      {
+        name: inquiryPayload.name,
+        phone: inquiryPayload.phone,
+        email: inquiryPayload.email,
+        city: inquiryPayload.city,
+        event_type: inquiryPayload.event_type,
+        event_date: inquiryPayload.event_date,
+        guest_count: inquiryPayload.guest_count,
+        budget: inquiryPayload.budget,
+        message: inquiryPayload.message,
+        status: inquiryPayload.status,
+        admin_notes: inquiryPayload.admin_notes,
+      },
+    ];
+
+    for (const payload of insertAttempts) {
+      try {
+        rows = await db.query("inquiries", { method: "POST", body: payload });
+        if (rows?.[0]?.id) break;
+      } catch (error) {
+        insertError = error;
+      }
+    }
+
+    if (!rows?.[0]?.id) {
+      const detail = String(insertError?.message || "");
+      console.error("Inquiry insert failed after all schema-compatible attempts:", detail);
+      throw new Error(detail || "Inquiry could not be saved.");
+    }
 
     const inquiry = rows?.[0];
     if (!inquiry?.id) throw new Error("Inquiry was not created.");
-    await notifyInquiry(inquiry, db);
+
+    // Notification delivery is intentionally non-blocking. A missing/broken
+    // email or WhatsApp integration must never make a successfully saved lead
+    // appear as a failed inquiry to the customer.
+    try {
+      await notifyInquiry(inquiry, db);
+    } catch (notificationError) {
+      console.error("Inquiry notification error (lead was saved):", notificationError);
+    }
 
     return res.status(201).json({ ok: true, data: inquiry });
   } catch (err) {
