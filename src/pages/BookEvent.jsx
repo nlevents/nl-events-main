@@ -253,8 +253,8 @@ export default function BookEvent() {
                 <path d="M14 27.5 22 35l16-18" />
               </svg>
             </div>
-            <h2 id="inquiry-success-title">Payment Successful!</h2>
-            <p>Your payment has been completed successfully.</p>
+            <h2 id="inquiry-success-title">Inquiry Submitted Successfully!</h2>
+            <p>Your inquiry has been submitted successfully. Our team will contact you within 24 hours.</p>
             <div className="inquiry-success-actions">
               <Link className="btn" to="/">Done</Link>
             </div>

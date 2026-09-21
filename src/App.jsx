@@ -18,6 +18,7 @@ const Packages = lazy(() => import("./pages/Packages"));
 const PackageDetails = lazy(() => import("./pages/PackageDetails"));
 const ShopByOccasion = lazy(() => import("./pages/ShopByOccasion"));
 const OccasionBrowser = lazy(() => import("./pages/OccasionBrowser"));
+const Wedding = lazy(() => import("./pages/Wedding"));
 const Gallery = lazy(() => import("./pages/Gallery"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -44,6 +45,7 @@ const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons"));
 const AdminAddons = lazy(() => import("./pages/admin/AdminAddons"));
 const AdminAvailability = lazy(() => import("./pages/admin/AdminAvailability"));
 const AdminInquiries = lazy(() => import("./pages/admin/AdminInquiries"));
+const AdminLeadDetails = lazy(() => import("./pages/admin/AdminLeadDetails"));
 const AdminClients = lazy(() => import("./pages/admin/AdminClients"));
 const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
 const AdminInvoiceForm = lazy(() => import("./pages/admin/AdminInvoiceForm"));
@@ -79,6 +81,7 @@ export default function App() {
                     <Route path="addons/products/:id/edit" element={<AdminProductForm />} />
                     <Route path="availability" element={<AdminAvailability />} />
                     <Route path="inquiries" element={<AdminInquiries />} />
+                    <Route path="inquiries/:leadId" element={<AdminLeadDetails />} />
                     <Route path="clients" element={<AdminClients />} />
                     <Route path="invoices" element={<AdminInvoices />} />
                     <Route path="invoices/new" element={<AdminInvoiceForm />} />
@@ -93,13 +96,14 @@ export default function App() {
                     <Route path="/products" element={<Products />} />
                     <Route path="/packages" element={<Packages />} />
                     <Route path="/package-details" element={<PackageDetails />} />
-                    <Route path="/weddings" element={<Navigate to="/occasion/wedding" replace />} />
+                    <Route path="/weddings" element={<Wedding />} />
                     <Route path="/birthdays" element={<Navigate to="/occasion/birthday" replace />} />
                     <Route path="/concerts" element={<Navigate to="/occasion/corporate" replace />} />
                     <Route path="/corporate" element={<Navigate to="/occasion/corporate" replace />} />
                     <Route path="/custom-events" element={<Navigate to="/shop-by-occasion" replace />} />
                     <Route path="/shop-by-occasion" element={<ShopByOccasion />} />
                     <Route path="/occasion" element={<ShopByOccasion />} />
+                    <Route path="/occasion/wedding" element={<Wedding />} />
                     <Route path="/occasion/*" element={<OccasionBrowser />} />
                     <Route path="/gallery" element={<Gallery />} />
                     <Route path="/about" element={<About />} />

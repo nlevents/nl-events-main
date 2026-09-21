@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { saveClient } from "../../lib/adminStore";
+import { getInvoices, saveClient } from "../../lib/adminStore";
 import { createAdminInquiry, deleteAdminInquiry, fetchAdminInquiries, updateAdminInquiry } from "../../lib/adminApi";
 import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
@@ -89,7 +89,10 @@ export default function AdminInquiries() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selected, setSelected] = useState(null);
+  const [showClientDetails, setShowClientDetails] = useState(false);
   const [drawerTab, setDrawerTab] = useState("details");
+  const [leadSourceCustom, setLeadSourceCustom] = useState(false);
+  const [customLeadSource, setCustomLeadSource] = useState("");
   const [sourceEdit, setSourceEdit] = useState("");
   const [noteEdit, setNoteEdit] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -184,6 +187,7 @@ export default function AdminInquiries() {
 
   function selectRecord(record) {
     setSelected(record);
+    setShowClientDetails(false);
     setSourceEdit(record.sourceDetail || "Inquiry Form");
     setNoteEdit(record.adminNotes || "");
     setDrawerTab("details");
@@ -191,6 +195,8 @@ export default function AdminInquiries() {
   function updateLeadField(field, value) { setLeadForm((prev) => ({ ...prev, [field]: value })); }
   function openAddLead() {
     setEditingLead(null);
+    setLeadSourceCustom(false);
+    setCustomLeadSource("");
     setLeadForm(EMPTY_LEAD);
     setLeadClientType("Individual");
     setLeadTags([]);
@@ -206,10 +212,16 @@ export default function AdminInquiries() {
   function handleLeadSourceChange(value) {
     const websiteDetails = ["Landing Page", "Inquiry Form", "Product Page", "CRM", "Website"];
     if (value === "__custom__") {
-      setLeadForm((prev) => ({ ...prev, leadSource: "Website", source: "__custom__" }));
+      setLeadSourceCustom(true);
+      setCustomLeadSource("");
+      setLeadForm((prev) => ({ ...prev, leadSource: "Website", source: "" }));
     } else if (websiteDetails.includes(value)) {
+      setLeadSourceCustom(false);
+      setCustomLeadSource("");
       setLeadForm((prev) => ({ ...prev, leadSource: "Website", source: value }));
     } else {
+      setLeadSourceCustom(false);
+      setCustomLeadSource("");
       setLeadForm((prev) => ({ ...prev, leadSource: value, source: value }));
     }
   }
@@ -258,7 +270,11 @@ export default function AdminInquiries() {
   function openEditLead(record) {
     setEditingLead(record);
     const source = record.sourceDetail || record.leadSource || "CRM";
-    setLeadForm({ name: record.name === "Anonymous Client" ? "" : record.name, phone: record.phone || "", whatsapp: record.whatsapp || "", email: record.email || "", eventType: record.eventType || "", eventDate: record.eventDate || "", eventLocation: record.eventLocation || "", guestCount: record.guestCount || "", budget: record.budget || "", leadSource: record.leadSource || "Website", source, message: record.message || "", assignedTo: record.assignedTo === "Unassigned" ? "" : record.assignedTo || "", nextFollowUp: record.nextFollowUp || "" });
+    const knownSources = [...LEAD_SOURCE_OPTIONS, ...DEFAULT_SOURCE_DETAILS];
+    const isCustom = Boolean(source && !knownSources.includes(source));
+    setLeadSourceCustom(isCustom);
+    setCustomLeadSource(isCustom ? source : "");
+    setLeadForm({ name: record.name === "Anonymous Client" ? "" : record.name, phone: record.phone || "", whatsapp: record.whatsapp || "", email: record.email || "", eventType: record.eventType || "", eventDate: record.eventDate || "", eventLocation: record.eventLocation || "", guestCount: record.guestCount || "", budget: record.budget || "", leadSource: record.leadSource || "Website", source: isCustom ? "" : source, message: record.message || "", assignedTo: record.assignedTo === "Unassigned" ? "" : record.assignedTo || "", nextFollowUp: record.nextFollowUp || "" });
     setLeadClientType("Individual");
     setLeadTags([]);
     setLeadQuickActions({ followUp: Boolean(record.nextFollowUp), whatsapp: true, emailMarketing: false });
@@ -278,10 +294,12 @@ export default function AdminInquiries() {
       const nextFollowUp = leadQuickActions.followUp && leadFollowUpDate
         ? `${leadFollowUpDate}T${leadFollowUpTime || "09:00"}`
         : "";
-      const payload = { ...leadForm, status: leadStatus, nextFollowUp };
+      const resolvedSource = leadSourceCustom ? customLeadSource.trim() : String(leadForm.source || "").trim();
+      if (!resolvedSource) throw new Error("Please enter a custom lead source.");
+      const payload = { ...leadForm, source: resolvedSource, status: leadStatus, nextFollowUp };
       if (editingLead) await updateAdminInquiry(editingLead.id, payload);
       else await createAdminInquiry(payload);
-      await refresh(); setShowAddLead(false); setEditingLead(null); setLeadForm(EMPTY_LEAD); showFeedback(editingLead ? "Lead updated." : "Lead added.");
+      await refresh(); setShowAddLead(false); setEditingLead(null); setLeadForm(EMPTY_LEAD); setLeadSourceCustom(false); setCustomLeadSource(""); showFeedback(editingLead ? "Lead updated." : "Lead added.");
     } catch (err) { setError(err.message || "Unable to save lead."); }
     finally { setSavingLead(false); }
   }
@@ -324,6 +342,58 @@ export default function AdminInquiries() {
   ];
   const tabs = [["all", "All Leads"], ["new_lead", "New Inquiry"], ["contacted", "Contacted"], ["discovery_call", "Discovery Call"], ["meeting_scheduled", "Meeting Scheduled"], ["quotation_sent", "Quotation Sent"], ["negotiation", "Negotiation"], ["deal_closed", "Won"], ["lost", "Lost"], ["junk", "Junk"]];
 
+  function renderLeadDrawer(record) {
+    const initials = String(record.name || "CL").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "CL";
+    const statusLabel = STAGE_LABEL[record.status] || record.status || "New Inquiry";
+    const source = record.sourceDetail || record.leadSource || "Inquiry Form";
+    const location = record.eventLocation || record.city || "—";
+    const relatedInvoices = getInvoices().filter((invoice) => {
+      if (invoice.leadId === record.id) return true;
+      const client = getClientsForRecord(record).find((item) => item && item.id === invoice.clientId);
+      return Boolean(client);
+    });
+    const quotations = relatedInvoices.filter((invoice) => invoice.documentType === "quotation");
+    const invoices = relatedInvoices.filter((invoice) => invoice.documentType !== "quotation");
+    const payments = invoices.filter((invoice) => invoice.status === "paid");
+    return (
+      <>
+        <div className="crm-drawer-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setSelected(null); }} />
+        <aside className="crm-lead-drawer" aria-label="Lead details">
+          <div className="crm-drawer-head">
+            <div>
+              <span className="crm-drawer-eyebrow">Lead Details</span>
+              <h2>{record.name}</h2>
+              <p>{record.displayId || record.id} · {statusLabel}</p>
+            </div>
+            <button type="button" className="crm-drawer-close" onClick={() => setSelected(null)} aria-label="Close"><Icon name="close" /></button>
+          </div>
+          <button type="button" className="crm-open-client-button" onClick={() => navigate(`/admin/inquiries/${encodeURIComponent(record.id)}`)}><span><Icon name="user" /><b>Open Client Details</b><small>View complete client overview, events, billing and activity</small></span><Icon name="chevronRight" /></button>
+          <div className="crm-drawer-profile">
+            <div className="crm-drawer-avatar">{initials}</div>
+            <div><h3>{record.name}</h3><p>{record.eventType || "Event"} · {location}</p><span className={`crm-drawer-status status-${record.status}`}>{statusLabel}</span></div>
+          </div>
+          <section className="crm-drawer-section"><h3>Customer Information <button type="button" onClick={() => openEditLead(record)}>Edit</button></h3><div className="crm-drawer-rows"><div><span>Phone</span><b>{record.phone || "—"}</b></div><div><span>Email</span><b>{record.email || "—"}</b></div><div><span>WhatsApp</span><b>{record.whatsapp || record.phone || "—"}</b></div></div></section>
+          <section className="crm-drawer-section"><h3>Event Information <button type="button" onClick={() => openEditLead(record)}>Edit</button></h3><div className="crm-drawer-rows"><div><span>Event</span><b>{record.eventType || "—"}</b></div><div><span>Date</span><b>{fmtDate(record.eventDate)}</b></div><div><span>Location</span><b>{location}</b></div><div><span>Guests</span><b>{record.guestCount || "—"}</b></div><div><span>Budget</span><b>{record.budget || "—"}</b></div></div></section>
+          <section className="crm-drawer-section"><h3>Lead Information</h3><div className="crm-drawer-rows"><div><span>Source</span><b>{source}</b></div><div><span>Assigned To</span><b>{record.assignedTo || "Unassigned"}</b></div><div><span>Next Follow-up</span><b>{record.nextFollowUp ? fmtDateTime(record.nextFollowUp) : "—"}</b></div></div></section>
+          <section className="crm-drawer-section"><h3>Quick Actions</h3><div className="crm-drawer-actions"><button type="button" onClick={() => window.open(`tel:${record.phone}`)}><Icon name="phone" />Call</button><button type="button" onClick={() => window.open(`https://wa.me/${String(record.whatsapp || record.phone).replace(/\D/g, "")}`, "_blank", "noopener,noreferrer")}><Icon name="whatsapp" />WhatsApp</button><button type="button" onClick={() => handleScheduleFollowUp(record)}><Icon name="calendar" />Follow-up</button><button type="button" onClick={() => createQuotation(record)}><Icon name="send" />Quotation</button></div></section>
+          <div className="crm-drawer-footer"><span>{quotations.length} quotations · {invoices.length} invoices · {payments.length} payments</span><button type="button" onClick={() => navigate(`/admin/inquiries/${encodeURIComponent(record.id)}?tab=activity`)}>View Activity</button></div>
+        </aside>
+      </>
+    );
+  }
+
+  function getClientsForRecord(record) {
+    try {
+      const raw = window.localStorage.getItem("nle-admin-clients");
+      const clients = raw ? JSON.parse(raw) : [];
+      return (Array.isArray(clients) ? clients : []).filter((client) => {
+        const samePhone = record.phone && client.phone && String(record.phone).replace(/\D/g, "") === String(client.phone).replace(/\D/g, "");
+        const sameEmail = record.email && client.email && String(record.email).toLowerCase() === String(client.email).toLowerCase();
+        return samePhone || sameEmail;
+      });
+    } catch { return []; }
+  }
+
   function renderLeadDetailsPage(record) {
     const initials = String(record.name || "CL").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "CL";
     const statusLabel = STAGE_LABEL[record.status] || record.status || "New Inquiry";
@@ -335,12 +405,20 @@ export default function AdminInquiries() {
     const source = record.sourceDetail || record.leadSource || "Inquiry Form";
     const tagDefaults = ["VIP Client", "Repeat Client", "High Potential"];
     const noteText = record.adminNotes || record.message || "No notes have been added for this lead yet.";
+    const relatedInvoices = getInvoices().filter((invoice) => {
+      if (invoice.leadId === record.id) return true;
+      return getClientsForRecord(record).some((client) => client && client.id === invoice.clientId);
+    });
+    const quotations = relatedInvoices.filter((invoice) => invoice.documentType === "quotation");
+    const invoices = relatedInvoices.filter((invoice) => invoice.documentType !== "quotation");
+    const payments = invoices.filter((invoice) => invoice.status === "paid");
     const eventCount = record.eventDate ? 1 : 0;
+    const noteCount = noteText && noteText !== "No notes have been added for this lead yet." ? 1 : 0;
     const nextEvent = record.eventDate ? `${eventDate} (${record.eventType || "Event"})` : "No upcoming event";
 
     return (
       <div className="crm-lead-details-page">
-        <div className="crm-lead-detail-breadcrumb"><button type="button" onClick={() => setSelected(null)}>Leads</button><span>›</span><strong>Client Details</strong></div>
+        <div className="crm-lead-detail-breadcrumb"><button type="button" onClick={() => setShowClientDetails(false)}>← Back to Lead</button><span>›</span><strong>Client Details / Overview</strong></div>
 
         <div className="crm-lead-detail-header">
           <div className="crm-lead-detail-identity">
@@ -370,7 +448,7 @@ export default function AdminInquiries() {
         </div>
 
         <div className="crm-lead-detail-tabs">
-          {[["overview", "Overview"], ["events", `Events (${eventCount})`], ["quotations", "Quotations (0)"], ["invoices", "Invoices (0)"], ["payments", "Payments (0)"], ["notes", "Notes (1)"], ["documents", "Documents (0)"], ["activity", "Activity Log"]].map(([key, label]) => <button type="button" key={key} className={drawerTab === key ? "active" : ""} onClick={() => setDrawerTab(key)}>{label}</button>)}
+          {[["overview", "Overview"], ["events", `Events (${eventCount})`], ["quotations", `Quotations (${quotations.length})`], ["invoices", `Invoices (${invoices.length})`], ["payments", `Payments (${payments.length})`], ["notes", `Notes (${noteCount})`], ["documents", "Documents (0)"], ["activity", "Activity Log"]].map(([key, label]) => <button type="button" key={key} className={drawerTab === key ? "active" : ""} onClick={() => setDrawerTab(key)}>{label}</button>)}
         </div>
 
         <div className="crm-lead-detail-layout">
@@ -411,9 +489,9 @@ export default function AdminInquiries() {
             </>}
 
             {drawerTab === "events" && <section className="crm-lead-card crm-tab-panel"><h2>Events</h2><div className="crm-event-detail"><b>{record.eventType || "Event"}</b><span>{nextEvent}</span><span>{location}</span><span>{record.guestCount || "—"} guests</span><span>{budget}</span></div></section>}
-            {drawerTab === "quotations" && <section className="crm-lead-card crm-tab-panel"><h2>Quotations</h2><p>No quotations are attached to this lead yet.</p><button type="button" className="crm-detail-gold-btn" onClick={() => createQuotation(record)}>Create Quotation</button></section>}
-            {drawerTab === "invoices" && <section className="crm-lead-card crm-tab-panel"><h2>Invoices</h2><p>No invoices are attached to this lead yet.</p></section>}
-            {drawerTab === "payments" && <section className="crm-lead-card crm-tab-panel"><h2>Payments</h2><p>No payments are recorded for this lead yet.</p></section>}
+            {drawerTab === "quotations" && <section className="crm-lead-card crm-tab-panel"><div className="crm-lead-card-head"><h2>Quotations</h2><button type="button" onClick={() => createQuotation(record)}>Create Quotation</button></div>{quotations.length ? <div className="crm-detail-document-list">{quotations.map((doc) => <div key={doc.id}><b>{doc.number || "Quotation"}</b><span>{fmtDate(doc.issueDate || doc.createdAt)}</span><strong>₹ {(doc.total || 0).toLocaleString("en-IN")}</strong><em>{doc.status || "draft"}</em></div>)}</div> : <p>No quotations are attached to this client yet.</p>}</section>}
+            {drawerTab === "invoices" && <section className="crm-lead-card crm-tab-panel"><div className="crm-lead-card-head"><h2>Invoices</h2><span /></div>{invoices.length ? <div className="crm-detail-document-list">{invoices.map((doc) => <div key={doc.id}><b>{doc.number || "Invoice"}</b><span>{fmtDate(doc.issueDate || doc.createdAt)}</span><strong>₹ {(doc.total || 0).toLocaleString("en-IN")}</strong><em>{doc.status || "draft"}</em></div>)}</div> : <p>No invoices are attached to this client yet.</p>}</section>}
+            {drawerTab === "payments" && <section className="crm-lead-card crm-tab-panel"> <div className="crm-lead-card-head"><h2>Payments</h2><span /></div>{payments.length ? <div className="crm-detail-document-list">{payments.map((doc) => <div key={doc.id}><b>{doc.number || "Payment"}</b><span>Paid invoice</span><strong>₹ {(doc.total || 0).toLocaleString("en-IN")}</strong><em>Paid</em></div>)}</div> : <p>No payments are recorded for this client yet.</p>}</section>}
             {drawerTab === "notes" && <section className="crm-lead-card crm-tab-panel"><div className="crm-lead-card-head"><h2>Notes</h2><span /></div><textarea className="crm-detail-notes" value={noteEdit} onChange={(e) => setNoteEdit(e.target.value)} placeholder="Add internal notes…" /><button type="button" className="crm-detail-gold-btn" onClick={() => handleSaveNote(record.id)}>Save Note</button></section>}
             {drawerTab === "documents" && <section className="crm-lead-card crm-tab-panel"><h2>Documents</h2><p>No documents attached yet.</p></section>}
             {drawerTab === "activity" && <section className="crm-lead-card crm-tab-panel"><h2>Activity Log</h2><div className="crm-detail-activity"><div><b>Lead Created</b><span>{fmtDateTime(record.createdAt)}</span></div><div><b>Source Captured</b><span>{record.leadSource} → {source}</span></div><div><b>Status</b><span>{statusLabel}</span></div>{record.nextFollowUp && <div><b>Follow-up scheduled</b><span>{fmtDateTime(record.nextFollowUp)}</span></div>}</div></section>}
@@ -439,7 +517,7 @@ export default function AdminInquiries() {
         <div className="crm-user"><span className="crm-user-avatar">SV</span><span><strong>Sumit Verma</strong><small>Admin</small></span><span className="crm-user-chevron">⌄</span></div>
       </header>
 
-      {!selected && <main className="crm-content">
+      <main className="crm-content">
         <div className="crm-heading-row">
           <div><h1>CRM – Leads</h1><p>Manage your inquiries, follow-ups and convert them into successful events.</p></div>
           <div className="crm-heading-actions">
@@ -492,9 +570,10 @@ export default function AdminInquiries() {
           </tbody></table></div>}
           <div className="crm-pagination"><button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>{Array.from({ length: Math.min(pageCount, 5) }, (_, i) => i + 1).map((n) => <button type="button" key={n} className={page === n ? "active" : ""} onClick={() => setPage(n)}>{n}</button>)}{pageCount > 5 && <><span>…</span><button type="button" onClick={() => setPage(pageCount)}>{pageCount}</button></>}<button type="button" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>›</button></div>
         </section>
-      </main>}
+      </main>
 
-      {selected && renderLeadDetailsPage(selected)}
+      {selected && !showClientDetails && renderLeadDrawer(selected)}
+      {selected && showClientDetails && renderLeadDetailsPage(selected)}
 
       {showAddLead && (
         <div className="crm-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowAddLead(false); }}>
@@ -548,8 +627,8 @@ export default function AdminInquiries() {
               <aside className="crm-add-lead-side">
                 <section className="crm-add-side-card crm-source-card">
                   <div className="crm-side-title"><Icon name="share" /><div><h3>Lead Source</h3><p>Where did this inquiry come from?</p></div></div>
-                  <div className="crm-source-select"><Icon name={SOURCE_ICONS[leadForm.source] || "layers"} /><select value={leadForm.source || "CRM"} onChange={(e) => handleLeadSourceChange(e.target.value)}>{LEAD_SOURCE_OPTIONS.map((source) => <option key={source} value={source}>{source}</option>)}<option value="__custom__">Custom Source…</option></select><span>⌄</span></div>
-                  {leadForm.source === "__custom__" && <input className="crm-custom-source" required placeholder="Type custom source" onChange={(e) => updateLeadField("source", e.target.value)} />}
+                  <div className="crm-source-select"><Icon name={SOURCE_ICONS[leadSourceCustom ? "layers" : leadForm.source] || "layers"} /><select value={leadSourceCustom ? "__custom__" : (leadForm.source || "CRM")} onChange={(e) => handleLeadSourceChange(e.target.value)}>{LEAD_SOURCE_OPTIONS.map((source) => <option key={source} value={source}>{source}</option>)}<option value="__custom__">Custom Source…</option></select><span>⌄</span></div>
+                  {leadSourceCustom && <input className="crm-custom-source" required value={customLeadSource} placeholder="Type custom source" onChange={(e) => setCustomLeadSource(e.target.value)} />}
                   <div className="crm-source-tip"><Icon name="bulb" /><span>Select the correct source to<br />track marketing performance<br />accurately.</span></div>
                 </section>
 

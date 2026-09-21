@@ -1,17 +1,14 @@
-import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { IMAGES } from "../data/images";
-import { useLiveProducts } from "../hooks/useLiveCatalog";
+import { IMAGES, waLink } from "../data/images";
+import { GLOBAL_ADDONS } from "../data/addons";
 import usePageMeta from "../hooks/usePageMeta";
-import ProductRail from "../components/ProductRail";
 import ShortsRail from "../components/ShortsRail";
 import VideoReviewGrid from "../components/VideoReviewGrid";
 import Faq from "../components/Faq";
-import { useCity } from "../context/CityContext";
-import { cityPrice, fmtINR } from "../lib/pricing";
-import { onImgError } from "../lib/imageFallback";
+import ProductRail from "../components/ProductRail";
+import { listAllProducts, sortProducts, toRailItem } from "../data/occasions";
 
-const HOME_CATEGORIES = [
+const CELEBRATIONS = [
   { label: "Weddings", href: "/occasion/wedding", img: IMAGES.typeWedding },
   { label: "Birthdays", href: "/occasion/birthday", img: IMAGES.typeBirthday },
   { label: "Anniversaries", href: "/occasion/anniversary", img: IMAGES.typeAnniversary },
@@ -23,13 +20,51 @@ const HOME_CATEGORIES = [
   { label: "Festivals & Culture", href: "/occasion/festivals-culture", img: IMAGES.typeFestival },
 ];
 
-const FALLBACK_ITEMS = [
-  { id: "birthday", name: "Birthday Balloon Decoration", image: IMAGES.typeBirthday, price: 2499 },
-  { id: "kids", name: "Kids Birthday Decoration", image: IMAGES.typeKidsBirthday, price: 3999 },
-  { id: "baby", name: "Baby Shower Decoration", image: IMAGES.typeBabyShower, price: 4699 },
-  { id: "anniversary", name: "Romantic Anniversary Decor", image: IMAGES.typeAnniversary, price: 3999 },
-  { id: "wedding", name: "Wedding Decor", image: IMAGES.typeWedding, price: 7999 },
+const WEDDING_CONCEPTS = [
+  { label: "Haldi", img: IMAGES.showcase1 },
+  { label: "Mehendi", img: IMAGES.themeMehndiHenna },
+  { label: "Sangeet", img: IMAGES.showcase3 },
+  { label: "Wedding", img: IMAGES.galWedding1 },
+  { label: "Reception", img: IMAGES.galWedding2 },
+  { label: "Engagement", img: IMAGES.showcase4 },
+  { label: "Mayra / Rituals", img: IMAGES.showcase5 },
 ];
+
+const WEDDING_SERVICES = [
+  { label: "Décor", sub: "Packages & elements", img: IMAGES.typeDecor },
+  { label: "Entry", sub: "Grand & unique entries", img: IMAGES.showcase4 },
+  { label: "Entertainment", sub: "Artists, DJ, live bands", img: IMAGES.galConcert2 },
+  { label: "Sound & Technical", sub: "Lighting, AV, effects", img: IMAGES.themeStageLights },
+  { label: "Tent & Furniture", sub: "Tents, seating, tables", img: IMAGES.showcase2 },
+  { label: "Photography & Videography", sub: "Capture every moment", img: IMAGES.typePhotography },
+  { label: "Catering", sub: "Delicious food experiences", img: IMAGES.typeCatering },
+  { label: "Baraat / Procession", sub: "Make an unforgettable entry", img: IMAGES.themeStageLights },
+];
+
+const BIRTHDAY_THEMES = [
+  { label: "Jungle", img: IMAGES.themeJungleLeaves },
+  { label: "Cocomelon", img: IMAGES.typeKidsBirthday },
+  { label: "Fairy", img: IMAGES.themeTiaraCrown },
+  { label: "Superhero", img: IMAGES.heroBirthday },
+  { label: "Barbie", img: IMAGES.themePony },
+  { label: "Frozen", img: IMAGES.heroBirthday },
+  { label: "And Many More!", img: IMAGES.themeBalloonCelebration },
+];
+
+const RECENT_WORK = [
+  { category: "Weddings", label: "Royal Wedding", img: IMAGES.galWedding1 },
+  { category: "Weddings", label: "Reception Night", img: IMAGES.galWedding2 },
+  { category: "Birthdays", label: "Kids Birthday", img: IMAGES.galBirthday1 },
+  { category: "Birthdays", label: "Balloon Celebration", img: IMAGES.galBirthday2 },
+  { category: "Corporate", label: "Success Together", img: IMAGES.galCorporate1 },
+  { category: "Corporate", label: "Corporate Launch", img: IMAGES.galCorporate2 },
+  { category: "Kids", label: "Jungle Theme", img: IMAGES.themeJungleLeaves },
+  { category: "Kids", label: "Princess Theme", img: IMAGES.themeTiaraCrown },
+  { category: "Other Events", label: "Outdoor Celebration", img: IMAGES.showcase4 },
+  { category: "Other Events", label: "Festive Evening", img: IMAGES.galDecor3 },
+];
+
+const RECENT_FILTERS = ["All", "Weddings", "Birthdays", "Corporate", "Kids", "Other Events"];
 
 
 const HOME_FAQS = [
@@ -48,13 +83,199 @@ const HOME_REVIEWS = [
   { initials: "MP", name: "Meera Patil", meta: "Birthday, Pune", text: "My daughter's birthday theme was so well executed, from the balloon arch to the cake table styling. Highly recommended.", tags: ["Creative Theming", "Kid-Friendly"] },
 ];
 
-function HomeStats() {
+const HOME_USPS = [
+  ["✦", "Creative Themes & Concepts", "Unique ideas for every occasion."],
+  ["◉", "Experienced Team", "Passionate professionals who manage every detail."],
+  ["◎", "End-to-End Support", "From planning to execution, one trusted team."],
+  ["◇", "Premium Quality", "We never compromise on the details."],
+  ["♢", "Personalized Planning", "Tailored to your needs and budget."],
+  ["✓", "One Point Solution", "All services under one roof."],
+];
+
+function HomeHero() {
   return (
-    <section className="video-home-stats">
-      <div className="container">
-        <div className="video-home-stat"><strong>150+</strong><span>Events Celebrated</span></div>
-        <div className="video-home-stat"><strong>5+</strong><span>Years of Experience</span></div>
-        <div className="video-home-stat"><strong>4.9</strong><span>Average Rating</span></div>
+    <section className="ref-home-hero">
+      <img src={IMAGES.heroHome} alt="Wedding celebration by Next Level Events" />
+      <div className="ref-home-hero-overlay" />
+      <div className="ref-home-hero-content">
+        <span>WELCOME TO NEXT LEVEL EVENTS</span>
+        <h1>We Create <em>Experiences,</em><br />Not Just Events.</h1>
+        <p>Weddings • Birthdays • Corporate • Celebrations</p>
+        <small>From intimate gatherings to grand celebrations, we bring your vision to life with creativity, precision and passion.</small>
+        <div className="ref-home-hero-actions">
+          <Link to="/book-event" className="ref-home-gold-btn">Plan Your Event <b>→</b></Link>
+          <Link to="/gallery" className="ref-home-outline-btn">◉ &nbsp;Explore Our Work</Link>
+        </div>
+        <div className="ref-home-hero-stats">
+          <span><b>500+</b>Events Planned</span>
+          <span><b>100%</b>Client Satisfaction</span>
+          <span><b>6+ Years</b>of Experience</span>
+          <span><b>End-to-End</b>Event Support</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RefSectionHead({ eyebrow, title, link }) {
+  return (
+    <div className="ref-home-head">
+      <div>
+        {eyebrow && <span>{eyebrow}</span>}
+        <h2>{title}</h2>
+      </div>
+      {link && <Link to={link.href}>{link.label} →</Link>}
+    </div>
+  );
+}
+
+function HorizontalCards({ items, cardClass = "ref-home-card", dark = false }) {
+  return (
+    <div className={`ref-home-slider ${dark ? "is-dark" : ""}`}>
+      {items.map((item) => (
+        <Link className={cardClass} to={item.href || "/book-event"} key={item.label}>
+          <img src={item.img} alt={item.label} />
+          <strong>{item.label}</strong>
+          {item.sub && <span>{item.sub}</span>}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function CelebrationSection() {
+  return (
+    <section className="ref-home-celebrations">
+      <div className="ref-home-container">
+        <div className="ref-home-occasion-head">
+          <h2>Shop by Occasion</h2>
+          <Link to="/shop-by-occasion">SEE ALL</Link>
+        </div>
+        <div className="ref-home-celebration-grid">
+          {CELEBRATIONS.map((item) => (
+            <Link to={item.href} className="ref-home-celebration-card" key={item.label}>
+              <span className="ref-home-celebration-image">
+                <img src={item.img} alt={item.label} />
+              </span>
+              <b>{item.label}</b>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WeddingSection() {
+  return (
+    <>
+      <section className="ref-home-dark-section">
+        <div className="ref-home-container">
+          <RefSectionHead eyebrow="THE WEDDING COLLECTION" title="Weddings, Beautifully Planned" link={{ label: "Explore wedding functions", href: "/occasion/wedding" }} />
+          <p className="ref-home-dark-copy">From Haldi to the grand Reception, we design every function with unique themes, stunning décor and seamless execution.</p>
+          <HorizontalCards items={WEDDING_CONCEPTS} cardClass="ref-home-concept-card" dark />
+        </div>
+      </section>
+
+      <section className="ref-home-light-section">
+        <div className="ref-home-container">
+          <RefSectionHead title="Everything You Need for Your Event" link={{ label: "Explore all services", href: "/services" }} />
+          <p className="ref-home-intro">One team. All your event needs. Hassle-free planning, stunning execution.</p>
+          <HorizontalCards items={WEDDING_SERVICES} cardClass="ref-home-service-card" />
+        </div>
+      </section>
+    </>
+  );
+}
+
+function BirthdaySection() {
+  return (
+    <section className="ref-home-birthday">
+      <div className="ref-home-container">
+        <RefSectionHead title="A World of Imagination for Little Celebrations" link={{ label: "Explore kids birthday themes", href: "/occasion/birthday/kids-birthday" }} />
+        <p className="ref-home-intro">Magical themes, joyful setups and unforgettable moments for your little one.</p>
+        <HorizontalCards items={BIRTHDAY_THEMES} cardClass="ref-home-theme-card" />
+      </div>
+    </section>
+  );
+}
+
+function PopularPackagesSection() {
+  const entries = listAllProducts();
+  const seen = new Set();
+  const popularPackages = sortProducts(entries.map((entry) => entry.product), "popular")
+    .filter((product) => {
+      const key = product?.slug || product?.id;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 8)
+    .map((product) => {
+      const key = product?.slug || product?.id;
+      const entry = entries.find((item) => (item?.product?.slug || item?.product?.id) === key);
+      return entry ? toRailItem(product, entry.trail) : null;
+    })
+    .filter(Boolean);
+
+  return (
+    <ProductRail
+      title="Popular Packages"
+      viewAllHref="/packages"
+      items={popularPackages}
+    />
+  );
+}
+
+function AddonsSection() {
+  const items = GLOBAL_ADDONS.map((item) => ({
+    ...item,
+    sub: item.subLabel,
+    href: item.href,
+  }));
+
+  return (
+    <section className="ref-home-addons">
+      <div className="ref-home-container">
+        <RefSectionHead title="Add-Ons to Elevate Your Celebration" link={{ label: "Explore add-ons", href: "/occasion/event-add-ons" }} />
+        <p className="ref-home-intro">Create more magical moments with our wide range of add-ons.</p>
+        <HorizontalCards items={items} cardClass="ref-home-addon-card" />
+      </div>
+    </section>
+  );
+}
+
+function HomeUSPs() {
+  return (
+    <section className="ref-home-usp">
+      <div className="ref-home-container">
+        <RefSectionHead title="The Next Level Difference" />
+        <p className="ref-home-dark-copy">Why clients trust us, again and again.</p>
+        <div className="ref-home-usp-grid">
+          {HOME_USPS.map(([icon, title, text]) => (
+            <div key={title}><i>{icon}</i><b>{title}</b><span>{text}</span></div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCTA() {
+  return (
+    <section className="ref-home-final-cta">
+      <img src={IMAGES.heroWedding} alt="" />
+      <div className="ref-home-final-overlay" />
+      <div className="ref-home-container">
+        <div>
+          <span>LET'S CREATE SOMETHING MAGICAL</span>
+          <h2>Tell Us Your Dream.<br /><em>We'll Take It to the Next Level.</em></h2>
+          <p>Share your ideas, and let our team create an unforgettable experience for you.</p>
+          <div className="ref-home-cta-actions">
+            <Link to="/book-event" className="ref-home-gold-btn">Get a Free Consultation →</Link>
+            <a href={waLink("Hi Next Level Events! I'd like a free consultation for my event.")} target="_blank" rel="noreferrer" className="ref-home-outline-btn">◉ &nbsp;WhatsApp Us</a>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -155,154 +376,28 @@ function HomeTrustSections() {
   );
 }
 
-function normalizeProduct(p) {
-  return {
-    id: p.id || p.slug,
-    href: "/package-details?id=" + (p.id || p.slug),
-    img: p.image || p.img || IMAGES.typeBirthday,
-    name: p.name || "Event Decoration",
-    badge: p.badge,
-    price: typeof p.price === "number" ? p.price : undefined,
-    originalPrice: typeof p.originalPrice === "number" ? p.originalPrice : undefined,
-    popularity: Number(p.popularity || 0),
-  };
-}
-
-function fallbackRail(prefix, items = FALLBACK_ITEMS) {
-  return items.map((item, i) => ({
-    ...item,
-    id: prefix + "-" + item.id,
-    href: "/packages",
-    img: item.image,
-    popularity: 100 - i,
-  }));
-}
-
-function HomeHero() {
-  return (
-    <section className="video-home-hero">
-      <div className="video-home-hero-bg">
-        <img src={IMAGES.heroCompactHome} alt="Beautiful event decoration" onError={onImgError} />
-      </div>
-      <div className="video-home-hero-overlay" />
-      <div className="video-home-hero-copy container">
-        <span className="video-home-kicker">NEXT LEVEL EVENTS</span>
-        <h1>Beautiful celebrations.<br /><strong>Made for your moment.</strong></h1>
-        <p>Explore birthday, anniversary, baby shower and wedding decorations.</p>
-        <Link to="/shop-by-occasion" className="video-home-hero-btn">Explore Decorations</Link>
-      </div>
-      <div className="video-home-hero-dots" aria-hidden="true"><i /><i className="active" /><i /><i /></div>
-    </section>
-  );
-}
-
-function CategoryStrip() {
-  return (
-    <section className="video-home-category-section">
-      <div className="container">
-        <div className="video-home-section-head">
-          <div>
-            <h2>Shop by Occasion</h2>
-          </div>
-          <Link to="/shop-by-occasion">See all</Link>
-        </div>
-        <div className="video-home-category-strip">
-          {HOME_CATEGORIES.map((category) => (
-            <Link className="video-home-category-card" to={category.href} key={category.label}>
-              <span className="video-home-category-image"><img src={category.img} alt={category.label} onError={onImgError} /></span>
-              <span>{category.label}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PromoBanner({ image, eyebrow, title, text, href = "/book-event" }) {
-  return (
-    <div className="video-home-promo">
-      <img src={image} alt="Event decoration promotion" onError={onImgError} />
-      <div className="video-home-promo-copy">
-        <span>{eyebrow}</span>
-        <h3>{title}</h3>
-        <p>{text}</p>
-        <Link to={href}>Book now</Link>
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   usePageMeta(
-    "Next Level Events — Event Decoration & Planning",
-    "Explore birthday, anniversary, baby shower, kids birthday and wedding decoration packages from Next Level Events."
+    "Next Level Events — Event Planning, Weddings, Birthdays & Celebrations",
+    "Plan weddings, birthdays, corporate events and celebrations with Next Level Events."
   );
-
-  const products = useLiveProducts();
-  const { city } = useCity();
-
-  const live = useMemo(() => (Array.isArray(products) ? products.map(normalizeProduct) : []), [products]);
-
-  const trending = useMemo(() => {
-    const items = [...live].sort((a, b) => b.popularity - a.popularity).slice(0, 6);
-    return items.length >= 4 ? items : fallbackRail("trending");
-  }, [live]);
-
-  const birthday = useMemo(() => {
-    const items = live.filter((p) => /birthday|balloon|kids|dinosaur|barbie|princess|theme/i.test(p.name)).slice(0, 8);
-    return items.length >= 4 ? items : fallbackRail("birthday", FALLBACK_ITEMS.slice(0, 4));
-  }, [live]);
-
-  const anniversary = useMemo(() => {
-    const items = live.filter((p) => /anniversary|romantic|proposal|couple|love/i.test(p.name)).slice(0, 8);
-    return items.length >= 4 ? items : fallbackRail("anniversary", [FALLBACK_ITEMS[3], FALLBACK_ITEMS[0], FALLBACK_ITEMS[4], FALLBACK_ITEMS[2]]);
-  }, [live]);
-
-  const babyShower = useMemo(() => {
-    const items = live.filter((p) => /baby|shower|newborn|welcome|naming/i.test(p.name)).slice(0, 8);
-    return items.length >= 4 ? items : fallbackRail("baby", [FALLBACK_ITEMS[2], FALLBACK_ITEMS[1], FALLBACK_ITEMS[0], FALLBACK_ITEMS[4]]);
-  }, [live]);
-
-  const carBoot = useMemo(() => {
-    const items = live.filter((p) => /car|boot|surprise|proposal/i.test(p.name)).slice(0, 8);
-    return items.length >= 4 ? items : fallbackRail("car", [FALLBACK_ITEMS[3], FALLBACK_ITEMS[0], FALLBACK_ITEMS[2], FALLBACK_ITEMS[4]]);
-  }, [live]);
 
   return (
     <main className="video-home">
       <HomeHero />
-      <HomeStats />
-      <CategoryStrip />
+      <CelebrationSection />
+      <WeddingSection />
+      <BirthdaySection />
+      <PopularPackagesSection />
+      <AddonsSection />
+      <HomeUSPs />
+      <FinalCTA />
 
-      <ProductRail title="Birthday Balloon Decoration" viewAllHref="/occasion/birthday" items={trending} />
-      <ProductRail title="Kids Special" viewAllHref="/occasion/birthday/kids-birthday" items={birthday} tone="surface" />
-      <ProductRail title="Romantic Anniversary Decoration" viewAllHref="/occasion/anniversary" items={anniversary} />
-
-      <section className="video-home-banner-section">
-        <div className="container">
-          <PromoBanner
-            image={IMAGES.promo4}
-            eyebrow="Kids' Birthday Activities"
-            title="Make the party unforgettable"
-            text="Clown, magician, face painting and fun activities for kids."
-            href="/book-event"
-          />
-        </div>
-      </section>
-
-      <ProductRail title="Baby Shower Packages" viewAllHref="/occasion/baby-shower" items={babyShower} tone="surface" />
-      <ProductRail title="Car Boot Surprise Decorations" viewAllHref="/shop-by-occasion" items={carBoot} />
-
+      {/* Everything from Shorts onward is intentionally kept in the existing website order. */}
       <ShortsRail />
       <CustomerReviews />
       <VideoReviewGrid />
       <HomeTrustSections />
-
-      {/* Keep the city/pricing context available to the storefront without changing the reference layout. */}
-      <div className="video-home-city-note" aria-hidden="true">
-        {city && fmtINR(cityPrice(0, city)) === "₹0" ? null : null}
-      </div>
     </main>
   );
 }
