@@ -173,7 +173,7 @@ export default function Checkout() {
                     <h4>{it.name}{it.quantity > 1 ? " × " + it.quantity : ""}</h4>
                     <p>{describeBooking(it) || "—"}</p>
                     {it.address ? <p className="muted">{it.locationType ? it.locationType + " — " : ""}{it.address}</p> : null}
-                    {it.addons?.length ? <p className="muted">Add-ons: {it.addons.map((a) => a.name).join(", ")}</p> : null}
+                    {it.addons?.length ? <p className="muted">Services: {it.addons.map((a) => a.name).join(", ")}</p> : null}
                     {it.notes ? <p className="muted">Notes: {it.notes}</p> : null}
                   </div>
                   <b>{fmtINR(itemLineTotal(it))}</b>
@@ -183,7 +183,7 @@ export default function Checkout() {
               <h3 style={{ fontSize: 16, margin: "22px 0 10px" }}>Price Breakdown</h3>
               <div className="review-list">
                 {items.map((it) => <div className="review-row" key={it.id}><span>{it.name}{it.quantity > 1 ? " (×" + it.quantity + ")" : ""}</span><span>{fmtINR(itemBasePrice(it) * (it.quantity || 1))}</span></div>)}
-                {items.some((it) => itemAddonsTotal(it) > 0) && <div className="review-row"><span>Add-on services</span><span>{fmtINR(items.reduce((s, it) => s + itemAddonsTotal(it) * (it.quantity || 1), 0))}</span></div>}
+                {items.some((it) => itemAddonsTotal(it) > 0) && <div className="review-row"><span>Services</span><span>{fmtINR(items.reduce((s, it) => s + itemAddonsTotal(it) * (it.quantity || 1), 0))}</span></div>}
                 {discount > 0 && <div className="review-row" style={{ color: "#2f8f5b" }}><span>Discount</span><span>-{fmtINR(discount)}</span></div>}
                 <div className="review-row" style={{ fontWeight: 700, fontSize: 15 }}><span>Estimated Total</span><span>{fmtINR(subtotal)}</span></div>
               </div>

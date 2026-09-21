@@ -15,11 +15,11 @@ export default function AdminProductForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const isEditing = Boolean(id);
-  const isAddonMode = location.pathname.startsWith("/admin/addons/products");
+  const isAddonMode = (location.pathname.startsWith("/admin/services/products") || location.pathname.startsWith("/admin/addons/products"));
 
   usePageMeta(
     isEditing ? "Edit Product — Admin" : "New Product — Admin",
-    "Configure product details, inclusions, add-ons, pricing, and pictures."
+    "Configure product details, inclusions, services, pricing, and pictures."
   );
 
   const occasions = getOccasions();
@@ -28,7 +28,7 @@ export default function AdminProductForm() {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
-    occasionSlug: isAddonMode ? "event-add-ons" : (occasions[0]?.slug || "wedding"),
+    occasionSlug: isAddonMode ? "event-services" : (occasions[0]?.slug || "wedding"),
     categorySlug: "",
     isAddon: isAddonMode,
     categoryPath: [],
@@ -77,7 +77,7 @@ export default function AdminProductForm() {
       if (p) {
         setFormData({
           ...p,
-          isAddon: Boolean(p.isAddon || p.occasionSlug === "event-add-ons" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-add-ons")),
+          isAddon: Boolean(p.isAddon || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")),
           price: p.price || 0,
           originalPrice: p.originalPrice || "",
           includes: Array.isArray(p.includes) ? p.includes : [],
@@ -207,13 +207,13 @@ export default function AdminProductForm() {
       setSaving(true);
       const saved = await saveProductToCloud({
         ...formData,
-        ...(isAddonMode ? { isAddon: true, occasionSlug: "event-add-ons" } : {}),
+        ...(isAddonMode ? { isAddon: true, occasionSlug: "event-services" } : {}),
         id: formData.id || (isEditing ? id : undefined),
       });
 
       setSavedMessage(`Successfully saved "${saved.name}" to the live catalog.`);
       setTimeout(() => {
-        navigate(isAddonMode ? "/admin/addons" : "/admin/products");
+        navigate(isAddonMode ? "/admin/services" : "/admin/products");
       }, 1000);
     } catch (err) {
       setError(err.message || "Failed to save product.");
@@ -222,8 +222,8 @@ export default function AdminProductForm() {
     }
   }
 
-  // Category choices are intentionally different for add-on products.
-  // Add-ons always live under Event Add-ons and never mix with normal
+  // Category choices are intentionally different for service products.
+  // Services always live under Event Services and never mix with normal
   // occasion/package categories.
   const currentOccasion = occasions.find((o) => o.slug === formData.occasionSlug);
   const availableCategories = isAddonMode
@@ -251,16 +251,16 @@ export default function AdminProductForm() {
       <div className="admin-page-head">
         <div>
           <p className="admin-crumb">
-            <Link to={isAddonMode ? "/admin/addons" : "/admin/products"}>← Back to {isAddonMode ? "Event Add-ons" : "Products"}</Link>
+            <Link to={isAddonMode ? "/admin/services" : "/admin/products"}>← Back to {isAddonMode ? "Event Services" : "Products"}</Link>
           </p>
-          <h1>{isEditing ? `Edit: ${formData.name || "Product"}` : `Create New ${isAddonMode ? "Add-on Product" : "Product"}`}</h1>
+          <h1>{isEditing ? `Edit: ${formData.name || "Product"}` : `Create New ${isAddonMode ? "Service Product" : "Product"}`}</h1>
         </div>
         <div className="admin-head-actions">
           <button type="button" className="btn btn-outline" onClick={() => setPreviewOpen(true)}>
             <Icon name="eye" /> Live Preview
           </button>
           <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
-            <Icon name="check" /> {saving ? "Saving…" : (isAddonMode ? "Save Add-on Product" : "Save Product")}
+            <Icon name="check" /> {saving ? "Saving…" : (isAddonMode ? "Save Service Product" : "Save Product")}
           </button>
         </div>
       </div>
@@ -435,7 +435,7 @@ export default function AdminProductForm() {
 
           {/* Section 3: Inclusions & Addons */}
           <section className="admin-panel">
-            <h2>3. Package Inclusions & Add-ons</h2>
+            <h2>3. Package Inclusions & Services</h2>
 
             <div className="admin-form-group">
               <label className="admin-form-label">What's Included</label>
@@ -466,12 +466,12 @@ export default function AdminProductForm() {
             </div>
 
             <div className="admin-form-group" style={{ marginTop: "20px" }}>
-              <label className="admin-form-label">Recommended Add-ons</label>
+              <label className="admin-form-label">Recommended Services</label>
               {formData.addons.length > 0 && (
                 <table className="admin-table admin-table-sm" style={{ marginBottom: "14px" }}>
                   <thead>
                     <tr>
-                      <th>Add-on Name</th>
+                      <th>Service Name</th>
                       <th>Price (₹)</th>
                       <th style={{ width: "60px" }}></th>
                     </tr>
@@ -645,15 +645,15 @@ export default function AdminProductForm() {
 
           {/* Section 5: Category & Hierarchy */}
           <section className="admin-panel">
-            <h2>{isAddonMode ? "Add-on Category" : "Occasion & Category"}</h2>
+            <h2>{isAddonMode ? "Service Category" : "Occasion & Category"}</h2>
             {isAddonMode ? (
               <>
-                <div className="admin-calc-box"><strong>Event Add-ons</strong><span className="admin-table-sub">This product will appear only in the Add-on catalog.</span></div>
+                <div className="admin-calc-box"><strong>Event Services</strong><span className="admin-table-sub">This product will appear only in the Service catalog.</span></div>
                 {availableCategories.length > 0 && (
                   <div className="admin-form-group">
-                    <label className="admin-form-label">Add-on Category *</label>
-                    <select className="admin-select" value={(formData.categoryPath || []).join("/")} onChange={(e) => { const selected = availableCategories.find((c) => c.path.join("/") === e.target.value); setFormData({ ...formData, occasionSlug: "event-add-ons", categorySlug: selected ? selected.slug : "", categoryPath: selected ? selected.path : [], isAddon: true }); }} required>
-                      <option value="">Select Add-on Category</option>
+                    <label className="admin-form-label">Service Category *</label>
+                    <select className="admin-select" value={(formData.categoryPath || []).join("/")} onChange={(e) => { const selected = availableCategories.find((c) => c.path.join("/") === e.target.value); setFormData({ ...formData, occasionSlug: "event-services", categorySlug: selected ? selected.slug : "", categoryPath: selected ? selected.path : [], isAddon: true }); }} required>
+                      <option value="">Select Service Category</option>
                       {availableCategories.map((c) => <option key={c.path.join("/")} value={c.path.join("/")}>{c.displayLabel}</option>)}
                     </select>
                   </div>

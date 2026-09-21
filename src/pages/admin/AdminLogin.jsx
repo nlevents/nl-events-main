@@ -1,3 +1,4 @@
+import "../../styles/admin.css";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";

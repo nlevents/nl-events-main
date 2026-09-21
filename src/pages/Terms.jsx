@@ -67,7 +67,7 @@ export default function Terms() {
 
           <section id="pricing">
             <h2>5. Pricing &amp; payments</h2>
-            <p>Prices shown on the Site are starting prices for the city you have selected and are indicative, not final quotes — final pricing depends on guest count, add-ons, exact date and specific requirements. Prices outside Ranchi include a logistics adjustment, disclosed on the relevant page.</p>
+            <p>Prices shown on the Site are starting prices for the city you have selected and are indicative, not final quotes — final pricing depends on guest count, services, exact date and specific requirements. Prices outside Ranchi include a logistics adjustment, disclosed on the relevant page.</p>
             <p>At present, payment is coordinated directly with our team (for example by UPI or bank transfer) after your booking is confirmed, and receipts are issued separately. We do not currently collect or store card details through the Site.</p>
           </section>
 

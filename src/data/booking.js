@@ -23,9 +23,9 @@ export const LOCATION_TYPE_OPTIONS = [
   "Other",
 ];
 
-// Fallback add-on services offered on every booking, on top of whatever
+// Fallback services offered on every booking, on top of whatever
 // addons a specific product/package already defines (see BookingPanel).
-// This guarantees the "Add-On Services" section always has something to
+// This guarantees the "Services" section always has something to
 // offer, even for Shop-by-Occasion products that don't carry their own
 // addons list. Prices are Ranchi base rates — cityPrice() adjusts them
 // per-city the same way product prices are adjusted.

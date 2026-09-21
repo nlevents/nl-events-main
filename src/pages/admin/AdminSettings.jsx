@@ -58,7 +58,7 @@ export default function AdminSettings() {
         Inquiries: catalog.inquiries || [],
         Blackouts: catalog.blackouts || [],
         Cities: catalog.cities || [],
-        "Event Add-ons": catalog.addons || [],
+        "Event Services": catalog.addons || [],
         Clients: admin.clients,
         Invoices: admin.invoices,
         Settings: [admin.settings],
@@ -150,7 +150,7 @@ export default function AdminSettings() {
       <section className="admin-panel">
         <h2>Data backup</h2>
         <p className="admin-hint">
-          Download a complete Excel backup of your catalog, categories, products, media, cities, add-ons, videos, enquiries, clients, invoices, and settings. Keep a copy somewhere safe for your records.
+          Download a complete Excel backup of your catalog, categories, products, media, cities, services, videos, enquiries, clients, invoices, and settings. Keep a copy somewhere safe for your records.
         </p>
         <div className="admin-modal-actions" style={{ justifyContent: "flex-start", gap: 12 }}>
           <button type="button" className="btn btn-primary" onClick={handleExcelExport}>Download full Excel (.xlsx)</button>

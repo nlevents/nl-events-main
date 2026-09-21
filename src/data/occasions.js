@@ -43,14 +43,14 @@ function makeOccasion(o) {
 }
 
 export const OCCASIONS = [
-  // Event Add-ons is a real catalog branch. It is intentionally hidden from
-  // the normal Shop by Occasion browser, but it gives every add-on a proper
-  // category hierarchy: Event Add-ons → SFX → actual SFX products, etc.
+  // Event Services is a real catalog branch. It is intentionally hidden from
+  // the normal Shop by Occasion browser, but it gives every service a proper
+  // category hierarchy: Event Services → SFX → actual SFX products, etc.
   makeOccasion({
-    slug: "event-add-ons",
-    label: "Event Add-ons",
-    tagline: "Enhance your event with specialist add-on services.",
-    description: "Browse add-on services by category, then choose the actual package or service you need.",
+    slug: "event-services",
+    label: "Event Services",
+    tagline: "Enhance your event with specialist services.",
+    description: "Browse services by category, then choose the actual package or service you need.",
     image: IMAGES.showcase7,
     heroImg: IMAGES.showcase7,
     addonOnly: true,
@@ -446,6 +446,21 @@ export const OCCASIONS = [
   }),
 
   makeOccasion({
+    slug: "kids-family",
+    label: "Kids & Family",
+    tagline: "Family milestones and celebrations designed with care.",
+    description: "Browse baby showers, Annaprashan, Mundan, naming ceremonies and family event setups.",
+    image: IMAGES.typeBabyShower,
+    heroImg: IMAGES.heroBirthday,
+    children: [
+      makeCategory({ slug: "baby-shower", label: "Baby Shower", description: "Warm, photo-ready baby shower celebrations.", image: IMAGES.typeBabyShower }),
+      makeCategory({ slug: "annaprashan", label: "Annaprashan", description: "Traditional and modern first-food ceremony styling.", image: IMAGES.typeAnnaprashan }),
+      makeCategory({ slug: "mundan-ceremony", label: "Mundan Ceremony", description: "A sacred family tradition, beautifully celebrated.", image: IMAGES.showcase5 }),
+      makeCategory({ slug: "naming-ceremony", label: "Naming Ceremony", description: "Meaningful naming ceremony décor and planning.", image: IMAGES.typeNewbornWelcome }),
+    ],
+  }),
+
+  makeOccasion({
     slug: "corporate",
     label: "Corporate",
     tagline: "Branded corporate events organised by event type.",
@@ -542,8 +557,8 @@ replaceChildren("wedding", [
   makeRefNode("category", "wedding-car", "Wedding Car", IMAGES.showcase1, "Wedding car decoration packages."),
 ]);
 
-// Event Add-ons hierarchy: the visible cards are categories, never products.
-replaceChildren("event-add-ons", [
+// Event Services hierarchy: the visible cards are categories, never products.
+replaceChildren("event-services", [
   makeRefNode("category", "sfx", "SFX", IMAGES.showcase7, "Special effects: cold pyro, fog and fireworks.", [
     makeRefNode("category", "cold-pyro", "Cold Pyro", IMAGES.showcase7, "Cold spark effects for entries and stages."),
     makeRefNode("category", "fog", "Fog", IMAGES.showcase7, "Fog and atmospheric effects."),
@@ -731,8 +746,23 @@ function getLiveOccasions() {
   }
 }
 
+const PUBLIC_TOP_LEVEL_OCCASIONS = new Set([
+  "wedding",
+  "birthday",
+  "corporate",
+  "kids-family",
+  "anniversary",
+  "festivals-culture",
+]);
+
 export function listOccasions() {
-  return getLiveOccasions().filter((o) => !o.addonOnly);
+  // Keep the public Shop by Occasion collection intentionally limited to the
+  // six primary occasion families. Baby Shower, Newborn Welcome and
+  // Annaprashan remain available as nested Kids & Family categories / legacy
+  // routes, but they are no longer separate top-level occasions.
+  return getLiveOccasions().filter(
+    (o) => !o.addonOnly && PUBLIC_TOP_LEVEL_OCCASIONS.has(o.slug),
+  );
 }
 
 export function findOccasion(slug) {
@@ -829,7 +859,7 @@ function cheapestPriceOf(node) {
 
 // Flattens the live occasion tree (admin-added products already merged in)
 // into every browsable node — occasion, category, or theme, but never a
-// leaf product. Used by Admin → Event Add-ons so an add-on card always
+// leaf product. Used by Admin → Event Services so a service card always
 // points at a real sub-category with real products, instead of a
 // hand-typed link the catalog knows nothing about.
 export function flattenCategoryTree() {
@@ -1162,9 +1192,9 @@ export function heroGalleryFor(node, trail) {
 // listing, where facets like Occasion/Theme/City/Price/Popularity all
 // apply across every occasion at once.
 //
-// Event Add-ons (addonOnly branch) is intentionally excluded here: those
+// Event Services (addonOnly branch) is intentionally excluded here: those
 // products are only meant to surface (a) on their own product page, and
-// (b) as "Popular Add-ons" cards just under an occasion's subcategories
+// (b) as "Popular Services" cards just under an occasion's subcategories
 // (see CategoryTemplate). They must never appear in the generic site-wide
 // packages grid, "Popular Packages", or "Popular in your city" rails.
 export function listAllProducts() {

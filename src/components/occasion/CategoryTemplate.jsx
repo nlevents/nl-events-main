@@ -59,7 +59,7 @@ export default function CategoryTemplate({ node, trail }) {
   );
   const quickLinks = useMemo(() => quickLinksFor(node, trail), [node, trail]);
 
-  // Add-ons are admin-editable (Admin → Event Add-ons), so they're read
+  // Services are admin-editable (Admin → Event Services), so they're read
   // from the catalog store rather than the static data file, and kept in
   // sync with "nle-catalog-updated" so admin edits show without a reload.
   const topSlug = Array.isArray(trail) && trail.length > 0 ? trail[0].slug : null;
@@ -147,7 +147,7 @@ export default function CategoryTemplate({ node, trail }) {
         <OccasionQuickLinks title={node.label + " Decoration Themes"} items={quickLinks} node={node} trail={trail} />
 
         {!node.addonOnly && (
-          <EventAddons title="Add-ons Categories" occasionLabel={node.label} items={addonItems} />
+          <EventAddons title="Services Categories" occasionLabel={node.label} items={addonItems} />
         )}
 
         {products.length > 0 && (

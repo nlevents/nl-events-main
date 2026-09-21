@@ -40,7 +40,7 @@ export default function AdminProducts() {
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
-      if (p.isAddon === true || p.occasionSlug === "event-add-ons" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-add-ons")) return false;
+      if (p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")) return false;
       const matchSearch =
         !search ||
         p.name.toLowerCase().includes(search.toLowerCase()) ||

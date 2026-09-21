@@ -63,7 +63,7 @@
 }
 .occ-cat-count svg{ width:13px; height:13px; }
 
-/* ---------- Add-ons (SFX / Artists / Photography, per occasion) ---------- */
+/* ---------- Services (SFX / Artists / Photography, per occasion) ---------- */
 .occ-addon-grid{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:18px;
 }

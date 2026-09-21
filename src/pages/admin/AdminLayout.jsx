@@ -1,3 +1,4 @@
+import "../../styles/admin.css";
 import { useState } from "react";
 import { NavLink, Outlet, useLocation, Navigate } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";
@@ -7,43 +8,39 @@ import usePageMeta from "../../hooks/usePageMeta";
 
 
 const CRM_NAV_GROUPS = [
-  { title: "Sales & Bookings", items: [
+  { title: null, items: [
     { to: "/admin", label: "Dashboard", icon: "home", end: true },
-    { to: "/admin/inquiries", label: "CRM", icon: "user" },
-    { to: "/admin/invoices", label: "Quotations", icon: "send" },
-    { to: "/admin/clients", label: "Clients", icon: "user" },
-    { to: "/admin/coupons", label: "Coupons & Promos", icon: "percent" },
   ] },
-  { title: "Event Management", items: [
-    { to: "/admin/events", label: "All Events", icon: "calendar" },
+  { title: "Sales & CRM", items: [
+    { to: "/admin/inquiries", label: "CRM", icon: "users" },
+    { to: "/admin/calendar", label: "Calendar", icon: "calendar" },
+    { to: "/admin/clients", label: "Clients", icon: "users" },
+  ] },
+  { title: "Catalog", items: [
+    { to: "/admin/products", label: "Catalog", icon: "package" },
+    { to: "/admin/media", label: "Media", icon: "image" },
+  ] },
+  { title: "Events & Operations", items: [
+    { to: "/admin/events", label: "All Events", icon: "clipboard" },
     { to: "/admin/availability", label: "Event Calendar", icon: "calendar" },
-    { to: "/admin/tasks", label: "Tasks & Follow-ups", icon: "check" },
+    { to: "/admin/tasks", label: "Tasks", icon: "list" },
+    { to: "/admin/vendors", label: "Vendors", icon: "truck" },
   ] },
-  { title: "Catalog & Media", items: [
-    { to: "/admin/products", label: "Products & Packages", icon: "package" },
-    { to: "/admin/categories", label: "Occasions & Categories", icon: "grid" },
-    { to: "/admin/media", label: "Media & Pictures", icon: "image" },
-    { to: "/admin/video-content", label: "Instagram & Video Reviews", icon: "sparkle" },
-    { to: "/admin/addons", label: "Event Add-ons", icon: "tag" },
+  { title: "HR & Team", items: [
+    { to: "/admin/candidates", label: "Candidates", icon: "users" },
+    { to: "/admin/team", label: "Team", icon: "users" },
+    { to: "/admin/attendance", label: "Attendance", icon: "calendar" },
+    { to: "/admin/payroll", label: "Salary & Payroll", icon: "card" },
   ] },
-  { title: "Operations", items: [
-    { to: "/admin/projects", label: "Projects / Operations", icon: "layers" },
-    { to: "/admin/vendors", label: "Vendors", icon: "user" },
-    { to: "/admin/inventory", label: "Inventory", icon: "package" },
-    { to: "/admin/team-tasks", label: "Team Tasks", icon: "check" },
-  ] },
-  { title: "Reports", items: [
-    { to: "/admin/reports/sales", label: "Sales Reports", icon: "layers" },
-    { to: "/admin/reports/events", label: "Event Reports", icon: "calendar" },
-    { to: "/admin/reports/team", label: "Team Performance", icon: "user" },
-  ] },
-  { title: "Accounting", items: [
-    { to: "/admin/invoices", label: "Invoices", icon: "send" },
-    { to: "/admin/payments", label: "Payments", icon: "check" },
+  { title: "Finance", items: [
+    { to: "/admin/quotations", label: "Quotations", icon: "file" },
+    { to: "/admin/invoices", label: "Invoices", icon: "file" },
+    { to: "/admin/payments", label: "Payments", icon: "card" },
+    { to: "/admin/expenses", label: "Expenses", icon: "pie" },
+    { to: "/admin/reports/sales", label: "Financial Reports", icon: "chart" },
   ] },
   { title: "Settings", items: [
-    { to: "/admin/settings", label: "Settings & Backup", icon: "phone" },
-    { to: "/admin/users", label: "Users & Roles", icon: "user" },
+    { to: "/admin/settings", label: "Settings & Backup", icon: "settings" },
   ] },
 ];
 
@@ -61,7 +58,7 @@ const NAV_GROUPS = [
       { to: "/admin/categories", label: "Occasions & Categories", icon: "grid" },
       { to: "/admin/media", label: "Media & Pictures", icon: "image" },
       { to: "/admin/video-content", label: "Instagram & Video Reviews", icon: "sparkle" },
-      { to: "/admin/addons", label: "Event Add-ons", icon: "tag" },
+      { to: "/admin/services", label: "Event Services", icon: "tag" },
     ],
   },
   {
@@ -135,18 +132,7 @@ export default function AdminLayout() {
           </div>
         ))}
       </nav>
-      {isCrm && <div className="crm-sidebar-tagline">Because<br /><strong>You Deserve</strong> the Next Level</div>}
-      <button
-        type="button"
-        className="admin-nav-link admin-logout"
-        onClick={() => {
-          setMobileMenuOpen(false);
-          auth.logout();
-        }}
-      >
-        <Icon name="close" />
-        <span>Log out</span>
-      </button>
+      {isCrm && <div className="crm-sidebar-tagline">Because<br /><strong>You Deserve</strong><br />the Next Level</div>}
     </>
     );
   };

@@ -26,11 +26,8 @@ export const SEARCH_INDEX = [
   { label: "Wedding", cat: "Category", href: "/occasion/wedding", keywords: "wedding weddings mandap bride groom haldi mehendi sangeet ring ceremony" },
   { label: "Kids Theme Decor", cat: "Category", href: "/occasion/birthday", keywords: "birthday birthdays kids theme decor balloon cake party" },
   { label: "Anniversary", cat: "Category", href: "/occasion/anniversary", keywords: "anniversary anniversaries romance candlelight surprise" },
-  { label: "Baby Shower", cat: "Category", href: "/occasion/baby-shower", keywords: "baby shower maternity" },
-  { label: "Kids Birthday", cat: "Category", href: "/occasion/birthday/kids-birthday", keywords: "kids birthday children theme cartoon princess superhero jungle" },
-  { label: "Newborn Welcome", cat: "Category", href: "/occasion/newborn-welcome", keywords: "newborn welcome naming ceremony baby" },
+  { label: "Kids & Family Events", cat: "Category", href: "/occasion/kids-family", keywords: "kids family baby shower annaprashan mundan naming ceremony family events" },
   { label: "Corporate Events", cat: "Category", href: "/occasion/corporate", keywords: "corporate office launch conference av branding party" },
-  { label: "Annaprashan", cat: "Category", href: "/occasion/annaprashan", keywords: "annaprashan rice ceremony mukhe bhaat first rice baby" },
   { label: "Festivals & Culture", cat: "Category", href: "/occasion/festivals-culture", keywords: "festival festivals culture diwali holi navratri garba cultural" },
 
   // Wedding subcategories

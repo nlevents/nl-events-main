@@ -35,7 +35,7 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("nle-catalog-updated", onUpdate);
   }, []);
 
-  const addonProducts = products.filter((p) => p.isAddon === true || p.occasionSlug === "event-add-ons" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-add-ons"));
+  const addonProducts = products.filter((p) => p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services"));
   const regularProducts = products.filter((p) => !addonProducts.includes(p));
   const activeProducts = regularProducts.filter((p) => p.status !== "archived");
   const newLeads = inquiries.filter((i) => i.status === "new");
@@ -93,9 +93,9 @@ export default function AdminDashboard() {
           <span className="admin-stat-sub">{regularProducts.length - activeProducts.length} archived</span>
         </div>
         <div className="admin-stat-card">
-          <span>Add-on Products</span>
+          <span>Service Products</span>
           <strong>{addonProducts.filter((p) => p.status !== "archived").length}</strong>
-          <span className="admin-stat-sub"><Link to="/admin/addons">Manage in Event Add-ons</Link></span>
+          <span className="admin-stat-sub"><Link to="/admin/services">Manage in Event Services</Link></span>
         </div>
         <div className="admin-stat-card">
           <span>Occasions & Themes</span>

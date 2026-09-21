@@ -64,7 +64,7 @@ const CATEGORY_META = {
     ],
     faqs: [
       { q: "Can you match our brand guidelines?", a: "Yes — share your brand kit and our team will apply it across staging, signage and any digital displays." },
-      { q: "Do you handle live streaming?", a: "Live streaming is available as an add-on where listed; let us know your platform requirements in advance." },
+      { q: "Do you handle live streaming?", a: "Live streaming is available as a service where listed; let us know your platform requirements in advance." },
     ],
   },
   concert: {
@@ -117,7 +117,7 @@ export default function PackageDetails() {
 
   usePageMeta(
     product ? product.name + " Package — Next Level Events" : "Package Not Found — Next Level Events",
-    "Package details, inclusions and add-on services from Next Level Events."
+    "Package details, inclusions and services from Next Level Events."
   );
   useReveal([rawId]);
 

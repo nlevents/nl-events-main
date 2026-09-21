@@ -123,7 +123,7 @@ export default function AdminCategories() {
     flash(`Deleted "${node.label}".`);
   }
 
-  const cityProductCount = useMemo(() => products.filter((p) => !p.isAddon && p.occasionSlug !== "event-add-ons").length, [products]);
+  const cityProductCount = useMemo(() => products.filter((p) => !p.isAddon && p.occasionSlug !== "event-services").length, [products]);
 
   function renderTree(children, occasionSlug, parentTrail = [], depth = 0) {
     return (children || []).map((node) => {

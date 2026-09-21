@@ -1,7 +1,7 @@
 import { IMAGES } from "./images";
 
 // ===========================================================
-// EVENT ADD-ONS — shown below "Explore {Occasion}" on every
+// EVENT SERVICES — shown below "Explore {Occasion}" on every
 // Shop-by-Occasion page (CategoryTemplate, all depths).
 //
 // GLOBAL_ADDONS appear on every single category/theme/occasion page.
@@ -10,10 +10,10 @@ import { IMAGES } from "./images";
 // "Wedding Activities" and "Baraat Entry" on top of the global three.
 // ===========================================================
 
-// Every add-on below is a subcategory (browse & pick a specific product),
+// Every service below is a subcategory (browse & pick a specific product),
 // not a flat single item — `href` means "navigate to that occasion node",
 // not "add to cart". See data/occasions.js for the matching node + its
-// products (each add-on's slug matches an occasion/category slug there).
+// products (each service's slug matches an occasion/category slug there).
 export const GLOBAL_ADDONS = [
   {
     slug: "sfx",
@@ -22,7 +22,7 @@ export const GLOBAL_ADDONS = [
     image: IMAGES.showcase7,
     price: 3499,
     icon: "sparkle",
-    href: "/occasion/event-add-ons/sfx",
+    href: "/occasion/event-services/sfx",
   },
   {
     slug: "artists",
@@ -31,7 +31,7 @@ export const GLOBAL_ADDONS = [
     image: IMAGES.galConcert2,
     price: 9999,
     icon: "user",
-    href: "/occasion/event-add-ons/artists",
+    href: "/occasion/event-services/artists",
   },
   {
     slug: "photography",
@@ -40,7 +40,7 @@ export const GLOBAL_ADDONS = [
     image: IMAGES.typePhotography,
     price: 14999,
     icon: "image",
-    href: "/occasion/event-add-ons/photography",
+    href: "/occasion/event-services/photography",
   },
 ];
 
@@ -53,7 +53,7 @@ export const EXTRA_ADDONS_BY_OCCASION = {
       image: IMAGES.showcase3,
       price: 6999,
       icon: "sparkle",
-      href: "/occasion/event-add-ons/wedding-activity",
+      href: "/occasion/event-services/wedding-activity",
     },
     {
       slug: "baraat-procession",
@@ -62,13 +62,13 @@ export const EXTRA_ADDONS_BY_OCCASION = {
       image: IMAGES.themeStageLights,
       price: 12999,
       icon: "compass",
-      href: "/occasion/event-add-ons/baraat-procession",
+      href: "/occasion/event-services/baraat-procession",
     },
   ],
 };
 
 
-// These are the actual sellable add-on products. They live in the Event Add-ons
+// These are the actual sellable service products. They live in the Event Services
 // catalog branch and are intentionally separate from normal decoration packages.
 export const SEED_ADDON_PRODUCTS = [
   { slug: "cold-pyro", name: "Cold Pyro", categorySlug: "sfx", price: 3499, originalPrice: 4499, shortDesc: "Indoor-friendly cold spark special effects for entries and stages.", image: IMAGES.showcase7, includes: ["Cold pyro machines", "Operator", "Setup & takedown"] },
@@ -83,7 +83,7 @@ export const SEED_ADDON_PRODUCTS = [
   { slug: "baraat-dhol-band", name: "Baraat Dhol & Band", categorySlug: "baraat-procession", price: 12999, originalPrice: 14999, shortDesc: "Dhol, band and coordinated baraat entry entertainment.", image: IMAGES.themeStageLights, includes: ["Dhol / band performers", "Entry coordination", "Event support"] },
 ];
 
-// Combines global add-ons with any extras for this occasion tree. `trail`
+// Combines global services with any extras for this occasion tree. `trail`
 // is the ancestor chain from the resolved node, so trail[0] is always the
 // top-level occasion regardless of how deep the current page sits.
 export function addonsFor(trail) {

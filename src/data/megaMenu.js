@@ -79,7 +79,7 @@ export const CATEGORY_NAV = [
         ],
       },
       {
-        heading: "Add-ons",
+        heading: "Services",
         links: [
           { label: "360° Photo Booth", href: "/packages" },
           { label: "Cold Pyro Entry", href: "/packages" },

@@ -53,7 +53,7 @@ export const CATEGORIES = {
       { img: IMAGES.pkgPremiumBirthday, alt: "Milestone birthday cake table styling" },
     ],
     packages: [
-      { tag: "Birthday", img: IMAGES.pkgBirthdayBash, name: "Birthday Bash", desc: "Themed backdrop, balloon styling, cake table and entertainment add-ons.", price: 19999 },
+      { tag: "Birthday", img: IMAGES.pkgBirthdayBash, name: "Birthday Bash", desc: "Themed backdrop, balloon styling, cake table and entertainment services.", price: 19999 },
       { tag: "Birthday", img: IMAGES.pkgPremiumBirthday, name: "Premium Birthday", desc: "Custom theme design, premium florals, photo corner and host coordination.", price: 39999 },
       { tag: "Birthday", img: IMAGES.pkgCustomExperience, name: "Custom Experience", desc: "A fully personalised birthday theme, built around the guest of honour.", price: null },
     ],

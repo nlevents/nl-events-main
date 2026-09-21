@@ -3,22 +3,22 @@ import Icon from "../Icon";
 import { fmtINR } from "../../data/images";
 import { onImgError } from "../../lib/imageFallback";
 
-// Add-on strip shown right below "Explore {Occasion}" on every category
+// Service strip shown right below "Explore {Occasion}" on every category
 // page (top-level occasion, subcategory, or theme). Each card links into
 // a real sub-category (e.g. SFX -> Fireworks, Cold Pyro, Fog Machine…),
-// managed from Admin -> Event Add-ons (see lib/catalogStore.js
+// managed from Admin -> Event Services (see lib/catalogStore.js
 // getAddonsForOccasion). "items" is passed in already resolved for the
 // current occasion by CategoryTemplate.
 export default function EventAddons({ title, occasionLabel, items }) {
   if (!Array.isArray(items) || items.length === 0) return null;
 
-  // Add-on cards are category shortcuts, never cart items.
+  // Service cards are category shortcuts, never cart items.
 
   return (
     <div className="occ-block occ-addons">
       <div className="section-head reveal">
         <h2>{title}</h2>
-        <p>Browse these popular add-on categories{occasionLabel ? " for your " + occasionLabel.toLowerCase() : ""} and choose a package or service.</p>
+        <p>Browse these popular service categories{occasionLabel ? " for your " + occasionLabel.toLowerCase() : ""} and choose a package or service.</p>
       </div>
       <div className="occ-addon-grid reveal">
         {items.map((addon) => {

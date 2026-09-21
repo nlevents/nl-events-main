@@ -29,7 +29,7 @@ export function onImgError(e) {
   else if (/newborn|annaprashan|naming|welcome baby/.test(text)) fallback = LOCAL_FALLBACKS.newborn;
   else if (/anniversary|romantic|couple/.test(text)) fallback = LOCAL_FALLBACKS.anniversary;
   else if (/wedding|haldi|mehndi|sangeet|mandap|reception|ring ceremony|engagement|baraat/.test(text)) fallback = LOCAL_FALLBACKS.wedding;
-  else if (/kids/.test(text)) fallback = LOCAL_FALLBACKS.kids;
+  else if (/kids|family|corporate|sfx|artist|photography|festival|celebration|occasion/.test(text)) fallback = LOCAL_FALLBACKS.kids;
 
   img.src = fallback;
 }

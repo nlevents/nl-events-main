@@ -19,6 +19,8 @@ const PackageDetails = lazy(() => import("./pages/PackageDetails"));
 const ShopByOccasion = lazy(() => import("./pages/ShopByOccasion"));
 const OccasionBrowser = lazy(() => import("./pages/OccasionBrowser"));
 const Wedding = lazy(() => import("./pages/Wedding"));
+const Birthday = lazy(() => import("./pages/Birthday"));
+const OccasionLanding = lazy(() => import("./pages/OccasionLanding"));
 const Gallery = lazy(() => import("./pages/Gallery"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -51,6 +53,7 @@ const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
 const AdminInvoiceForm = lazy(() => import("./pages/admin/AdminInvoiceForm"));
 const AdminInvoiceView = lazy(() => import("./pages/admin/AdminInvoiceView"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
 
 function RouteFallback() {
   return <div style={{ minHeight: "60vh" }} aria-hidden="true"></div>;
@@ -76,17 +79,31 @@ export default function App() {
                     <Route path="media" element={<AdminMedia />} />
                     <Route path="video-content" element={<AdminVideoContent />} />
                     <Route path="coupons" element={<AdminCoupons />} />
+                    <Route path="services" element={<AdminAddons />} />
                     <Route path="addons" element={<AdminAddons />} />
+                    <Route path="services/products/new" element={<AdminProductForm />} />
                     <Route path="addons/products/new" element={<AdminProductForm />} />
+                    <Route path="services/products/:id/edit" element={<AdminProductForm />} />
                     <Route path="addons/products/:id/edit" element={<AdminProductForm />} />
                     <Route path="availability" element={<AdminAvailability />} />
+                    <Route path="calendar" element={<AdminAvailability />} />
                     <Route path="inquiries" element={<AdminInquiries />} />
                     <Route path="inquiries/:leadId" element={<AdminLeadDetails />} />
                     <Route path="clients" element={<AdminClients />} />
                     <Route path="invoices" element={<AdminInvoices />} />
+                    <Route path="quotations" element={<AdminPlaceholder title="Quotations" />} />
                     <Route path="invoices/new" element={<AdminInvoiceForm />} />
                     <Route path="invoices/:id" element={<AdminInvoiceView />} />
                     <Route path="invoices/:id/edit" element={<AdminInvoiceForm />} />
+                    <Route path="events" element={<AdminPlaceholder title="All Events" />} />
+                    <Route path="tasks" element={<AdminPlaceholder title="Tasks" />} />
+                    <Route path="vendors" element={<AdminPlaceholder title="Vendors" />} />
+                    <Route path="candidates" element={<AdminPlaceholder title="Candidates" />} />
+                    <Route path="team" element={<AdminPlaceholder title="Team" />} />
+                    <Route path="attendance" element={<AdminPlaceholder title="Attendance" />} />
+                    <Route path="payroll" element={<AdminPlaceholder title="Salary & Payroll" />} />
+                    <Route path="payments" element={<AdminPlaceholder title="Payments" />} />
+                    <Route path="expenses" element={<AdminPlaceholder title="Expenses" />} />
                     <Route path="settings" element={<AdminSettings />} />
                   </Route>
                   <Route path="/landing" element={<Landing />} />
@@ -97,13 +114,18 @@ export default function App() {
                     <Route path="/packages" element={<Packages />} />
                     <Route path="/package-details" element={<PackageDetails />} />
                     <Route path="/weddings" element={<Wedding />} />
-                    <Route path="/birthdays" element={<Navigate to="/occasion/birthday" replace />} />
+                    <Route path="/birthdays" element={<Birthday />} />
                     <Route path="/concerts" element={<Navigate to="/occasion/corporate" replace />} />
-                    <Route path="/corporate" element={<Navigate to="/occasion/corporate" replace />} />
+                    <Route path="/corporate" element={<OccasionLanding type="corporate" />} />
                     <Route path="/custom-events" element={<Navigate to="/shop-by-occasion" replace />} />
                     <Route path="/shop-by-occasion" element={<ShopByOccasion />} />
                     <Route path="/occasion" element={<ShopByOccasion />} />
                     <Route path="/occasion/wedding" element={<Wedding />} />
+                    <Route path="/occasion/birthday" element={<Birthday />} />
+                    <Route path="/occasion/anniversary" element={<OccasionLanding type="anniversary" />} />
+                    <Route path="/occasion/festivals-culture" element={<OccasionLanding type="festivals" />} />
+                    <Route path="/occasion/kids-family" element={<OccasionLanding type="family" />} />
+                    <Route path="/occasion/corporate" element={<OccasionLanding type="corporate" />} />
                     <Route path="/occasion/*" element={<OccasionBrowser />} />
                     <Route path="/gallery" element={<Gallery />} />
                     <Route path="/about" element={<About />} />

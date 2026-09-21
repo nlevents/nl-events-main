@@ -1,3 +1,4 @@
+import "../../styles/account.css";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Icon from "../../components/Icon";

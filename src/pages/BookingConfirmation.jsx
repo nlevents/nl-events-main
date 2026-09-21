@@ -63,7 +63,7 @@ export default function BookingConfirmation() {
               <br />
               <small style={{ color: "var(--text-secondary)", fontWeight: 400 }}>{describeBooking(it)}</small>
               {it.locationType || it.address ? <><br /><small style={{ color: "var(--text-secondary)", fontWeight: 400 }}>{it.locationType || "Venue"}{it.address ? " — " + it.address : ""}</small></> : null}
-              {it.addons?.length ? <><br /><small style={{ color: "var(--text-secondary)", fontWeight: 400 }}>Add-ons: {it.addons.map((a) => a.name).join(", ")}</small></> : null}
+              {it.addons?.length ? <><br /><small style={{ color: "var(--text-secondary)", fontWeight: 400 }}>Services: {it.addons.map((a) => a.name).join(", ")}</small></> : null}
             </span>
             <span>{fmtINR(itemLineTotal(it))}</span>
           </div>

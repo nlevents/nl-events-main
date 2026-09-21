@@ -160,8 +160,8 @@ function WeddingAddons() {
   return (
     <section className="wedding-addons-section">
       <div className="wedding-container">
-        <SectionHead eyebrow="WEDDING ADD-ONS" title="Add-ons Categories" link={{ label: "View All Add-ons", href: "/occasion/event-add-ons" }} />
-        <p className="wedding-addons-intro">Browse popular add-on categories for your wedding and choose the package or service that fits your celebration.</p>
+        <SectionHead eyebrow="WEDDING SERVICES" title="Services Categories" link={{ label: "View All Services", href: "/occasion/event-services" }} />
+        <p className="wedding-addons-intro">Browse popular service categories for your wedding and choose the package or service that fits your celebration.</p>
         <div className="wedding-addon-grid">
           {addons.map((addon) => (
             <Link to={addon.href} className="wedding-addon-card" key={addon.slug}>

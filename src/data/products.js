@@ -54,13 +54,13 @@ function getLiveProductsMap() {
   try {
     getCatalogProducts().forEach((p) => {
       if (!p) return;
-      // Products filed under the "Event Add-ons" branch (occasionSlug or
-      // categoryPath[0] === "event-add-ons") are add-ons, not standalone
+      // Products filed under the "Event Services" branch (occasionSlug or
+      // categoryPath[0] === "event-services") are services, not standalone
       // packages. They must only appear on their own product page and in
-      // the "Popular Add-ons" strip under an occasion's subcategories —
+      // the "Popular Services" strip under an occasion's subcategories —
       // never in the generic Home "Popular Packages" rail or the flagship
       // Packages listing, both of which read from this flat map.
-      const isAddon = p.occasionSlug === "event-add-ons" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-add-ons");
+      const isAddon = p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
       if (isAddon) return;
       if (p.slug) map[p.slug] = { ...p, id: p.slug };
       if (p.id) map[p.id] = { ...p, id: p.id };

@@ -67,7 +67,7 @@ export function downloadBookingPdf(order) {
     if (item.locationType) lines.push(`Location type: ${item.locationType}`);
     if (item.address) lines.push(...wrap(`Venue: ${item.address}`));
     if (Array.isArray(item.addons) && item.addons.length) {
-      lines.push("Add-on services:");
+      lines.push("Services:");
       item.addons.forEach((addon) => lines.push(...wrap(`- ${addon.name} — INR ${Number(addon.price || 0).toLocaleString("en-IN")}`)));
     }
     if (item.notes) lines.push(...wrap(`Notes: ${item.notes}`));

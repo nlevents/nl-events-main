@@ -36,7 +36,7 @@ const KEYS = {
   addonProductsSeededV1: STORE_KEY_PREFIX + "addon_products_seeded_v1",
 };
 
-const STORE_VERSION = "4.5-image-completeness";
+const STORE_VERSION = "4.6-services-rename";
 const REFERENCE_HIERARCHY_MIGRATION = "2";
 
 
@@ -194,8 +194,8 @@ function seedAddonProductsIfNeeded() {
       ...p,
       id: uid("addon-prod"),
       type: "product",
-      occasionSlug: "event-add-ons",
-      categoryPath: ["event-add-ons", p.categorySlug],
+      occasionSlug: "event-services",
+      categoryPath: ["event-services", p.categorySlug],
       isAddon: true,
       status: "active",
       rating: 4.7,
@@ -501,6 +501,21 @@ function seedReferenceDemoProductsIfNeeded() {
 }
 
 function initializeSeedsIfNeeded() {
+  // Backward-compatible rename: Event Add-ons -> Event Services.
+  // Existing admin/catalog data is kept intact when users upgrade.
+  const serviceRenameKeys = [KEYS.occasions, KEYS.products, KEYS.addons];
+  serviceRenameKeys.forEach((key) => {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const value = JSON.parse(raw);
+      const renamed = JSON.parse(JSON.stringify(value).replaceAll("event-add-ons", "event-services"));
+      localStorage.setItem(key, JSON.stringify(renamed));
+    } catch {
+      // Leave malformed/unknown storage untouched; normal validation handles it later.
+    }
+  });
+
   const currentVersion = localStorage.getItem(KEYS.version);
   if (currentVersion === STORE_VERSION && localStorage.getItem(KEYS.referenceHierarchyMigration) === REFERENCE_HIERARCHY_MIGRATION && localStorage.getItem(KEYS.referenceDemoProductsSeededV3) === "1") return;
 
@@ -589,13 +604,13 @@ function initializeSeedsIfNeeded() {
   }
   seedReferenceDemoProductsIfNeeded();
 
-  // Migrate any older add-on products into the explicit add-on namespace so
+  // Migrate any older service products into the explicit service namespace so
   // the normal Products & Packages screen can safely hide them.
   {
     const stored = readStorage(KEYS.products, []);
     let changed = false;
     stored.forEach((product) => {
-      const addon = product?.occasionSlug === "event-add-ons" || (Array.isArray(product?.categoryPath) && product.categoryPath[0] === "event-add-ons");
+      const addon = product?.occasionSlug === "event-services" || (Array.isArray(product?.categoryPath) && product.categoryPath[0] === "event-services");
       if (addon && !product.isAddon) { product.isAddon = true; changed = true; }
     });
     if (changed) writeStorage(KEYS.products, stored);
@@ -634,8 +649,8 @@ function initializeSeedsIfNeeded() {
     );
   }
 
-  // Initialize Event Add-ons. Add-on cards are featured doorways into the
-  // real Event Add-ons catalog tree; they are not sellable products themselves.
+  // Initialize Event Services. Service cards are featured doorways into the
+  // real Event Services catalog tree; they are not sellable products themselves.
   const storedAddons = readStorage(KEYS.addons, null);
   if (!Array.isArray(storedAddons)) {
     writeStorage(KEYS.addons, extractAllSeedAddons());
@@ -644,7 +659,7 @@ function initializeSeedsIfNeeded() {
     const migratedAddons = storedAddons.map((a) => {
       const path = Array.isArray(a.categoryPath) ? a.categoryPath.filter(Boolean) : [];
       return path.length === 1 && legacyAddonSlugs.has(path[0])
-        ? { ...a, categoryPath: ["event-add-ons", path[0]] }
+        ? { ...a, categoryPath: ["event-services", path[0]] }
         : a;
     });
     const seeded = extractAllSeedAddons();
@@ -775,7 +790,7 @@ export function saveProduct(product) {
       : [],
     cities: Array.isArray(product.cities) ? product.cities.map(sanitizeText) : [],
     categoryPath: Array.isArray(product.categoryPath) ? product.categoryPath.map(sanitizeSlug).filter(Boolean) : [],
-    isAddon: Boolean(product.isAddon || product.occasionSlug === "event-add-ons" || (Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-add-ons")),
+    isAddon: Boolean(product.isAddon || product.occasionSlug === "event-services" || (Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services")),
     updatedAt: now,
   };
   // Category hierarchy is the source of truth. setupType is intentionally
@@ -905,8 +920,8 @@ export function saveOccasion(occasion) {
     image: sanitizeUrl(occasion.image) || IMAGES.typeWedding,
     heroImg: sanitizeUrl(occasion.heroImg) || IMAGES.heroWedding,
     children: Array.isArray(occasion.children) ? occasion.children : [],
-    // When true, this occasion is only ever reached via an Event Add-on
-    // card (Admin -> Event Add-ons) — it's excluded from Shop by Occasion,
+    // When true, this occasion is only ever reached via an Event Service
+    // card (Admin -> Event Services) — it's excluded from Shop by Occasion,
     // the main nav, and "Related Categories" everywhere else, so
     // categories like SFX/Artists/Photography don't get mistaken for
     // regular browsable occasions.
@@ -1465,7 +1480,7 @@ export function deleteCity(name) {
 }
 
 // =============================================================================
-// 9. EVENT ADD-ONS ("Popular Add-ons" strip on Shop-by-Occasion pages)
+// 9. EVENT SERVICES ("Popular Services" strip on Shop-by-Occasion pages)
 // =============================================================================
 
 export function getAddons() {
@@ -1477,7 +1492,7 @@ export function getAddons() {
 // Attaches live data derived from the linked sub-category — current
 // cheapest product price, how many products it holds, the browse link,
 // and whether that category still exists (an admin may have renamed or
-// deleted it after this add-on was linked to it).
+// deleted it after this service was linked to it).
 function enrichAddon(addon) {
   const path = Array.isArray(addon.categoryPath) ? addon.categoryPath : [];
   const category = path.length ? categoryByPath(path) : null;
@@ -1509,12 +1524,12 @@ function countProductsOf(node) {
   return allProductsOf(node).length;
 }
 
-// List of every existing occasion/category/theme an add-on can link to,
+// List of every existing occasion/category/theme a service can link to,
 // with its live product count and cheapest price — powers the "Linked
-// Category" picker in Admin → Event Add-ons so an add-on can never point
+// Category" picker in Admin → Event Services so a service can never point
 // at a category that doesn't actually exist or has no products.
 export function getAddonCategoryTree() {
-  return getOccasion("event-add-ons") || { children: [] };
+  return getOccasion("event-services") || { children: [] };
 }
 
 export function getAddonCategories() {
@@ -1526,7 +1541,7 @@ export function getAddonCategories() {
       const next = [...trail, node];
       out.push({
         ...node,
-        path: ["event-add-ons", ...next.map((n) => n.slug)],
+        path: ["event-services", ...next.map((n) => n.slug)],
         label: next.map((n) => n.label).join(" › "),
         displayLabel: next.map((n) => n.label).join(" › "),
         productCount: countProductsOf(node),
@@ -1544,7 +1559,7 @@ export function getAddonCategoryOptions() {
 
 export function getAddonProducts() {
   return getProducts()
-    .filter((p) => p && (p.isAddon === true || p.occasionSlug === "event-add-ons" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-add-ons")))
+    .filter((p) => p && (p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")))
     .map((p) => {
       const category = categoryByPath(p.categoryPath);
       return {
@@ -1554,7 +1569,7 @@ export function getAddonProducts() {
     });
 }
 
-// Combines active global add-ons with any active extras scoped to this
+// Combines active global services with any active extras scoped to this
 // occasion — mirrors the old static addonsFor(trail) helper but reads
 // from the admin-editable store instead of the hardcoded data file. Cards
 // whose linked category no longer resolves, or has zero live products,
@@ -1570,12 +1585,12 @@ export function saveAddon(addon) {
   const list = readStorage(KEYS.addons, []);
   const now = new Date().toISOString();
   const categoryPath = Array.isArray(addon.categoryPath) ? addon.categoryPath.filter(Boolean) : [];
-  if (!categoryPath.length) throw new Error("Pick which category/sub-category this add-on links to.");
+  if (!categoryPath.length) throw new Error("Pick which category/sub-category this service links to.");
 
   const safe = {
     id: addon.id || uid("addon"),
     slug: sanitizeSlug(addon.slug || addon.label || "addon"),
-    label: sanitizeText(addon.label || "New Add-on"),
+    label: sanitizeText(addon.label || "New Service"),
     subLabel: sanitizeText(addon.subLabel || ""),
     image: sanitizeUrl(addon.image) || IMAGES.showcase7,
     icon: sanitizeText(addon.icon || "sparkle"),

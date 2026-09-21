@@ -18,7 +18,7 @@ const EVENT_TYPE_BY_OCCASION = {
   "newborn-welcome": "Naming Ceremony",
   corporate: "Corporate Event",
   "dummy-event": "Custom Celebration",
-  "event-add-ons": "Custom Celebration",
+  "event-services": "Custom Celebration",
   "festivals-culture": "Custom Celebration",
   annaprashan: "Custom Celebration",
 };
@@ -48,7 +48,7 @@ function formatPickedDate(iso) {
 //                      wherever the item is displayed later.
 //   productHref       path back to this product's detail page (stored on
 //                      the cart item so "Edit" / "View product" can return here)
-//   addons            [{ name, price }] — optional add-on services
+//   addons            [{ name, price }] — optional services
 //   requiresTimeSlot  whether a time slot must be chosen (default true)
 //   defaultEventType  pre-selects the Event/Appointment Type dropdown
 export default function BookingPanel({ product, productHref, addons, requiresTimeSlot = true, defaultEventType }) {
@@ -309,7 +309,7 @@ export default function BookingPanel({ product, productHref, addons, requiresTim
 
       {addonList.length > 0 && (
         <div className="form-group">
-          <label>Add-On Services</label>
+          <label>Services</label>
           <div className="addon-list">
             {addonList.map((addon) => {
               const added = selectedAddons[addon.name] !== undefined;

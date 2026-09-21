@@ -1,23 +1,21 @@
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
 import { GLOBAL_ADDONS } from "../data/addons";
+import { onImgError } from "../lib/imageFallback";
 import usePageMeta from "../hooks/usePageMeta";
-import ShortsRail from "../components/ShortsRail";
-import VideoReviewGrid from "../components/VideoReviewGrid";
+const ShortsRail = lazy(() => import("../components/ShortsRail"));
+const VideoReviewGrid = lazy(() => import("../components/VideoReviewGrid"));
 import Faq from "../components/Faq";
 import ProductRail from "../components/ProductRail";
-import { listAllProducts, sortProducts, toRailItem } from "../data/occasions";
 
 const CELEBRATIONS = [
   { label: "Weddings", href: "/occasion/wedding", img: IMAGES.typeWedding },
   { label: "Birthdays", href: "/occasion/birthday", img: IMAGES.typeBirthday },
-  { label: "Anniversaries", href: "/occasion/anniversary", img: IMAGES.typeAnniversary },
-  { label: "Baby Shower", href: "/occasion/baby-shower", img: IMAGES.typeBabyShower },
-  { label: "Kids Birthday", href: "/occasion/birthday/kids-birthday", img: IMAGES.typeKidsBirthday },
-  { label: "Newborn Welcome", href: "/occasion/newborn-welcome", img: IMAGES.typeNewbornWelcome },
-  { label: "Corporate", href: "/occasion/corporate", img: IMAGES.typeCorporate },
-  { label: "Annaprashan", href: "/occasion/annaprashan", img: IMAGES.typeAnnaprashan },
-  { label: "Festivals & Culture", href: "/occasion/festivals-culture", img: IMAGES.typeFestival },
+  { label: "Corporate Events", href: "/occasion/corporate", img: IMAGES.typeCorporate },
+  { label: "Kids & Family Events", href: "/occasion/kids-family", img: IMAGES.typeBabyShower },
+  { label: "Anniversary", href: "/occasion/anniversary", img: IMAGES.typeAnniversary },
+  { label: "Festivals & Other Celebrations", href: "/occasion/festivals-culture", img: IMAGES.typeFestival },
 ];
 
 const WEDDING_CONCEPTS = [
@@ -95,7 +93,7 @@ const HOME_USPS = [
 function HomeHero() {
   return (
     <section className="ref-home-hero">
-      <img src={IMAGES.heroHome} alt="Wedding celebration by Next Level Events" />
+      <img src={IMAGES.heroHome} alt="Wedding celebration by Next Level Events" fetchPriority="high" decoding="async" />
       <div className="ref-home-hero-overlay" />
       <div className="ref-home-hero-content">
         <span>WELCOME TO NEXT LEVEL EVENTS</span>
@@ -134,7 +132,7 @@ function HorizontalCards({ items, cardClass = "ref-home-card", dark = false }) {
     <div className={`ref-home-slider ${dark ? "is-dark" : ""}`}>
       {items.map((item) => (
         <Link className={cardClass} to={item.href || "/book-event"} key={item.label}>
-          <img src={item.img} alt={item.label} />
+          <img src={item.img} alt={item.label} data-context={item.label} loading="lazy" decoding="async" onError={onImgError} />
           <strong>{item.label}</strong>
           {item.sub && <span>{item.sub}</span>}
         </Link>
@@ -155,7 +153,7 @@ function CelebrationSection() {
           {CELEBRATIONS.map((item) => (
             <Link to={item.href} className="ref-home-celebration-card" key={item.label}>
               <span className="ref-home-celebration-image">
-                <img src={item.img} alt={item.label} />
+                <img src={item.img} alt={item.label} data-context={item.label} loading="lazy" decoding="async" onError={onImgError} />
               </span>
               <b>{item.label}</b>
             </Link>
@@ -201,23 +199,33 @@ function BirthdaySection() {
 }
 
 function PopularPackagesSection() {
-  const entries = listAllProducts();
-  const seen = new Set();
-  const popularPackages = sortProducts(entries.map((entry) => entry.product), "popular")
-    .filter((product) => {
-      const key = product?.slug || product?.id;
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 8)
-    .map((product) => {
-      const key = product?.slug || product?.id;
-      const entry = entries.find((item) => (item?.product?.slug || item?.product?.id) === key);
-      return entry ? toRailItem(product, entry.trail) : null;
-    })
-    .filter(Boolean);
+  const [popularPackages, setPopularPackages] = useState([]);
 
+  useEffect(() => {
+    let active = true;
+    import("../data/occasions").then(({ listAllProducts, sortProducts, toRailItem }) => {
+      const entries = listAllProducts();
+      const seen = new Set();
+      const items = sortProducts(entries.map((entry) => entry.product), "popular")
+        .filter((product) => {
+          const key = product?.slug || product?.id;
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 8)
+        .map((product) => {
+          const key = product?.slug || product?.id;
+          const entry = entries.find((item) => (item?.product?.slug || item?.product?.id) === key);
+          return entry ? toRailItem(product, entry.trail) : null;
+        })
+        .filter(Boolean);
+      if (active) setPopularPackages(items);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  if (!popularPackages.length) return null;
   return (
     <ProductRail
       title="Popular Packages"
@@ -230,6 +238,9 @@ function PopularPackagesSection() {
 function AddonsSection() {
   const items = GLOBAL_ADDONS.map((item) => ({
     ...item,
+    // Service data stores the thumbnail as `image`, while the shared
+    // HorizontalCards component reads `img`.
+    img: item.image,
     sub: item.subLabel,
     href: item.href,
   }));
@@ -237,8 +248,8 @@ function AddonsSection() {
   return (
     <section className="ref-home-addons">
       <div className="ref-home-container">
-        <RefSectionHead title="Add-Ons to Elevate Your Celebration" link={{ label: "Explore add-ons", href: "/occasion/event-add-ons" }} />
-        <p className="ref-home-intro">Create more magical moments with our wide range of add-ons.</p>
+        <RefSectionHead title="Services to Elevate Your Celebration" link={{ label: "Explore services", href: "/occasion/event-services" }} />
+        <p className="ref-home-intro">Create more magical moments with our wide range of services.</p>
         <HorizontalCards items={items} cardClass="ref-home-addon-card" />
       </div>
     </section>
@@ -264,7 +275,7 @@ function HomeUSPs() {
 function FinalCTA() {
   return (
     <section className="ref-home-final-cta">
-      <img src={IMAGES.heroWedding} alt="" />
+      <img src={IMAGES.heroWedding} alt="" loading="lazy" decoding="async" />
       <div className="ref-home-final-overlay" />
       <div className="ref-home-container">
         <div>
@@ -376,6 +387,36 @@ function HomeTrustSections() {
   );
 }
 
+function DeferredHomeContent({ children, rootMargin = "900px" }) {
+  const [ready, setReady] = useState(false);
+  const [node, setNode] = useState(null);
+
+  useEffect(() => {
+    if (!node) return;
+    if (!("IntersectionObserver" in window)) {
+      setReady(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setReady(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin, threshold: 0 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [node, rootMargin]);
+
+  return (
+    <div ref={setNode} style={{ display: "contents" }}>
+      {ready ? <Suspense fallback={null}>{children}</Suspense> : null}
+    </div>
+  );
+}
+
 export default function Home() {
   usePageMeta(
     "Next Level Events — Event Planning, Weddings, Birthdays & Celebrations",
@@ -394,9 +435,13 @@ export default function Home() {
       <FinalCTA />
 
       {/* Everything from Shorts onward is intentionally kept in the existing website order. */}
-      <ShortsRail />
+      <DeferredHomeContent>
+        <ShortsRail />
+      </DeferredHomeContent>
       <CustomerReviews />
-      <VideoReviewGrid />
+      <DeferredHomeContent>
+        <VideoReviewGrid />
+      </DeferredHomeContent>
       <HomeTrustSections />
     </main>
   );

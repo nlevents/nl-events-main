@@ -52,7 +52,7 @@ export default function Cart() {
         <p className="crumb"><Link to="/">Home</Link> / Cart</p>
         <span className="eyebrow">Step 1 of 3</span>
         <h1>Your Cart</h1>
-        <p>Review your selected packages and add-ons before submitting your booking.</p>
+        <p>Review your selected packages and services before submitting your booking.</p>
       </section>
 
       <section className="section-tight container">
@@ -179,7 +179,7 @@ function CartLine({ item }) {
 
         {item.addons && item.addons.length > 0 && (
           <p className="cart-line-addons">
-            Add-ons: {item.addons.map((a) => a.name).join(", ")}
+            Services: {item.addons.map((a) => a.name).join(", ")}
           </p>
         )}
         {item.notes ? <p className="cart-line-addons">Note: {item.notes}</p> : null}
@@ -191,7 +191,7 @@ function CartLine({ item }) {
             <button type="button" aria-label="Increase quantity" onClick={() => setQty(1)}>+</button>
           </div>
           <div className="cart-line-price">
-            {addonsTotal > 0 ? <span className="cart-line-price-note">{fmtINR(base)} + {fmtINR(addonsTotal)} add-ons</span> : null}
+            {addonsTotal > 0 ? <span className="cart-line-price-note">{fmtINR(base)} + {fmtINR(addonsTotal)} services</span> : null}
             {original && original > base ? <s>{fmtINR((original + addonsTotal) * (item.quantity || 1))}</s> : null}
             <b>{fmtINR(lineTotal)}</b>
           </div>
