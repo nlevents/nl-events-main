@@ -782,6 +782,9 @@ function childOf(node, slug) {
 // the tree. Returns { node, trail } where `trail` is the full ancestor
 // chain (occasion first) including `node` itself, or null if unresolved.
 const PATH_ALIASES = {
+  // Legacy/public links that existed before the live wedding tree was
+  // normalised. Keep them working so older bookmarks and in-app links never
+  // land on a NotFound page.
   "kids-special": "kids-birthday",
   "animal-themes": "animal-theme",
   "car-themes": "car-theme",
@@ -790,6 +793,11 @@ const PATH_ALIASES = {
   "princess-themes": "princess-theme",
   "barbie-themes": "barbie-theme",
   "wedding-car-decoration": "wedding-car",
+  "mehendi": "mehndi",
+  "sangeet": "sangeet-night",
+  "mandap": "mandap-ceremony-decor",
+  "wedding-ceremony": "mandap-ceremony-decor",
+  "reception": "reception-styling",
 };
 
 export function resolvePath(slugs) {

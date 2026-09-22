@@ -11,9 +11,9 @@ import usePageMeta from "../hooks/usePageMeta";
 const FUNCTIONS = [
   { label: "Haldi", img: IMAGES.themeJungleLeaves, href: "/occasion/wedding/haldi" },
   { label: "Mehendi", img: IMAGES.themeMehndiHenna, href: "/occasion/wedding/mehndi" },
-  { label: "Sangeet", img: IMAGES.themeStageLights, href: "/occasion/wedding/sangeet" },
-  { label: "Wedding", img: IMAGES.heroWedding, href: "/occasion/wedding/wedding-ceremony" },
-  { label: "Reception", img: IMAGES.showcase1, href: "/occasion/wedding/reception" },
+  { label: "Sangeet", img: IMAGES.themeStageLights, href: "/occasion/wedding/sangeet-night" },
+  { label: "Wedding", img: IMAGES.heroWedding, href: "/occasion/wedding/mandap-ceremony-decor" },
+  { label: "Reception", img: IMAGES.showcase1, href: "/occasion/wedding/reception-styling" },
   { label: "Engagement", img: IMAGES.showcase2, href: "/occasion/wedding/ring-ceremony" },
   { label: "Mayra / Rituals", img: IMAGES.showcase5, href: "/occasion/wedding" },
 ];

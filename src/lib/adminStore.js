@@ -53,6 +53,8 @@ const DEFAULT_SETTINGS = {
   nextInvoiceSeq: 1,
   nextQuotationSeq: 1,
   invoiceNotes: "Thank you for choosing Next Level Events.",
+  defaultTerms: "Payment terms and event conditions will be confirmed in writing before the event.",
+  logoUrl: "/assets/images/landing/nle-logo.png",
 };
 
 // ---------- Settings ----------
@@ -100,7 +102,20 @@ export function deleteClient(id) {
 // ---------- Invoices ----------
 
 export function getInvoices() {
-  return readJSON(KEYS.invoices, []);
+  const invoices = readJSON(KEYS.invoices, []);
+  // Backward compatibility: older records used dueDate. The product now
+  // uses eventDate for both quotations and invoices.
+  return invoices.map((inv) => ({
+    ...inv,
+    eventDate: inv.eventDate || inv.dueDate || "",
+    eventTime: inv.eventTime || "",
+    subject: inv.subject || "",
+    terms: inv.terms ?? "",
+    payments: Array.isArray(inv.payments) ? inv.payments : [],
+    writeOff: inv.writeOff || null,
+    sourceQuotationId: inv.sourceQuotationId || "",
+    convertedToInvoiceId: inv.convertedToInvoiceId || "",
+  }));
 }
 
 export function getInvoice(id) {
@@ -138,7 +153,21 @@ export function saveInvoice(invoice) {
   const invoices = getInvoices();
   const now = new Date().toISOString();
   const { subtotal, taxAmount, total } = computeTotals(invoice.items, invoice.discount, invoice.taxRate);
-  const withTotals = { ...invoice, subtotal, taxAmount, total };
+  const withTotals = {
+    ...invoice,
+    subtotal,
+    taxAmount,
+    total,
+    eventDate: invoice.eventDate || invoice.dueDate || "",
+    eventTime: invoice.eventTime || "",
+    subject: invoice.subject || "",
+    terms: invoice.terms ?? getSettings().defaultTerms ?? "",
+    payments: Array.isArray(invoice.payments) ? invoice.payments : [],
+    writeOff: invoice.writeOff || null,
+    sourceQuotationId: invoice.sourceQuotationId || "",
+    convertedToInvoiceId: invoice.convertedToInvoiceId || "",
+  };
+  delete withTotals.dueDate;
 
   if (invoice.id) {
     const idx = invoices.findIndex((inv) => inv.id === invoice.id);
@@ -160,6 +189,62 @@ export function saveInvoice(invoice) {
   return record;
 }
 
+export function getInvoiceBalance(invoice) {
+  if (!invoice) return 0;
+  const paid = (invoice.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const writtenOff = Number(invoice.writeOff?.amount) || 0;
+  return Math.max(0, (Number(invoice.total) || 0) - paid - writtenOff);
+}
+
+export function recordInvoicePayment(id, payment) {
+  const invoices = getInvoices();
+  const idx = invoices.findIndex((inv) => inv.id === id);
+  if (idx === -1) throw new Error("Invoice not found.");
+  const invoice = invoices[idx];
+  const balance = getInvoiceBalance(invoice);
+  const amount = Number(payment?.amount);
+  if (!(amount > 0)) throw new Error("Enter a payment amount greater than zero.");
+  if (amount > balance + 0.01) throw new Error("Payment cannot be greater than the remaining balance.");
+  const nextPayments = [...(invoice.payments || []), {
+    id: uid(),
+    amount,
+    paymentDate: payment.paymentDate || new Date().toISOString().slice(0, 10),
+    method: String(payment.method || "Bank transfer"),
+    reference: String(payment.reference || ""),
+    notes: String(payment.notes || ""),
+    createdAt: new Date().toISOString(),
+  }];
+  const nextBalance = Math.max(0, balance - amount);
+  invoices[idx] = {
+    ...invoice,
+    payments: nextPayments,
+    status: nextBalance <= 0.01 ? "paid" : "partially_paid",
+    updatedAt: new Date().toISOString(),
+  };
+  writeJSON(KEYS.invoices, invoices);
+  return invoices[idx];
+}
+
+export function writeOffInvoice(id, amount, reason) {
+  const invoices = getInvoices();
+  const idx = invoices.findIndex((inv) => inv.id === id);
+  if (idx === -1) throw new Error("Invoice not found.");
+  const invoice = invoices[idx];
+  const balance = getInvoiceBalance(invoice);
+  const value = amount == null ? balance : Number(amount);
+  if (!(value > 0)) throw new Error("Write-off amount must be greater than zero.");
+  if (value > balance + 0.01) throw new Error("Write-off cannot exceed the remaining balance.");
+  if (!String(reason || "").trim()) throw new Error("A write-off reason is required.");
+  invoices[idx] = {
+    ...invoice,
+    writeOff: { amount: value, reason: String(reason).trim(), date: new Date().toISOString().slice(0, 10) },
+    status: "written_off",
+    updatedAt: new Date().toISOString(),
+  };
+  writeJSON(KEYS.invoices, invoices);
+  return invoices[idx];
+}
+
 export function deleteInvoice(id) {
   writeJSON(KEYS.invoices, getInvoices().filter((inv) => inv.id !== id));
 }
@@ -178,20 +263,19 @@ export function setInvoiceStatus(id, status) {
 export function getStats() {
   const invoices = getInvoices();
   const clients = getClients();
-  const paid = invoices.filter((i) => i.status === "paid");
-  const outstanding = invoices.filter((i) => i.status === "sent" || i.status === "overdue");
-  const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-  const revenueThisMonth = paid
-    .filter((i) => (i.issueDate || "").slice(0, 7) === thisMonth)
-    .reduce((s, i) => s + (i.total || 0), 0);
+  const financialInvoices = invoices.filter((i) => i.documentType !== "quotation");
+  const totalRevenue = financialInvoices.reduce((sum, i) => sum + (i.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0), 0);
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const revenueThisMonth = financialInvoices.reduce((sum, i) => sum + (i.payments || []).filter((p) => (p.paymentDate || p.createdAt || "").slice(0, 7) === thisMonth).reduce((s, p) => s + (Number(p.amount) || 0), 0), 0);
+  const outstanding = financialInvoices.filter((i) => getInvoiceBalance(i) > 0.01);
   return {
     totalClients: clients.length,
-    totalInvoices: invoices.length,
-    totalRevenue: paid.reduce((s, i) => s + (i.total || 0), 0),
+    totalInvoices: financialInvoices.length,
+    totalRevenue,
     revenueThisMonth,
-    outstandingAmount: outstanding.reduce((s, i) => s + (i.total || 0), 0),
+    outstandingAmount: outstanding.reduce((s, i) => s + getInvoiceBalance(i), 0),
     outstandingCount: outstanding.length,
-    recentInvoices: [...invoices].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 5),
+    recentInvoices: [...financialInvoices].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 5),
   };
 }
 

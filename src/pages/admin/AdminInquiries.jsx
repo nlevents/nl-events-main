@@ -259,7 +259,7 @@ export default function AdminInquiries() {
   }
   function createQuotation(r) {
     const client = getOrCreateClient(r);
-    navigate("/admin/invoices/new", { state: { clientId: client.id, leadId: r.id, documentType: "quotation", lead: r } });
+    navigate("/admin/quotations/new", { state: { clientId: client.id, leadId: r.id, documentType: "quotation", lead: r } });
   }
   async function handleScheduleFollowUp(record) {
     const value = window.prompt("Follow-up date/time (YYYY-MM-DDTHH:mm):", record.nextFollowUp ? String(record.nextFollowUp).slice(0, 16) : "");

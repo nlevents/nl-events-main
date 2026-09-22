@@ -129,6 +129,7 @@ export default function AdminSettings() {
           <div className="form-group"><label>GSTIN (optional)</label><input value={settings.gstin} onChange={(e) => set("gstin", e.target.value)} placeholder="Leave blank if not registered" /></div>
         </div>
         <div className="form-group"><label>Address</label><input value={settings.address} onChange={(e) => set("address", e.target.value)} /></div>
+        <div className="form-row-2"><div className="form-group"><label>Quotation / Invoice logo URL</label><input value={settings.logoUrl || ""} onChange={(e) => set("logoUrl", e.target.value)} placeholder="/assets/images/landing/nle-logo.png" /><p className="admin-hint">This logo is printed on both quotations and invoices. You can use the built-in logo or a hosted image URL.</p></div><div className="form-group"><label>Logo preview</label>{settings.logoUrl ? <img src={settings.logoUrl} alt="Logo preview" style={{ maxHeight: 64, maxWidth: 220, objectFit: "contain", border: "1px solid var(--border-soft)", padding: 8, background: "#fff" }} /> : <p className="admin-hint">No logo configured.</p>}</div></div>
 
         <h2 style={{ marginTop: 28 }}>Invoice defaults</h2>
         <div className="form-row-2">
@@ -139,7 +140,8 @@ export default function AdminSettings() {
           <div className="form-group"><label>UPI ID (optional)</label><input value={settings.upiId} onChange={(e) => set("upiId", e.target.value)} /></div>
           <div className="form-group"><label>Bank details (optional)</label><input value={settings.bankDetails} onChange={(e) => set("bankDetails", e.target.value)} placeholder="Account name, number, IFSC" /></div>
         </div>
-        <div className="form-group"><label>Default invoice note</label><textarea value={settings.invoiceNotes} onChange={(e) => set("invoiceNotes", e.target.value)} /></div>
+        <div className="form-group"><label>Default invoice / quotation note</label><textarea value={settings.invoiceNotes} onChange={(e) => set("invoiceNotes", e.target.value)} /></div>
+        <div className="form-group"><label>Default terms and conditions</label><textarea rows="6" value={settings.defaultTerms || ""} onChange={(e) => set("defaultTerms", e.target.value)} placeholder="These terms will be pre-filled on new quotations and invoices." /></div>
 
         <div className="admin-modal-actions" style={{ justifyContent: "flex-start" }}>
           <button type="submit" className="btn btn-primary">Save settings</button>

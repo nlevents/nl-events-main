@@ -34,9 +34,10 @@ const KEYS = {
   referenceDemoProductsSeeded: STORE_KEY_PREFIX + "reference_demo_products_seeded_v1",
   referenceDemoProductsSeededV3: STORE_KEY_PREFIX + "reference_demo_products_seeded_v3",
   addonProductsSeededV1: STORE_KEY_PREFIX + "addon_products_seeded_v1",
+  serviceOccasionSplitV1: STORE_KEY_PREFIX + "service_occasion_split_v1",
 };
 
-const STORE_VERSION = "4.6-services-rename";
+const STORE_VERSION = "4.7-service-occasion-split";
 const REFERENCE_HIERARCHY_MIGRATION = "2";
 
 
@@ -159,11 +160,13 @@ function extractAllSeedAddons() {
   const list = [];
   (SEED_GLOBAL_ADDONS || []).forEach((a) => {
     const { price: _price, href: _href, ...rest } = a;
+    const scopes = a.slug === "sfx" ? ["wedding"] : ["wedding", "birthday"];
     list.push({
       ...rest,
       id: uid("addon"),
       categoryPath: hrefToCategoryPath(_href),
-      scope: "global",
+      scopes,
+      scope: scopes[0],
       active: true,
       createdAt: new Date().toISOString(),
     });
@@ -501,6 +504,23 @@ function seedReferenceDemoProductsIfNeeded() {
 }
 
 function initializeSeedsIfNeeded() {
+  // Migrate featured service cards from the old global scope to explicit
+  // wedding/birthday availability. Pyro/SFX is wedding-only; photography and
+  // artists are useful for both occasions. This keeps the storefront separated
+  // without requiring admins to rebuild their service catalog.
+  if (!localStorage.getItem(KEYS.serviceOccasionSplitV1)) {
+    const existingAddons = readStorage(KEYS.addons, []);
+    if (Array.isArray(existingAddons) && existingAddons.length) {
+      const migrated = existingAddons.map((addon) => {
+        if (addon.scope !== "global" && Array.isArray(addon.scopes) && addon.scopes.length) return addon;
+        const slug = String(addon.slug || "").toLowerCase();
+        const scopes = slug === "sfx" ? ["wedding"] : ["wedding", "birthday"];
+        return { ...addon, scopes, scope: scopes[0] };
+      });
+      writeStorage(KEYS.addons, migrated);
+    }
+    localStorage.setItem(KEYS.serviceOccasionSplitV1, "1");
+  }
   // Backward-compatible rename: Event Add-ons -> Event Services.
   // Existing admin/catalog data is kept intact when users upgrade.
   const serviceRenameKeys = [KEYS.occasions, KEYS.products, KEYS.addons];
@@ -663,8 +683,8 @@ function initializeSeedsIfNeeded() {
         : a;
     });
     const seeded = extractAllSeedAddons();
-    const existingKeys = new Set(migratedAddons.map((a) => `${a.scope}:${a.slug}`));
-    const missing = seeded.filter((a) => !existingKeys.has(`${a.scope}:${a.slug}`));
+    const existingKeys = new Set(migratedAddons.map((a) => `${(Array.isArray(a.scopes) && a.scopes.length ? a.scopes.join(",") : a.scope || "")}::${a.slug}`));
+    const missing = seeded.filter((a) => !existingKeys.has(`${(a.scopes || [a.scope || ""]).join(",")}::${a.slug}`));
     writeStorage(KEYS.addons, [...missing, ...migratedAddons]);
   }
 
@@ -1498,6 +1518,7 @@ function enrichAddon(addon) {
   const category = path.length ? categoryByPath(path) : null;
   return {
     ...addon,
+    scopes: Array.isArray(addon.scopes) && addon.scopes.length ? addon.scopes : (addon.scope && addon.scope !== "global" ? [addon.scope] : []),
     price: category ? productPriceOf(category) : null,
     productCount: category ? countProductsOf(category) : 0,
     href: category ? pathFor(buildTrailFor(path)) : "",
@@ -1576,9 +1597,11 @@ export function getAddonProducts() {
 // are dropped so the storefront never shows a dead "View Options" link.
 export function getAddonsForOccasion(topSlug) {
   const all = getAddons().filter((a) => a.active !== false && !a.linkBroken && a.productCount > 0 && a.price != null);
-  const globalOnes = all.filter((a) => a.scope === "global");
-  const extras = topSlug ? all.filter((a) => a.scope === topSlug) : [];
-  return [...globalOnes, ...extras];
+  if (!topSlug) return [];
+  return all.filter((a) => {
+    const scopes = Array.isArray(a.scopes) && a.scopes.length ? a.scopes : (a.scope && a.scope !== "global" ? [a.scope] : []);
+    return scopes.includes(topSlug);
+  });
 }
 
 export function saveAddon(addon) {
@@ -1595,7 +1618,10 @@ export function saveAddon(addon) {
     image: sanitizeUrl(addon.image) || IMAGES.showcase7,
     icon: sanitizeText(addon.icon || "sparkle"),
     categoryPath,
-    scope: sanitizeSlug(addon.scope || "global") || "global",
+    scopes: Array.isArray(addon.scopes) && addon.scopes.length
+      ? addon.scopes.map(sanitizeSlug).filter(Boolean)
+      : (addon.scope && addon.scope !== "global" ? [sanitizeSlug(addon.scope)] : []),
+    scope: Array.isArray(addon.scopes) && addon.scopes.length ? addon.scopes[0] : (sanitizeSlug(addon.scope || "") || ""),
     active: addon.active !== false,
     updatedAt: now,
   };

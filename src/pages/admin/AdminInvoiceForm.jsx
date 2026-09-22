@@ -24,7 +24,7 @@ export default function AdminInvoiceForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = getSettings();
-  const requestedType = location.state?.documentType || "invoice";
+  const requestedType = location.state?.documentType || (location.pathname.startsWith("/admin/quotations") ? "quotation" : "invoice");
   const requestedLeadId = location.state?.leadId || "";
   const requestedLead = location.state?.lead || null;
   const existing = id ? getInvoice(id) : null;
@@ -38,13 +38,16 @@ export default function AdminInvoiceForm() {
   const [newClient, setNewClient] = useState({ name: "", phone: "", email: "", address: "", city: "Ranchi" });
 
   const [issueDate, setIssueDate] = useState(existing?.issueDate || today());
-  const [dueDate, setDueDate] = useState(existing?.dueDate || "");
+  const [eventDate, setEventDate] = useState(existing?.eventDate || existing?.dueDate || "");
+  const [eventTime, setEventTime] = useState(existing?.eventTime || "");
+  const [subject, setSubject] = useState(existing?.subject || "");
   const initialLeadItem = requestedLead ? [{ id: uidLocal(), description: `${requestedLead.eventType || "Event"} — event services`, qty: 1, rate: 0 }] : [blankItem()];
   const [items, setItems] = useState(existing?.items?.length ? existing.items : initialLeadItem);
   const [discount, setDiscount] = useState(existing?.discount || 0);
   const [taxRate, setTaxRate] = useState(existing?.taxRate ?? settings.defaultTaxRate);
   const [status, setStatus] = useState(existing?.status || "draft");
   const [notes, setNotes] = useState(existing?.notes ?? settings.invoiceNotes);
+  const [terms, setTerms] = useState(existing?.terms ?? settings.defaultTerms);
   const [packagePick, setPackagePick] = useState("");
   const [error, setError] = useState("");
 
@@ -93,6 +96,9 @@ export default function AdminInvoiceForm() {
   function handleSave(e) {
     e.preventDefault();
     if (!clientSnapshot) return setError("Choose or add a client.");
+    if (!subject.trim()) return setError("Subject is required.");
+    if (!eventDate) return setError("Event date is required.");
+    if (!eventTime) return setError("Event time is required.");
     const cleanItems = items.filter((it) => it.description.trim() !== "");
     if (cleanItems.length === 0) return setError("Add at least one line item.");
     setError("");
@@ -103,14 +109,22 @@ export default function AdminInvoiceForm() {
       clientId,
       client: clientSnapshot,
       issueDate,
-      dueDate,
+      eventDate,
+      eventTime,
+      subject: subject.trim(),
       items: cleanItems,
       discount: Number(discount) || 0,
       taxRate: Number(taxRate) || 0,
       status,
       notes,
+      terms,
       documentType,
       leadId,
+      // Editing a document must never erase its financial history.
+      payments: existing?.payments || [],
+      writeOff: existing?.writeOff || null,
+      sourceQuotationId: existing?.sourceQuotationId || "",
+      convertedToInvoiceId: existing?.convertedToInvoiceId || "",
     });
     if (leadId) {
       updateAdminInquiry(leadId, documentType === "quotation"
@@ -161,10 +175,14 @@ export default function AdminInvoiceForm() {
         </section>
 
         <section className="admin-panel">
-          <h2>Dates &amp; status</h2>
+          <h2>Event details &amp; status</h2>
           <div className="form-row-2">
+            <div className="form-group"><label>Subject *</label><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Wedding decoration package" required /></div>
             <div className="form-group"><label>Issue date</label><input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} /></div>
-            <div className="form-group"><label>Due date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+          </div>
+          <div className="form-row-2">
+            <div className="form-group"><label>Event date *</label><input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required /></div>
+            <div className="form-group"><label>Event time *</label><input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} required /></div>
           </div>
           <div className="form-group">
             <label>Status</label>
@@ -224,8 +242,9 @@ export default function AdminInvoiceForm() {
         </section>
 
         <section className="admin-panel">
-          <h2>Notes</h2>
-          <div className="form-group"><textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+          <h2>Notes &amp; Terms and Conditions</h2>
+          <div className="form-group"><label>Customer notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+          <div className="form-group"><label>Terms and conditions</label><textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows="6" placeholder="Add terms and conditions for this quotation/invoice…" /></div>
         </section>
 
         {error && <p className="form-error">{error}</p>}

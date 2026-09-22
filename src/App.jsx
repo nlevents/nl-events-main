@@ -52,6 +52,7 @@ const AdminClients = lazy(() => import("./pages/admin/AdminClients"));
 const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
 const AdminInvoiceForm = lazy(() => import("./pages/admin/AdminInvoiceForm"));
 const AdminInvoiceView = lazy(() => import("./pages/admin/AdminInvoiceView"));
+const AdminPayments = lazy(() => import("./pages/admin/AdminPayments"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
 
@@ -90,8 +91,9 @@ export default function App() {
                     <Route path="inquiries" element={<AdminInquiries />} />
                     <Route path="inquiries/:leadId" element={<AdminLeadDetails />} />
                     <Route path="clients" element={<AdminClients />} />
-                    <Route path="invoices" element={<AdminInvoices />} />
-                    <Route path="quotations" element={<AdminPlaceholder title="Quotations" />} />
+                    <Route path="invoices" element={<AdminInvoices documentType="invoice" />} />
+                    <Route path="quotations" element={<AdminInvoices documentType="quotation" />} />
+                    <Route path="quotations/new" element={<AdminInvoiceForm />} />
                     <Route path="invoices/new" element={<AdminInvoiceForm />} />
                     <Route path="invoices/:id" element={<AdminInvoiceView />} />
                     <Route path="invoices/:id/edit" element={<AdminInvoiceForm />} />
@@ -102,7 +104,7 @@ export default function App() {
                     <Route path="team" element={<AdminPlaceholder title="Team" />} />
                     <Route path="attendance" element={<AdminPlaceholder title="Attendance" />} />
                     <Route path="payroll" element={<AdminPlaceholder title="Salary & Payroll" />} />
-                    <Route path="payments" element={<AdminPlaceholder title="Payments" />} />
+                    <Route path="payments" element={<AdminPayments />} />
                     <Route path="expenses" element={<AdminPlaceholder title="Expenses" />} />
                     <Route path="settings" element={<AdminSettings />} />
                   </Route>

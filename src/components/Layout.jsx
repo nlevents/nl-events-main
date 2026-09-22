@@ -25,14 +25,22 @@ export default function Layout() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  // Product detail pages intentionally use a distraction-free layout:
+  // no global header or mobile bottom navigation. The booking controls remain
+  // the primary navigation/action on these pages.
+  const pathParts = location.pathname.split("/").filter(Boolean);
+  const isProductDetail =
+    location.pathname === "/package-details" ||
+    (pathParts[0] === "occasion" && pathParts.length >= 3);
+
   return (
     <>
-      <Header />
-      <main>
+      {!isProductDetail && <Header />}
+      <main className={isProductDetail ? "product-detail-shell" : undefined}>
         <Outlet />
       </main>
       <Footer />
-      <BottomNav />
+      {!isProductDetail && <BottomNav />}
       <ErrorBoundary fallback={null}>
         <Chatbot />
       </ErrorBoundary>

@@ -103,7 +103,7 @@ function hashStr(str) {
 function buildGallery(product) {
   const h = hashStr(product.id);
   const pool = GALLERY_POOL.filter((img) => img !== product.image);
-  const picks = [0, 1, 2].map((i) => pool[(h + i * 7) % pool.length]);
+  const picks = [0, 1, 2, 3, 4].map((i) => pool[(h + i * 7) % pool.length]);
   return [product.image, ...picks];
 }
 
@@ -159,47 +159,57 @@ export default function PackageDetails() {
     return { id: p.id, img: p.image, name: p.name, price: p.price, originalPrice: p.originalPrice, href: "/package-details?id=" + encodeURIComponent(p.id) };
   }
 
+  const highlights = (product.includes || []).slice(0, 5);
+  const addonList = Array.isArray(product.addons) ? product.addons.slice(0, 4) : [];
+  const description = product.description || product.tagline || "A thoughtfully designed event package, prepared and delivered by the Next Level Events team.";
+
   return (
     <>
-      <section className="hero hero-sm">
-        <div className="hero-media"><img src={product.image} alt={product.name + " package decor"}  onError={onImgError}/></div>
-        <div className="hero-content">
-          <span className="eyebrow">{product.eyebrow}</span>
-          <h1>{product.name}</h1>
-          <p>{product.tagline}</p>
-        </div>
-      </section>
-
-      <section className="section-tight container">
-        <p className="crumb" style={{ marginBottom: 24 }}><Link to="/">Home</Link> / <Link to="/packages">Packages</Link> / <span>{product.name}</span></p>
-
+      <section className="section-tight container pd-page-top">
         <div id="packageDetailsGrid">
-          <div>
+          <div className="pd-main-column">
             <ProductGallery images={gallery} alt={product.name} />
 
-            <div className="reveal pd-info-block">
-              {product.badge ? <span className="tag-pill" style={{ marginRight: 8 }}>{product.badge}</span> : null}
+            <div className="reveal pd-market-info">
+              {product.badge ? <span className="pd-market-badge">{product.badge}</span> : null}
               <h1 className="pd-title">{product.name}</h1>
+
               <div className="pd-rating-line">
-                <RatingStars rating={product.rating} />
-                <span className="pd-rating-num">{Number(product.rating).toFixed(1)}</span>
-                <span className="pd-rating-reviews">({product.reviewCount}+ reviews)</span>
+                <span className="pd-rating-chip">
+                  {Number(product.rating).toFixed(1)} <span aria-hidden="true">★</span>
+                </span>
+                <span className="pd-rating-reviews">{product.reviewCount}+ ratings &amp; reviews</span>
               </div>
-              <div className="pd-price-row">
+
+              <div className="pd-market-price">
                 <b>{fmtINR(price)}</b>
                 {originalPrice ? <s>{fmtINR(originalPrice)}</s> : null}
-                {discount > 0 ? <span className="occ-prod-off">{discount}% OFF</span> : null}
+                {discount > 0 ? <span>{discount}% off</span> : null}
               </div>
+
               {city !== "Ranchi" && (
-                <p style={{ color: "var(--text-secondary)", fontSize: 12.5, marginTop: 4 }}>
-                  Price shown for {city} — includes a small logistics adjustment over our Ranchi base rate.
+                <p className="pd-city-note">
+                  Price shown for {city} · includes a small logistics adjustment.
                 </p>
               )}
-            </div>
 
-            <div className="reveal occ-block" style={{ paddingTop: 28, marginTop: 28 }}>
-              <h2 style={{ fontSize: 22, marginBottom: 12 }}>Description</h2>
-              <p style={{ color: "var(--text-secondary)", maxWidth: "68ch", lineHeight: 1.6 }}>{product.tagline}</p>
+              <div className="pd-offer-card">
+                <div className="pd-offer-head">
+                  <span className="pd-offer-icon">%</span>
+                  <strong>Package benefits</strong>
+                </div>
+                <p>No payment is required to send an enquiry. Confirm the date and details with our team first.</p>
+                <div className="pd-offer-points">
+                  <span><Icon name="check" /> Easy booking</span>
+                  <span><Icon name="check" /> Expert setup</span>
+                  <span><Icon name="check" /> Clear pricing</span>
+                </div>
+              </div>
+
+              <div className="pd-description" id="pd-description">
+                <h2>Description</h2>
+                <p>{description}</p>
+              </div>
             </div>
 
             {!isDesktop && (
@@ -216,27 +226,71 @@ export default function PackageDetails() {
               </div>
             )}
 
-            <div className="reveal occ-block">
-              <h2 style={{ fontSize: 22, marginBottom: 12 }}>What's Included</h2>
+            <section className="reveal pd-market-section pd-service-card" id="pd-service-details">
+              <div className="pd-section-heading">
+                <h2>Service details</h2>
+                <span>For your event</span>
+              </div>
+              <div className="pd-service-grid">
+                <div><Icon name="pin" /><div><b>{city}</b><small>Service location</small></div></div>
+                <div><Icon name="calendar" /><div><b>Flexible date</b><small>Confirm availability before booking</small></div></div>
+                <div><Icon name="clock" /><div><b>{meta.duration.split("•")[0]}</b><small>Setup &amp; service time</small></div></div>
+              </div>
+            </section>
+
+            <section className="reveal pd-market-section pd-peace-card">
+              <div className="pd-section-heading">
+                <h2>Book with confidence</h2>
+              </div>
+              <div className="pd-peace-grid">
+                <div><span>✓</span><b>Expert setup</b><small>Handled by our event team</small></div>
+                <div><span>✓</span><b>Transparent pricing</b><small>No surprise package fee</small></div>
+                <div><span>✓</span><b>Personal support</b><small>We'll confirm the details with you</small></div>
+              </div>
+            </section>
+
+            {highlights.length > 0 && (
+              <section className="reveal pd-market-section" id="pd-highlights">
+                <div className="pd-section-heading">
+                  <h2>Package highlights</h2>
+                  <span>{highlights.length} included</span>
+                </div>
+                <ul className="pd-highlight-list">
+                  {highlights.map((item) => <li key={item}><Icon name="check" /><span>{item}</span></li>)}
+                </ul>
+              </section>
+            )}
+
+            <section className="reveal pd-market-section pd-details-card" id="pd-details">
+              <div className="pd-section-heading">
+                <h2>All details</h2>
+                <span>Package information</span>
+              </div>
+              <div className="pd-detail-tabs" role="tablist">
+                <a href="#pd-description" className="is-active">Overview</a>
+                <a href="#pd-included">What's included</a>
+                <a href="#pd-not-included">Not included</a>
+                <a href="#pd-faq">FAQs</a>
+              </div>
+            </section>
+
+            <div className="reveal occ-block pd-market-section" id="pd-included">
+              <div className="pd-section-heading"><h2>What's included</h2></div>
               <ul className="included-list">
-                {product.includes.map((item) => (
-                  <li key={item}><Icon name="check" />{item}</li>
-                ))}
+                {product.includes.map((item) => <li key={item}><Icon name="check" />{item}</li>)}
               </ul>
             </div>
 
-            <div className="reveal occ-block">
-              <h2 style={{ fontSize: 22, marginBottom: 12 }}>What's Not Included</h2>
+            <div className="reveal occ-block pd-market-section" id="pd-not-included">
+              <div className="pd-section-heading"><h2>What's not included</h2></div>
               <ul className="not-included-list">
-                {meta.notIncluded.map((item) => (
-                  <li key={item}><Icon name="close" />{item}</li>
-                ))}
+                {meta.notIncluded.map((item) => <li key={item}><Icon name="close" />{item}</li>)}
               </ul>
             </div>
 
-            <div className="reveal occ-block pd-meta-grid">
+            <div className="reveal pd-market-section pd-meta-grid">
               <div className="pd-meta-card">
-                <h4><Icon name="compass" />Setup Requirements</h4>
+                <h4><Icon name="compass" />Setup requirements</h4>
                 <p>{meta.setupRequirements}</p>
               </div>
               <div className="pd-meta-card">
@@ -245,43 +299,71 @@ export default function PackageDetails() {
               </div>
             </div>
 
-            <div className="reveal occ-block">
-              <h2 style={{ fontSize: 22, marginBottom: 12 }}>Important Information</h2>
+            <div className="reveal pd-market-section">
+              <div className="pd-section-heading"><h2>Important information</h2></div>
               <ul className="important-info-list">
                 {meta.importantInfo.map((item, i) => <li key={i}>{item}</li>)}
               </ul>
             </div>
 
-            <div className="reveal occ-block">
-              <h2 style={{ fontSize: 22, marginBottom: 16 }}>Frequently Asked Questions</h2>
+            {similar.length > 0 && (
+              <div className="pd-market-section pd-similar-wrap">
+                <ProductRail title="Similar Packages" viewAllHref="/packages" items={similar.map(toRail)} />
+              </div>
+            )}
+
+            {addonList.length > 0 && (
+              <section className="reveal pd-market-section pd-addon-section">
+                <div className="pd-section-heading">
+                  <h2>Optional add-ons</h2>
+                  <span>Customise your package</span>
+                </div>
+                <div className="pd-addon-list">
+                  {addonList.map((addon) => (
+                    <div className="pd-addon-item" key={addon.name}>
+                      <div><b>{addon.name}</b><small>Add this service during booking</small></div>
+                      <span>Available</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="reveal pd-market-section" id="pd-faq">
+              <div className="pd-section-heading"><h2>Frequently asked questions</h2></div>
               <Faq items={meta.faqs} />
-            </div>
+            </section>
           </div>
 
           {isDesktop && (
             <aside className="reveal">
               <BookingPanel
-                  product={product}
-                  productHref={"/package-details?id=" + encodeURIComponent(product.id)}
-                  addons={product.addons}
-                  requiresTimeSlot
-                  defaultEventType={
-                    ({ wedding: "Wedding Ceremony", birthday: "Birthday Party", anniversary: "Anniversary", corporate: "Corporate Event" })[product.category] || "Custom Celebration"
-                  }
-                />
+                product={product}
+                productHref={"/package-details?id=" + encodeURIComponent(product.id)}
+                addons={product.addons}
+                requiresTimeSlot
+                defaultEventType={
+                  ({ wedding: "Wedding Ceremony", birthday: "Birthday Party", anniversary: "Anniversary", corporate: "Corporate Event" })[product.category] || "Custom Celebration"
+                }
+              />
             </aside>
           )}
+        </div>
+
+        <div className="pd-action-row" aria-label="Booking actions">
+          <a href="#booking-panel" className="pd-action pd-action-secondary">Custom Enquiry</a>
+          <a href="#booking-panel" className="pd-action pd-action-primary">Book This Package</a>
         </div>
       </section>
 
       {product.reviews && product.reviews.length > 0 && (
-        <section className="section-tight container">
-          <div className="shop-head reveal"><h2>Customer Reviews</h2></div>
+        <section className="section-tight container pd-reviews-section">
+          <div className="pd-section-heading reveal"><h2>Ratings &amp; reviews</h2><span>{product.reviewCount}+ reviews</span></div>
           <div className="reviews-summary reveal">
             <div className="reviews-score">
               <h3>{Number(product.rating).toFixed(1)}</h3>
               <RatingStars rating={product.rating} />
-              <p>Based on {product.reviewCount}+ verified reviews</p>
+              <p>Based on {product.reviewCount}+ customer reviews</p>
             </div>
             <div className="reviews-bars">
               {[5, 4, 3, 2, 1].map((star) => {
@@ -302,9 +384,7 @@ export default function PackageDetails() {
               <div className="review-card" key={r.name}>
                 <RatingStars rating={r.rating} size="sm" />
                 <p>{r.text}</p>
-                {r.tags && r.tags.length > 0 && (
-                  <div className="review-tags">{r.tags.map((t) => <span key={t}>{t}</span>)}</div>
-                )}
+                {r.tags && r.tags.length > 0 && <div className="review-tags">{r.tags.map((t) => <span key={t}>{t}</span>)}</div>}
                 <div className="review-who">
                   <span className="review-avatar">{r.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
                   <div><h5>{r.name}</h5><span>{r.location}</span></div>
@@ -315,20 +395,8 @@ export default function PackageDetails() {
         </section>
       )}
 
-      {similar.length > 0 && (
-        <ProductRail title="Similar Packages" viewAllHref="/packages" items={similar.map(toRail)} />
-      )}
-      {related.length > 0 && (
-        <ProductRail title="Related Packages" items={related.map(toRail)} tone="surface" />
-      )}
-      {popular.length > 0 && (
-        <ProductRail title={"Popular in " + city} items={popular.map(toRail)} />
-      )}
-
-      <div className="bottom-cta">
-        <Link to="/book-event" className="btn btn-ghost">Customize</Link>
-        <a href="#booking-panel" className="btn btn-primary">Book This Package</a>
-      </div>
+      {related.length > 0 && <ProductRail title="Related Packages" items={related.map(toRail)} tone="surface" />}
+      {popular.length > 0 && <ProductRail title={"Popular in " + city} items={popular.map(toRail)} />}
     </>
   );
 }
