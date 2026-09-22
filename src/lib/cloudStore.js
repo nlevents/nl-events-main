@@ -143,3 +143,12 @@ export async function bootstrapAdminState() {
     body: JSON.stringify({ state: payload }),
   });
 }
+
+export async function fetchAdminCloudState() {
+  const token = getAdminAccessToken();
+  if (!token) throw new Error("Admin session expired. Please log in again.");
+  const data = await request(`${API_BASE}/admin/state`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data?.state || {};
+}

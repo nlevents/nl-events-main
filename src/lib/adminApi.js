@@ -44,3 +44,7 @@ export async function deleteAdminInquiry(id) {
 export async function bulkDeleteAdminInquiries(ids) {
   return adminFetch("/admin/inquiries", { method: "DELETE", body: { ids } });
 }
+
+export async function fetchAdminBackup() {
+  return adminFetch("/admin/backup");
+}
