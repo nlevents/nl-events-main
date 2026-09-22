@@ -39,6 +39,8 @@ const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
+const AdminCatalog = lazy(() => import("./pages/admin/AdminCatalog"));
+const AdminFinancialReports = lazy(() => import("./pages/admin/AdminFinancialReports"));
 const AdminProductForm = lazy(() => import("./pages/admin/AdminProductForm"));
 const AdminCategories = lazy(() => import("./pages/admin/AdminCategories"));
 const AdminMedia = lazy(() => import("./pages/admin/AdminMedia"));
@@ -72,7 +74,7 @@ export default function App() {
                   <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
                   <Route path="/admin" element={<AdminAuthProvider><AdminLayout /></AdminAuthProvider>}>
                     <Route index element={<AdminDashboard />} />
-                    <Route path="products" element={<AdminProducts />} />
+                    <Route path="products" element={<AdminCatalog />} />
                     <Route path="products/new" element={<AdminProductForm />} />
                     <Route path="products/:id/edit" element={<AdminProductForm />} />
                     <Route path="categories" element={<AdminCategories />} />
@@ -92,7 +94,9 @@ export default function App() {
                     <Route path="clients" element={<AdminClients />} />
                     <Route path="invoices" element={<AdminInvoices />} />
                     <Route path="quotations" element={<AdminInvoices />} />
-                    <Route path="quotations" element={<AdminPlaceholder title="Quotations" />} />
+                    <Route path="quotations/new" element={<AdminInvoiceForm />} />
+                    <Route path="quotations/:id" element={<AdminInvoiceView />} />
+                    <Route path="quotations/:id/edit" element={<AdminInvoiceForm />} />
                     <Route path="invoices/new" element={<AdminInvoiceForm />} />
                     <Route path="invoices/:id" element={<AdminInvoiceView />} />
                     <Route path="invoices/:id/edit" element={<AdminInvoiceForm />} />
@@ -105,6 +109,7 @@ export default function App() {
                     <Route path="payroll" element={<AdminPlaceholder title="Salary & Payroll" />} />
                     <Route path="payments" element={<AdminPlaceholder title="Payments" />} />
                     <Route path="expenses" element={<AdminPlaceholder title="Expenses" />} />
+                    <Route path="reports/sales" element={<AdminFinancialReports />} />
                     <Route path="settings" element={<AdminSettings />} />
                   </Route>
                   <Route path="/landing" element={<Landing />} />

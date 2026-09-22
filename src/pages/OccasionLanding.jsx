@@ -228,8 +228,11 @@ function Moments({ config }) {
 }
 
 function Review({ config }) {
-  if (!config.review) return null;
-  return <section className="occasion-pro-section occasion-pro-review"><div className="occasion-pro-container"><SectionHead eyebrow="WHAT OUR CLIENTS SAY" title="Real Stories. Real Celebrations." /><div className="occasion-pro-review-card"><div className="occasion-pro-stars">★★★★★</div><p>“{config.review.quote}”</p><strong>{config.review.name}</strong><span>Next Level Events Client</span></div></div></section>;
+  const review = config.review || {
+    quote: "The team was professional, creative and attentive to every detail. Our celebration felt effortless and memorable.",
+    name: "Next Level Events Client",
+  };
+  return <section className="occasion-pro-section occasion-pro-review"><div className="occasion-pro-container"><SectionHead eyebrow="WHAT OUR CLIENTS SAY" title="Real Stories. Real Celebrations." /><div className="occasion-pro-review-card"><div className="occasion-pro-stars">★★★★★</div><p>“{review.quote}”</p><strong>{review.name}</strong><span>Verified Next Level Events Client</span></div></div></section>;
 }
 
 function Gallery({ config }) {

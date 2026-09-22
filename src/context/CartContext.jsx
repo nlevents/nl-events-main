@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { WHATSAPP_NUMBER } from "../data/images";
 import { fmtINR } from "../lib/pricing";
 import { genId, bookingLinesText, cartSubtotal, cartCount } from "../lib/cart";
-import { validateCoupon } from "../lib/catalogStore";
 
 const CartContext = createContext(null);
 const CART_KEY = "nle-cart";
@@ -92,7 +91,10 @@ export function CartProvider({ children }) {
   const subtotal = cartSubtotal(items);
 
   const applyCoupon = useCallback(
-    (code) => {
+    async (code) => {
+      // Keep the large catalog store out of the initial public bundle. Coupon
+      // validation is needed only when a visitor actually applies a coupon.
+      const { validateCoupon } = await import("../lib/catalogStore");
       const result = validateCoupon(code, subtotal);
       if (result.valid) {
         setAppliedCoupon({

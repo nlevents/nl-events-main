@@ -958,8 +958,8 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 }
 @media (max-width:640px){
   .wedding-container,.wedding-hero-content{width:min(100% - 28px,1240px)}
-  .wedding-hero,.wedding-hero-content{min-height:530px}
-  .wedding-hero-content{justify-content:flex-end;padding:40px 0 30px}
+  .wedding-hero,.wedding-hero-content{min-height:390px}
+  .wedding-hero-content{justify-content:flex-end;padding:28px 0 24px}
   .wedding-hero-content>span{font-size:8px}
   .wedding-hero-content h1{font-size:39px;margin-top:9px}
   .wedding-hero-content p{font-size:11px}

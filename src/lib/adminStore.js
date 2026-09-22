@@ -30,6 +30,9 @@ function writeJSON(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     queueCloudSync(key, value);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("nle-admin-data-updated", { detail: { key } }));
+    }
     return true;
   } catch {
     return false;
@@ -102,7 +105,8 @@ export function deleteClient(id) {
 // ---------- Invoices ----------
 
 export function getInvoices() {
-  const invoices = readJSON(KEYS.invoices, []);
+  const stored = readJSON(KEYS.invoices, []);
+  const invoices = Array.isArray(stored) ? stored : [];
   // Backward compatibility: older records used dueDate. The product now
   // uses eventDate for both quotations and invoices.
   return invoices.map((inv) => ({

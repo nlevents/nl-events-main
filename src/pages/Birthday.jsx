@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
 import usePageMeta from "../hooks/usePageMeta";
+import { getAddonsForOccasion } from "../lib/catalogStore";
 
 const CATEGORIES = [
   ["Kids Birthday", "Age 1–12", IMAGES.typeKidsBirthday, "/occasion/birthday/kids-birthday"],
@@ -142,15 +143,23 @@ function BirthdayCategories() {
 }
 
 function BirthdayServices() {
+  const [services, setServices] = useState(() => getAddonsForOccasion("birthday"));
+  useEffect(() => {
+    const refresh = () => setServices(getAddonsForOccasion("birthday"));
+    refresh();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+  const items = services.length ? services.map((service, i) => [service.label, service.subLabel, service.image || SERVICES[i % SERVICES.length]?.[3]]) : SERVICES;
   return (
     <section className="birthday-light-section">
       <div className="birthday-container">
-        <SectionHead eyebrow="OUR BIRTHDAY SERVICES" title="Everything You Need for a Perfect Birthday" link={{ label: "View All Services", href: "/services" }} />
+        <SectionHead eyebrow="OUR BIRTHDAY SERVICES" title="Everything You Need for a Perfect Birthday" link={{ label: "View All Services", href: "/occasion/event-services" }} />
         <p className="birthday-intro">From first idea to the final photo, our team takes care of the details.</p>
         <div className="birthday-services-grid">
-          {SERVICES.map(([title, sub, icon, image]) => (
-            <Link to="/services" className="birthday-service-card" key={title}>
-              <div className="birthday-service-icon">{icon}</div>
+          {items.map(([title, sub, image]) => (
+            <Link to="/occasion/event-services" className="birthday-service-card" key={title}>
+              <div className="birthday-service-icon">✦</div>
               <strong>{title}</strong>
               <span>{sub}</span>
               <img src={image} alt="" loading="lazy" decoding="async" />

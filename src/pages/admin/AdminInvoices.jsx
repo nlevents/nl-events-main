@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { getInvoices, deleteInvoice, setInvoiceStatus } from "../../lib/adminStore";
 import { fmtINR } from "../../lib/pricing";
@@ -9,6 +10,8 @@ const STATUS_LABEL = { draft: "Draft", sent: "Sent", partially_paid: "Partially 
 
 export default function AdminInvoices() {
   usePageMeta("Invoices — Admin", "Admin panel.", { noindex: true });
+  const location = useLocation();
+  const isQuotationView = location.pathname.startsWith("/admin/quotations");
   const [invoices, setInvoices] = useState(() => getInvoices());
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -20,10 +23,11 @@ export default function AdminInvoices() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return invoices
+      .filter((inv) => (isQuotationView ? inv.documentType === "quotation" : inv.documentType !== "quotation"))
       .filter((inv) => statusFilter === "all" || inv.status === statusFilter)
       .filter((inv) => !q || [inv.number, inv.client?.name].some((v) => (v || "").toLowerCase().includes(q)))
       .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  }, [invoices, query, statusFilter]);
+  }, [invoices, query, statusFilter, isQuotationView]);
 
   function handleDelete(inv) {
     if (!window.confirm(`Delete invoice ${inv.number}? This can't be undone.`)) return;
@@ -39,12 +43,18 @@ export default function AdminInvoices() {
   return (
     <div className="admin-page">
       <header className="admin-page-head">
-        <h1>Invoices</h1>
-        <Link to="/admin/invoices/new" className="btn btn-primary">+ New Invoice</Link>
+        <h1>{isQuotationView ? "Quotations" : "Invoices"}</h1>
+        <div className="admin-row-actions">
+          {isQuotationView ? (
+            <Link to="/admin/quotations/new" className="btn btn-primary">+ New Quotation</Link>
+          ) : (
+            <Link to="/admin/invoices/new" className="btn btn-primary">+ New Invoice</Link>
+          )}
+        </div>
       </header>
 
       <div className="admin-toolbar">
-        <input className="admin-search" placeholder="Search by invoice # or client…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input className="admin-search" placeholder={isQuotationView ? "Search by quotation # or client…" : "Search by invoice # or client…"} value={query} onChange={(e) => setQuery(e.target.value)} />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="all">All statuses</option>
           {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
@@ -52,7 +62,7 @@ export default function AdminInvoices() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="admin-empty">{invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}</p>
+        <p className="admin-empty">{filtered.length === 0 ? (isQuotationView ? "No quotations match your filters." : (invoices.length === 0 ? "No invoices yet." : "No invoices match your filters.")) : ""}</p>
       ) : (
         <table className="admin-table">
           <thead>
@@ -61,7 +71,7 @@ export default function AdminInvoices() {
           <tbody>
             {filtered.map((inv) => (
               <tr key={inv.id}>
-                <td>{inv.documentType === "quotation" ? "Quotation" : "Invoice"}</td><td><Link to={"/admin/invoices/" + inv.id}>{inv.number}</Link></td>
+                <td>{inv.documentType === "quotation" ? "Quotation" : "Invoice"}</td><td><Link to={(isQuotationView ? "/admin/quotations/" : "/admin/invoices/") + inv.id}>{inv.number}</Link></td>
                 <td>{inv.client?.name || "—"}</td>
                 <td>{inv.issueDate}</td>
                 <td>{inv.eventDate || inv.dueDate || "—"}</td>
@@ -76,8 +86,8 @@ export default function AdminInvoices() {
                   </select>
                 </td>
                 <td className="admin-row-actions">
-                  <Link to={"/admin/invoices/" + inv.id} className="btn btn-line btn-sm">View</Link>
-                  <Link to={"/admin/invoices/" + inv.id + "/edit"} className="btn btn-line btn-sm">Edit</Link>
+                  <Link to={(isQuotationView ? "/admin/quotations/" : "/admin/invoices/") + inv.id} className="btn btn-line btn-sm">View</Link>
+                  <Link to={(isQuotationView ? "/admin/quotations/" : "/admin/invoices/") + inv.id + "/edit"} className="btn btn-line btn-sm">Edit</Link>
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDelete(inv)}>Delete</button>
                 </td>
               </tr>

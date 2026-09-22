@@ -35,6 +35,7 @@ const KEYS = {
   referenceDemoProductsSeededV3: STORE_KEY_PREFIX + "reference_demo_products_seeded_v3",
   addonProductsSeededV1: STORE_KEY_PREFIX + "addon_products_seeded_v1",
   serviceOccasionSplitV1: STORE_KEY_PREFIX + "service_occasion_split_v1",
+  serviceOccasionSplitV2: STORE_KEY_PREFIX + "service_occasion_split_v2",
 };
 
 const STORE_VERSION = "4.7-service-occasion-split";
@@ -524,12 +525,26 @@ function initializeSeedsIfNeeded() {
       const migrated = existingAddons.map((addon) => {
         if (addon.scope !== "global" && Array.isArray(addon.scopes) && addon.scopes.length) return addon;
         const slug = String(addon.slug || "").toLowerCase();
-        const scopes = slug === "sfx" ? ["wedding"] : ["wedding", "birthday"];
+        const weddingOnly = new Set(["sfx", "baraat-procession", "wedding-activity"]);
+        const birthdayOnly = new Set(["birthday-entertainment", "kids-activities"]);
+        const scopes = weddingOnly.has(slug) ? ["wedding"] : (birthdayOnly.has(slug) ? ["birthday"] : ["wedding", "birthday"]);
         return { ...addon, scopes, scope: scopes[0] };
       });
       writeStorage(KEYS.addons, migrated);
     }
     localStorage.setItem(KEYS.serviceOccasionSplitV1, "1");
+  }
+  // Second migration: add birthday-specific featured services to existing
+  // installations without touching any admin-created service records.
+  if (!localStorage.getItem(KEYS.serviceOccasionSplitV2)) {
+    const existing = readStorage(KEYS.addons, []);
+    const existingSlugs = new Set(existing.map((a) => a?.slug).filter(Boolean));
+    const birthdaySeeds = [
+      { id: uid("addon"), slug: "birthday-entertainment", label: "Birthday Entertainment", subLabel: "Hosts, games & kids entertainment", image: IMAGES.galConcert2, icon: "sparkle", categoryPath: ["event-services", "artists"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
+      { id: uid("addon"), slug: "kids-activities", label: "Kids Activities", subLabel: "Games, activities & fun zones", image: IMAGES.themeBalloonCelebration, icon: "star", categoryPath: ["event-services", "wedding-activity"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
+    ].filter((a) => !existingSlugs.has(a.slug));
+    if (birthdaySeeds.length) writeStorage(KEYS.addons, [...birthdaySeeds, ...existing]);
+    localStorage.setItem(KEYS.serviceOccasionSplitV2, "1");
   }
   // Backward-compatible rename: Event Add-ons -> Event Services.
   // Existing admin/catalog data is kept intact when users upgrade.
@@ -695,6 +710,10 @@ function initializeSeedsIfNeeded() {
         : a;
     });
     const seeded = extractAllSeedAddons();
+    seeded.push(
+      { id: uid("addon"), slug: "birthday-entertainment", label: "Birthday Entertainment", subLabel: "Hosts, games & kids entertainment", image: IMAGES.galConcert2, icon: "sparkle", categoryPath: ["event-services", "artists"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
+      { id: uid("addon"), slug: "kids-activities", label: "Kids Activities", subLabel: "Games, activities & fun zones", image: IMAGES.themeBalloonCelebration, icon: "star", categoryPath: ["event-services", "wedding-activity"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
+    );
     const existingKeys = new Set(migratedAddons.map((a) => `${(Array.isArray(a.scopes) && a.scopes.length ? a.scopes.join(",") : a.scope || "")}::${a.slug}`));
     const missing = seeded.filter((a) => !existingKeys.has(`${(a.scopes || [a.scope || ""]).join(",")}::${a.slug}`));
     writeStorage(KEYS.addons, [...missing, ...migratedAddons]);
@@ -797,6 +816,7 @@ export function saveProduct(product) {
 
   const safeProduct = {
     ...product,
+    catalogKind: ["product", "package", "service"].includes(product.catalogKind) ? product.catalogKind : (product.isAddon ? "service" : "product"),
     // Must always be "product": the occasion tree walker uses this to
     // decide whether a node renders ProductTemplate (the product detail
     // page) or CategoryTemplate (a listing page). Without it, clicking a

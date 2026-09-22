@@ -18,6 +18,32 @@ import {
 } from "../../data/occasions";
 import { getAddonsForOccasion } from "../../lib/catalogStore";
 
+const SHOP_REVIEWS = {
+  wedding: { quote: "The wedding setup looked exactly like the vision we shared. Every function felt beautifully coordinated.", name: "Priya & Karan" },
+  birthday: { quote: "The birthday setup was colourful, organised and exactly what we wanted. The kids absolutely loved it!", name: "Ritika Sharma" },
+  anniversary: { quote: "Everything was beautifully planned and the team made our anniversary feel truly special.", name: "A Happy Couple" },
+  corporate: { quote: "Professional planning, clear coordination and a polished event from start to finish.", name: "Corporate Client" },
+  festivals: { quote: "The festive setup transformed the venue and made the celebration feel genuinely special.", name: "Happy Client" },
+  "kids-family": { quote: "The team handled all the details so our family could simply enjoy the celebration together.", name: "A Happy Family" },
+};
+
+function OccasionReview({ topSlug, label }) {
+  const review = SHOP_REVIEWS[topSlug] || {
+    quote: `The ${String(label || "celebration").toLowerCase()} setup was beautifully planned and delivered with great attention to detail.`,
+    name: "Next Level Events Client",
+  };
+  return (
+    <section className="occ-page-review" aria-label={`${label || "Occasion"} customer review`}>
+      <div className="occ-page-review-card">
+        <div className="occ-page-review-stars" aria-label="5 star review">★★★★★</div>
+        <p>“{review.quote}”</p>
+        <strong>{review.name}</strong>
+        <span>Verified Next Level Events Client</span>
+      </div>
+    </section>
+  );
+}
+
 // Renders ANY level of the tree that isn't a leaf product: the top-level
 // occasion page, a subcategory page, or a theme page. Same component —
 // what it shows (child cards vs. product grid vs. both) is driven purely
@@ -200,6 +226,8 @@ export default function CategoryTemplate({ node, trail }) {
         </div>
 
       </section>
+
+      <OccasionReview topSlug={topSlug} label={node.label} />
     </>
   );
 }

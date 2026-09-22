@@ -458,6 +458,12 @@ h3,.h3{ font-family:var(--font-display); font-weight:500; line-height:1.2; }
 @media (max-width:640px){
   .hero-sm{ height:130px !important; max-height:130px; }
   .hero-sm .hero-media, .hero-sm .hero-media-carousel{ height:130px; }
+  .occ-hero.hero-sm{ height:96px !important; max-height:96px; }
+  .occ-hero.hero-sm .hero-media, .occ-hero.hero-sm .hero-media-carousel{ height:96px; }
+  .occ-hero.hero-sm .hero-content{ padding-top:8px; padding-bottom:8px; }
+  .occ-hero.hero-sm h1{ font-size:20px; margin-top:2px; }
+  .occ-hero.hero-sm p{ display:none; }
+  .occ-hero.hero-sm .eyebrow{ font-size:9px; }
 }
 
 /* ---------- Cards: event types ---------- */

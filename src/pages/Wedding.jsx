@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
-import { addonsFor } from "../data/addons";
 import ProductCard from "../components/occasion/ProductCard";
 import { pathFor, sortProducts } from "../data/occasions";
 import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
 import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
 import usePageMeta from "../hooks/usePageMeta";
+import { getAddonsForOccasion } from "../lib/catalogStore";
 
 const FUNCTIONS = [
   { label: "Haldi", img: IMAGES.themeJungleLeaves, href: "/occasion/wedding/haldi" },
@@ -137,13 +137,21 @@ function WeddingFunctions() {
 }
 
 function WeddingServices() {
+  const [services, setServices] = useState(() => getAddonsForOccasion("wedding"));
+  useEffect(() => {
+    const refresh = () => setServices(getAddonsForOccasion("wedding"));
+    refresh();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+  const items = services.length ? services.map((service, i) => [service.label, service.subLabel, service.image || SERVICES[i % SERVICES.length]?.[2]]) : SERVICES;
   return (
     <section className="wedding-light-section">
       <div className="wedding-container">
-        <SectionHead eyebrow="OUR WEDDING SERVICES" title="Everything You Need for a Perfect Wedding" link={{ label: "View All Services", href: "/services" }} />
+        <SectionHead eyebrow="OUR WEDDING SERVICES" title="Everything You Need for a Perfect Wedding" link={{ label: "View All Services", href: "/occasion/event-services" }} />
         <HorizontalRail>
-          {SERVICES.map(([label, sub, img]) => (
-            <Link to="/services" className="wedding-service-card" key={label}>
+          {items.map(([label, sub, img]) => (
+            <Link to="/occasion/event-services" className="wedding-service-card" key={label}>
               <img src={img} alt={label} />
               <strong>{label}</strong>
               <span>{sub}</span>
@@ -156,7 +164,13 @@ function WeddingServices() {
 }
 
 function WeddingAddons() {
-  const addons = addonsFor([{ slug: "wedding" }]);
+  const [addons, setAddons] = useState(() => getAddonsForOccasion("wedding"));
+  useEffect(() => {
+    const refresh = () => setAddons(getAddonsForOccasion("wedding"));
+    refresh();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
   return (
     <section className="wedding-addons-section">
       <div className="wedding-container">
@@ -164,7 +178,7 @@ function WeddingAddons() {
         <p className="wedding-addons-intro">Browse popular service categories for your wedding and choose the package or service that fits your celebration.</p>
         <div className="wedding-addon-grid">
           {addons.map((addon) => (
-            <Link to={addon.href} className="wedding-addon-card" key={addon.slug}>
+            <Link to={addon.href} className="wedding-addon-card" key={addon.id || addon.slug}>
               <div className="wedding-addon-image"><img src={addon.image} alt={addon.label} /><span>✦</span></div>
               <div className="wedding-addon-copy">
                 <h3>{addon.label}</h3>

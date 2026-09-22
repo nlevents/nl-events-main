@@ -22,13 +22,14 @@ export default function AdminInvoiceView() {
   const [paymentNotes, setPaymentNotes] = useState("");
   const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [writeOffReason, setWriteOffReason] = useState("");
+  const documentBase = isQuotation ? "/admin/quotations/" : "/admin/invoices/";
 
   if (!invoice) return <NotFound />;
 
   function handleDelete() {
     if (!window.confirm(`Delete ${isQuotation ? "quotation" : "invoice"} ${invoice.number}? This can't be undone.`)) return;
     deleteInvoice(invoice.id);
-    navigate("/admin/invoices");
+    navigate(isQuotation ? "/admin/quotations" : "/admin/invoices");
   }
 
   function recordPayment() {
@@ -48,6 +49,11 @@ export default function AdminInvoiceView() {
   }
 
   function convertToInvoice() {
+    if (invoice.convertedToInvoiceId) {
+      navigate("/admin/invoices/" + invoice.convertedToInvoiceId);
+      return;
+    }
+    if (!window.confirm(`Convert quotation ${invoice.number} to an invoice? The quotation will remain available as the original document.`)) return;
     const converted = saveInvoice({
       ...invoice,
       id: undefined,
@@ -58,7 +64,9 @@ export default function AdminInvoiceView() {
       notes: invoice.notes,
       payments: [],
       writeOff: null,
+      convertedFromQuotationId: invoice.id,
     });
+    saveInvoice({ ...invoice, convertedToInvoiceId: converted.id });
     if (invoice.leadId) updateAdminInquiry(invoice.leadId, { invoiceId: converted.id, status: "quotation_sent" }).catch(() => {});
     navigate("/admin/invoices/" + converted.id);
   }
@@ -66,10 +74,10 @@ export default function AdminInvoiceView() {
   return (
     <div className="admin-page">
       <div className="admin-invoice-toolbar admin-print-hide">
-        <Link to="/admin/invoices" className="btn btn-ghost btn-sm">← Back to invoices</Link>
+        <Link to={isQuotation ? "/admin/quotations" : "/admin/invoices"} className="btn btn-ghost btn-sm">← Back to {isQuotation ? "quotations" : "invoices"}</Link>
         <div className="admin-row-actions">
-          {isQuotation ? <button type="button" className="btn btn-primary btn-sm" onClick={convertToInvoice}>Convert to Invoice</button> : getInvoiceBalance(invoice) > 0.01 && <><button type="button" className="btn btn-line btn-sm" onClick={() => { setPaymentAmount(String(getInvoiceBalance(invoice))); setPaymentOpen(true); }}>Record Payment</button><button type="button" className="btn btn-ghost btn-sm" onClick={() => setWriteOffOpen(true)}>Write Off</button></>}
-          <Link to={"/admin/invoices/" + invoice.id + "/edit"} className="btn btn-line btn-sm">Edit</Link>
+          {isQuotation ? <button type="button" className="btn btn-primary btn-sm" onClick={convertToInvoice}>{invoice.convertedToInvoiceId ? "Open Invoice" : "Convert to Invoice"}</button> : getInvoiceBalance(invoice) > 0.01 && <><button type="button" className="btn btn-line btn-sm" onClick={() => { setPaymentAmount(String(getInvoiceBalance(invoice))); setPaymentOpen(true); }}>Record Payment</button><button type="button" className="btn btn-ghost btn-sm" onClick={() => setWriteOffOpen(true)}>Write Off</button></>}
+          <Link to={documentBase + invoice.id + "/edit"} className="btn btn-line btn-sm">Edit</Link>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => window.print()}>Print / Save as PDF</button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={handleDelete}>Delete</button>
         </div>

@@ -24,7 +24,9 @@ export default function AdminInvoiceForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = getSettings();
-  const requestedType = location.state?.documentType || "invoice";
+  // Support both explicit navigation state and direct /admin/quotations/* URLs.
+  // This keeps quotation creation/editing working even after a refresh.
+  const requestedType = location.state?.documentType || (location.pathname.startsWith("/admin/quotations") ? "quotation" : "invoice");
   const requestedLeadId = location.state?.leadId || "";
   const requestedLead = location.state?.lead || null;
   const existing = id ? getInvoice(id) : null;
@@ -127,7 +129,7 @@ export default function AdminInvoiceForm() {
         : { invoiceId: saved.id }
       ).catch(() => {});
     }
-    navigate("/admin/invoices/" + saved.id);
+    navigate((documentType === "quotation" ? "/admin/quotations/" : "/admin/invoices/") + saved.id);
   }
 
   return (
@@ -184,8 +186,10 @@ export default function AdminInvoiceForm() {
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
+              <option value="partially_paid">Partially paid</option>
               <option value="paid">Paid</option>
               <option value="overdue">Overdue</option>
+              <option value="written_off">Written off</option>
               <option value="cancelled">Cancelled</option>
             </select>
           </div>

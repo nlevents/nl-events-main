@@ -32,6 +32,15 @@ export default function ShopByOccasion() {
           {occasions.map((o) => <OccasionCard key={o.slug} occasion={o} />)}
         </div>
       </section>
+
+      <section className="occ-page-review" aria-label="Customer review">
+        <div className="occ-page-review-card">
+          <div className="occ-page-review-stars" aria-label="5 star review">★★★★★</div>
+          <p>“The team understood exactly what we wanted and made the entire celebration feel effortless.”</p>
+          <strong>Happy Next Level Events Client</strong>
+          <span>Verified Next Level Events Client</span>
+        </div>
+      </section>
     </>
   );
 }
