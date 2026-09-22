@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
-import { GLOBAL_ADDONS } from "../data/addons";
+import { getAddons } from "../lib/catalogStore";
 import { onImgError } from "../lib/imageFallback";
 import usePageMeta from "../hooks/usePageMeta";
 const ShortsRail = lazy(() => import("../components/ShortsRail"));
@@ -236,10 +236,19 @@ function PopularPackagesSection() {
 }
 
 function AddonsSection() {
-  const items = GLOBAL_ADDONS.map((item) => ({
+  const [addons, setAddons] = useState(() => getAddons().filter((item) => item.active !== false && item.productCount > 0));
+
+  useEffect(() => {
+    const refresh = () => setAddons(getAddons().filter((item) => item.active !== false && item.productCount > 0));
+    refresh();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+
+  if (!addons.length) return null;
+
+  const items = addons.map((item) => ({
     ...item,
-    // Service data stores the thumbnail as `image`, while the shared
-    // HorizontalCards component reads `img`.
     img: item.image,
     sub: item.subLabel,
     href: item.href,

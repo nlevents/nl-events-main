@@ -1213,3 +1213,30 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
   .occasion-pro-featured-arrow.prev{left:0}
   .occasion-pro-featured-arrow.next{right:0}
 }
+
+/* Keep every horizontal storefront slider swipeable on touch devices. */
+.rail-track,
+.review-carousel,
+.insta-rail,
+.hero-carousel-track,
+.promo-carousel {
+  touch-action: pan-x pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Native touch scrolling for every storefront horizontal rail/slider. */
+.sort-pills,
+.rail-track,
+.promo-track,
+.hscroll,
+.review-carousel,
+.insta-rail,
+.ref-home-slider,
+.wedding-horizontal-rail,
+.birthday-rail,
+.video-home-category-strip {
+  touch-action: pan-x pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}

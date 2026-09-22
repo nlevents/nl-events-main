@@ -13,6 +13,7 @@ const KEYS = {
   clients: "nle-admin-clients",
   invoices: "nle-admin-invoices",
   settings: "nle-admin-settings",
+  resources: "nle-admin-resources",
 };
 
 function readJSON(key, fallback) {
@@ -56,6 +57,39 @@ const DEFAULT_SETTINGS = {
   defaultTerms: "Payment terms and event conditions will be confirmed in writing before the event.",
   logoUrl: "/assets/images/landing/nle-logo.png",
 };
+
+
+export function getAdminResource(type) {
+  const all = readJSON(KEYS.resources, {});
+  return Array.isArray(all[type]) ? all[type] : [];
+}
+
+export function saveAdminResource(type, record) {
+  const all = readJSON(KEYS.resources, {});
+  const list = Array.isArray(all[type]) ? all[type] : [];
+  const now = new Date().toISOString();
+  if (record?.id) {
+    const index = list.findIndex((item) => item.id === record.id);
+    if (index >= 0) list[index] = { ...list[index], ...record, updatedAt: now };
+    else list.push({ ...record, updatedAt: now });
+  } else {
+    list.push({ ...record, id: uid(), createdAt: now, updatedAt: now });
+  }
+  const next = { ...all, [type]: list };
+  writeJSON(KEYS.resources, next);
+  return list[list.length - 1];
+}
+
+export function deleteAdminResource(type, id) {
+  const all = readJSON(KEYS.resources, {});
+  const list = Array.isArray(all[type]) ? all[type] : [];
+  writeJSON(KEYS.resources, { ...all, [type]: list.filter((item) => item.id !== id) });
+}
+
+export function clearAdminResources(type) {
+  const all = readJSON(KEYS.resources, {});
+  writeJSON(KEYS.resources, { ...all, [type]: [] });
+}
 
 // ---------- Settings ----------
 

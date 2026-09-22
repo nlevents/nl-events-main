@@ -3,7 +3,7 @@
 // COUPONS, INQUIRIES, AVAILABILITY & GALLERY
 // ============================================================================
 
-import { OCCASIONS as SEED_OCCASIONS, flattenCategoryTree, categoryByPath, pathFor, allProductsOf } from "../data/occasions";
+import { OCCASIONS as SEED_OCCASIONS, PUBLIC_TOP_LEVEL_OCCASIONS, flattenCategoryTree, categoryByPath, pathFor, allProductsOf } from "../data/occasions";
 import { GALLERY_ITEMS as SEED_GALLERY } from "../data/categories";
 import { IMAGES } from "../data/images";
 import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
@@ -11,6 +11,8 @@ import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { GLOBAL_ADDONS as SEED_GLOBAL_ADDONS, EXTRA_ADDONS_BY_OCCASION as SEED_EXTRA_ADDONS, SEED_ADDON_PRODUCTS } from "../data/addons";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
 import { queueCloudSync, syncCloudState, hydratePublicState } from "./cloudStore";
+
+export { PUBLIC_TOP_LEVEL_OCCASIONS };
 
 const STORE_KEY_PREFIX = "nle_catalog_v2_";
 const KEYS = {
@@ -37,9 +39,8 @@ const KEYS = {
   serviceOccasionSplitV1: STORE_KEY_PREFIX + "service_occasion_split_v1",
 };
 
-const STORE_VERSION = "4.7-service-occasion-split";
+const STORE_VERSION = "5.0-db-catalog-source-of-truth";
 const REFERENCE_HIERARCHY_MIGRATION = "2";
-
 
 // Real-photo presentation bank used for the storefront catalogue. The supplied
 // reference PDF uses photographic decoration cards; these URLs keep the same
@@ -558,6 +559,13 @@ function initializeSeedsIfNeeded() {
     localStorage.removeItem(KEYS.products);
     localStorage.setItem(KEYS.demoProductsPurged, "1");
   }
+  // v5 migration: never keep an old browser-only catalog ahead of Supabase.
+  // The next cloud hydration will repopulate the cache from the database.
+  const catalogSourceMigrationKey = STORE_KEY_PREFIX + "db_source_of_truth_v1";
+  if (!localStorage.getItem(catalogSourceMigrationKey)) {
+    localStorage.removeItem(KEYS.products);
+    localStorage.setItem(catalogSourceMigrationKey, "1");
+  }
 
   // Seed the supplied YouTube launch content after the cleanup above. A separate
   // V2 flag prevents the old purge logic from wiping these links on upgrade.
@@ -571,50 +579,17 @@ function initializeSeedsIfNeeded() {
   {
     // Always merge the improved seed hierarchy into the existing tree instead
     // of replacing it. This preserves categories and edits created by Admin.
+    const rawStoredOccasions = localStorage.getItem(KEYS.occasions);
     const storedOccasions = normalizeReferenceStoredTree(readStorage(KEYS.occasions, null));
-    writeStorage(
-      KEYS.occasions,
-      Array.isArray(storedOccasions) && storedOccasions.length > 0
-        ? mergeSeedOccasions(storedOccasions, SEED_OCCASIONS)
-        : JSON.parse(JSON.stringify(SEED_OCCASIONS))
-    );
+    const seedPublic = JSON.parse(JSON.stringify(SEED_OCCASIONS)).filter((o) => PUBLIC_TOP_LEVEL_OCCASIONS.has(o.slug));
+    const storedPublic = Array.isArray(storedOccasions)
+      ? storedOccasions.filter((o) => PUBLIC_TOP_LEVEL_OCCASIONS.has(o.slug))
+      : [];
+    const hasStoredOccasions = rawStoredOccasions !== null;
+    writeStorage(KEYS.occasions, hasStoredOccasions ? storedPublic : seedPublic);
     localStorage.setItem(KEYS.referenceHierarchyMigration, REFERENCE_HIERARCHY_MIGRATION);
   }
 
-  // Refresh presentation images for the built-in hierarchy without replacing
-  // admin-created category names, children or other custom fields.
-  if (localStorage.getItem(KEYS.referenceHierarchyMigration) === REFERENCE_HIERARCHY_MIGRATION) {
-    const currentTree = readStorage(KEYS.occasions, []);
-    function refreshImages(nodes) {
-      (nodes || []).forEach((node) => {
-        node.image = realCatalogImageFor(node.slug, 0);
-        refreshImages(node.children);
-      });
-    }
-    refreshImages(currentTree);
-    writeStorage(KEYS.occasions, currentTree);
-
-    // Replace old illustration URLs on already-seeded demo/reference products,
-    // while leaving admin-created products untouched.
-    const storedProducts = readStorage(KEYS.products, []);
-    if (Array.isArray(storedProducts) && storedProducts.length) {
-      let changed = false;
-      storedProducts.forEach((product, index) => {
-        if (!product?.isDemo) return;
-        const next = realCatalogImageFor(product.categorySlug || product.occasionSlug, index);
-        if (product.image !== next) {
-          product.image = next;
-          product.gallery = [
-            next,
-            realCatalogImageFor(product.categorySlug || product.occasionSlug, index + 1),
-            realCatalogImageFor(product.categorySlug || product.occasionSlug, index + 2),
-          ];
-          changed = true;
-        }
-      });
-      if (changed) writeStorage(KEYS.products, storedProducts);
-    }
-  }
 
   // Initialize the reference catalog. These products are copied
   // from the supplied reference recording so the hierarchy can be tested visually.
@@ -622,7 +597,6 @@ function initializeSeedsIfNeeded() {
   if (!localStorage.getItem(KEYS.products)) {
     writeStorage(KEYS.products, []);
   }
-  seedReferenceDemoProductsIfNeeded();
 
   // Migrate any older service products into the explicit service namespace so
   // the normal Products & Packages screen can safely hide them.
@@ -635,7 +609,6 @@ function initializeSeedsIfNeeded() {
     });
     if (changed) writeStorage(KEYS.products, stored);
   }
-  seedAddonProductsIfNeeded();
 
   // Initialize Media
   if (!localStorage.getItem(KEYS.media)) {
@@ -922,7 +895,9 @@ function sanitizeCategoryNode(node) {
 
 export function getOccasions() {
   initializeSeedsIfNeeded();
-  return readStorage(KEYS.occasions, SEED_OCCASIONS).map(sanitizeCategoryNode);
+  return readStorage(KEYS.occasions, SEED_OCCASIONS)
+    .filter((o) => PUBLIC_TOP_LEVEL_OCCASIONS.has(o.slug))
+    .map(sanitizeCategoryNode);
 }
 
 export function getOccasion(slug) {
@@ -931,40 +906,23 @@ export function getOccasion(slug) {
 
 export function saveOccasion(occasion) {
   const list = getOccasions();
-  const safe = {
-    ...occasion,
-    slug: sanitizeSlug(occasion.slug || occasion.label || "occasion"),
-    label: sanitizeText(occasion.label || "Untitled Occasion"),
-    tagline: sanitizeText(occasion.tagline || ""),
-    description: sanitizeText(occasion.description || ""),
-    image: sanitizeUrl(occasion.image) || IMAGES.typeWedding,
-    heroImg: sanitizeUrl(occasion.heroImg) || IMAGES.heroWedding,
-    children: Array.isArray(occasion.children) ? occasion.children : [],
-    // When true, this occasion is only ever reached via an Event Service
-    // card (Admin -> Event Services) — it's excluded from Shop by Occasion,
-    // the main nav, and "Related Categories" everywhere else, so
-    // categories like SFX/Artists/Photography don't get mistaken for
-    // regular browsable occasions.
-    addonOnly: Boolean(occasion.addonOnly),
-  };
-
+  const requestedSlug = sanitizeSlug(occasion.slug || occasion.label || "occasion");
+  if (!PUBLIC_TOP_LEVEL_OCCASIONS.has(requestedSlug)) throw new Error("Use one of the six public occasion slugs.");
+  const safe = { ...occasion, slug: requestedSlug, label: sanitizeText(occasion.label || "Untitled Occasion"), tagline: sanitizeText(occasion.tagline || ""), description: sanitizeText(occasion.description || ""), image: sanitizeUrl(occasion.image) || IMAGES.typeWedding, heroImg: sanitizeUrl(occasion.heroImg) || IMAGES.heroWedding, children: Array.isArray(occasion.children) ? occasion.children : [], addonOnly: Boolean(occasion.addonOnly) };
   const idx = list.findIndex((o) => o.slug === safe.slug || o.id === safe.id);
-  if (idx !== -1) {
-    list[idx] = { ...list[idx], ...safe };
-  } else {
-    safe.id = safe.id || uid("occ");
-    list.push(safe);
-  }
-
+  if (idx !== -1) list[idx] = { ...list[idx], ...safe, slug: list[idx].slug };
+  else { safe.id = safe.id || uid("occ"); list.push(safe); }
   persist(KEYS.occasions, list);
   dispatchCatalogUpdate();
   return safe;
 }
 
 export function deleteOccasion(slug) {
+  if (!PUBLIC_TOP_LEVEL_OCCASIONS.has(slug)) return false;
   const list = getOccasions();
   const next = list.filter((o) => o.slug !== slug);
   persist(KEYS.occasions, next);
+  persist(KEYS.products, getProducts().map((p) => p.occasionSlug === slug ? { ...p, occasionSlug: "", categoryPath: [], uncategorized: true, updatedAt: new Date().toISOString() } : p));
   dispatchCatalogUpdate();
   return true;
 }
@@ -973,68 +931,54 @@ export function saveCategory(parentOccasionSlug, category) {
   const occasions = getOccasions();
   const occ = occasions.find((o) => o.slug === parentOccasionSlug);
   if (!occ) return null;
-
-  const safeCat = {
-    ...category,
-    slug: sanitizeSlug(category.slug || category.label || "category"),
-    label: sanitizeText(category.label || "New Category"),
-    description: sanitizeText(category.description || ""),
-    image: sanitizeUrl(category.image) || IMAGES.pkgDreamWedding,
-    type: category.type || "category",
-    products: Array.isArray(category.products) ? category.products : [],
-  };
-
-  // If parentCategorySlug is provided, insert under that category recursively
-  if (category.parentCategorySlug) {
-    const parentCat = findCategoryRecursive(occ, category.parentCategorySlug);
-    if (!parentCat) return null;
-    parentCat.children = parentCat.children || [];
-    const idx = parentCat.children.findIndex((c) => c.slug === safeCat.slug || c.id === safeCat.id);
-    if (idx !== -1) {
-      parentCat.children[idx] = { ...parentCat.children[idx], ...safeCat };
-    } else {
-      safeCat.id = safeCat.id || uid("cat");
-      parentCat.children.push(safeCat);
-    }
-  } else {
-    // Direct child of occasion
-    occ.children = occ.children || [];
-    const idx = occ.children.findIndex((c) => c.slug === safeCat.slug || c.id === safeCat.id);
-    if (idx !== -1) {
-      occ.children[idx] = { ...occ.children[idx], ...safeCat };
-    } else {
-      safeCat.id = safeCat.id || uid("cat");
-      occ.children.push(safeCat);
-    }
+  const safeCat = { ...category, id: category.id || uid("cat"), slug: sanitizeSlug(category.slug || category.label || "category"), label: sanitizeText(category.label || "New Category"), description: sanitizeText(category.description || ""), image: sanitizeUrl(category.image) || IMAGES.pkgDreamWedding, type: category.type || "category", products: Array.isArray(category.products) ? category.products : [], children: Array.isArray(category.children) ? category.children : [] };
+  let targetList = occ.children || (occ.children = []);
+  if (category.parentCategoryId || category.parentCategorySlug) {
+    const parentCat = category.parentCategoryId ? findCategoryById(occ, category.parentCategoryId) : findCategoryRecursive(occ, category.parentCategorySlug);
+    if (!parentCat) throw new Error("Parent category could not be found.");
+    targetList = parentCat.children || (parentCat.children = []);
   }
-
+  const idx = targetList.findIndex((c) => c.id === safeCat.id || c.slug === safeCat.slug);
+  const previous = idx !== -1 ? targetList[idx] : null;
+  if (idx !== -1) targetList[idx] = { ...targetList[idx], ...safeCat };
+  else targetList.push(safeCat);
+  if (previous && previous.slug !== safeCat.slug) {
+    persist(KEYS.products, getProducts().map((p) => p.occasionSlug === parentOccasionSlug && Array.isArray(p.categoryPath) ? { ...p, categoryPath: p.categoryPath.map((part) => part === previous.slug ? safeCat.slug : part), updatedAt: new Date().toISOString() } : p));
+  }
   persist(KEYS.occasions, occasions);
   dispatchCatalogUpdate();
   return safeCat;
 }
 
-export function deleteCategory(parentOccasionSlug, categorySlug, parentCategorySlug = null) {
+export function deleteCategory(parentOccasionSlug, categorySlug, parentCategorySlug = null, categoryId = null, parentCategoryId = null) {
   const occasions = getOccasions();
   const occ = occasions.find((o) => o.slug === parentOccasionSlug);
   if (!occ) return false;
-
-  const removeFromArray = (arr, slug) => {
-    const idx = arr.findIndex((c) => c.slug === slug);
-    if (idx !== -1) arr.splice(idx, 1);
-  };
-
-  if (parentCategorySlug) {
-    const parentCat = findCategoryRecursive(occ, parentCategorySlug);
-    if (!parentCat || !parentCat.children) return false;
-    removeFromArray(parentCat.children, categorySlug);
-  } else {
-    if (!occ.children) return false;
-    removeFromArray(occ.children, categorySlug);
-  }
-
+  const targetParent = parentCategoryId ? findCategoryById(occ, parentCategoryId) : parentCategorySlug ? findCategoryRecursive(occ, parentCategorySlug) : occ;
+  if (!targetParent) return false;
+  const children = targetParent.children || [];
+  const idx = children.findIndex((c) => (categoryId && c.id === categoryId) || c.slug === categorySlug);
+  if (idx === -1) return false;
+  const removed = children[idx];
+  const removedSlugs = new Set();
+  const collect = (node) => { if (!node) return; if (node.slug) removedSlugs.add(node.slug); (node.children || []).forEach(collect); };
+  collect(removed);
+  children.splice(idx, 1);
   persist(KEYS.occasions, occasions);
+  persist(KEYS.products, getProducts().map((p) => p.occasionSlug === parentOccasionSlug && Array.isArray(p.categoryPath) && p.categoryPath.some((part) => removedSlugs.has(part)) ? { ...p, categoryPath: [], uncategorized: true, updatedAt: new Date().toISOString() } : p));
   dispatchCatalogUpdate();
   return true;
+}
+
+function findCategoryById(occurrence, id) {
+  if (!occurrence || !id) return null;
+  const stack = [...(occurrence.children || [])];
+  while (stack.length) {
+    const cat = stack.pop();
+    if (cat.id === id) return cat;
+    stack.push(...(cat.children || []));
+  }
+  return null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
-import { addonsFor } from "../data/addons";
+import { getAddonsForOccasion } from "../lib/catalogStore";
 import ProductCard from "../components/occasion/ProductCard";
 import { pathFor, sortProducts } from "../data/occasions";
 import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
@@ -156,7 +156,14 @@ function WeddingServices() {
 }
 
 function WeddingAddons() {
-  const addons = addonsFor([{ slug: "wedding" }]);
+  const [addons, setAddons] = useState(() => getAddonsForOccasion("wedding"));
+  useEffect(() => {
+    const refresh = () => setAddons(getAddonsForOccasion("wedding"));
+    refresh();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+  if (!addons.length) return null;
   return (
     <section className="wedding-addons-section">
       <div className="wedding-container">

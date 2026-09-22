@@ -1540,3 +1540,45 @@
   }
   .product-detail-shell .bottom-cta .btn{min-height:48px;border-radius:8px}
 }
+
+/* ---------- Touch-friendly horizontal rails ---------- */
+.cat-rail-track,
+.occasion-pro-tab-rail,
+.occasion-pro-moment-rail,
+.occasion-pro-featured-viewport,
+.rail-track,
+.review-carousel,
+.insta-rail,
+.category-review-rail {
+  touch-action: pan-x pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* ---------- Category-specific reviews ---------- */
+.category-review-rail {
+  display:flex;
+  gap:14px;
+  overflow-x:auto;
+  padding:2px 2px 10px;
+  scroll-snap-type:x proximity;
+  scrollbar-width:none;
+}
+.category-review-rail::-webkit-scrollbar{display:none}
+.category-review-card{
+  flex:0 0 min(360px, 86vw);
+  scroll-snap-align:start;
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-m);
+  background:var(--surface);
+  padding:20px;
+  box-shadow:0 5px 18px rgba(13,32,52,.05);
+}
+.category-review-stars{color:var(--accent);letter-spacing:2px;font-size:13px;margin-bottom:10px}
+.category-review-card p{font-size:13px;line-height:1.6;color:var(--text-primary);margin:0 0 14px}
+.category-review-card strong{display:block;font-size:13px}
+.category-review-card span{display:block;color:var(--text-secondary);font-size:11.5px;margin-top:3px}
+.category-review-card small{display:inline-block;margin-top:12px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary);opacity:.8}
+@media (min-width:900px){
+  .category-review-card{flex-basis:31.5%;}
+}

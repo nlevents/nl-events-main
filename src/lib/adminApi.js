@@ -40,3 +40,7 @@ export async function createAdminInquiry(payload) {
 export async function deleteAdminInquiry(id) {
   return adminFetch("/admin/inquiries", { method: "DELETE", body: { id } });
 }
+
+export async function bulkDeleteAdminInquiries(ids) {
+  return adminFetch("/admin/inquiries", { method: "DELETE", body: { ids } });
+}

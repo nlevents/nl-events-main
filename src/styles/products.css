@@ -91,3 +91,13 @@
 
 @media (min-width:640px){ .fk-spot-grid{ grid-template-columns:repeat(4,1fr); } }
 @media (min-width:960px){ .fk-cat-row{ gap:30px; } }
+
+/* Product recommendation rails must remain swipeable on phones. */
+.products-rail,
+.products-slider,
+.product-rail,
+.product-rail-track {
+  touch-action: pan-x pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}

@@ -6,6 +6,7 @@ import {
   saveCategory,
   deleteCategory,
   getProducts,
+  PUBLIC_TOP_LEVEL_OCCASIONS,
 } from "../../lib/catalogStore";
 import { sanitizeSlug } from "../../lib/sanitize";
 import MediaPickerModal from "../../components/admin/MediaPickerModal";
@@ -30,7 +31,7 @@ function flattenNodes(children, trail = []) {
 export default function AdminCategories() {
   usePageMeta("Occasions & Categories — Admin", "Manage an unlimited nested occasion and category hierarchy.");
 
-  const [occasions, setOccasions] = useState(getOccasions);
+  const [occasions, setOccasions] = useState(() => getOccasions().filter((o) => PUBLIC_TOP_LEVEL_OCCASIONS.has(o.slug)));
   const [products] = useState(getProducts);
   const [editingOccasion, setEditingOccasion] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -58,6 +59,7 @@ export default function AdminCategories() {
     setEditingCategory({
       occasionSlug,
       parentCategorySlug: parentTrail.length ? parentTrail[parentTrail.length - 1].slug : null,
+      parentCategoryId: parentTrail.length ? parentTrail[parentTrail.length - 1].id : null,
       parentLabel: parentTrail.length ? parentTrail.map((n) => n.label).join(" › ") : "Top level",
       cat: {
         label: "",
@@ -76,6 +78,7 @@ export default function AdminCategories() {
     setEditingCategory({
       occasionSlug,
       parentCategorySlug: parent?.slug || null,
+      parentCategoryId: parent?.id || null,
       parentLabel: parent ? trail.slice(0, -1).map((n) => n.label).join(" › ") : "Top level",
       cat: { ...node },
     });
@@ -105,6 +108,7 @@ export default function AdminCategories() {
         ...cat,
         slug: sanitizeSlug(cat.slug || cat.label),
         parentCategorySlug: editingCategory.parentCategorySlug || null,
+        parentCategoryId: editingCategory.parentCategoryId || null,
       });
       refresh();
       setEditingCategory(null);
@@ -118,7 +122,7 @@ export default function AdminCategories() {
     const node = trail[trail.length - 1];
     const parent = trail.length > 1 ? trail[trail.length - 2] : null;
     if (!window.confirm(`Delete "${node.label}" and everything nested under it? This cannot be undone.`)) return;
-    deleteCategory(occasionSlug, node.slug, parent?.slug || null);
+    deleteCategory(occasionSlug, node.slug, parent?.slug || null, node.id || null, parent?.id || null);
     refresh();
     flash(`Deleted "${node.label}".`);
   }
@@ -172,9 +176,7 @@ export default function AdminCategories() {
           <p className="admin-hint"><strong>{cityProductCount}</strong> live products currently exist. You can create as many hierarchy levels as needed.</p>
         </div>
         <div className="admin-head-actions">
-          <button type="button" className="btn btn-primary" onClick={() => setEditingOccasion({ label: "", slug: "", tagline: "", description: "", image: "/assets/images/categories/wedding.webp", heroImg: "/assets/images/categories/wedding.webp", children: [] })}>
-            <Icon name="plus" /> Add New Occasion
-          </button>
+          <span className="admin-hint">6 public occasion families • unlimited nested subcategories</span>
         </div>
       </div>
 
@@ -182,7 +184,7 @@ export default function AdminCategories() {
       {error && <div className="admin-alert admin-alert--error">{error}</div>}
 
       <div className="admin-categories-tree">
-        {occasions.filter((o) => !o.addonOnly).map((occ) => (
+        {occasions.filter((o) => !o.addonOnly && PUBLIC_TOP_LEVEL_OCCASIONS.has(o.slug)).map((occ) => (
           <div key={occ.slug} className="admin-panel admin-tree-node">
             <div className="admin-tree-head">
               <div className="admin-tree-info">
@@ -212,8 +214,8 @@ export default function AdminCategories() {
           <div className="admin-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header"><h2>{editingOccasion.id ? `Edit ${editingOccasion.label}` : "New Occasion"}</h2><button type="button" className="btn-icon" onClick={() => setEditingOccasion(null)}><Icon name="close" /></button></div>
             <form onSubmit={handleSaveOccasion}>
-              <div className="admin-form-group"><label className="admin-form-label">Occasion Title *</label><input className="admin-input" value={editingOccasion.label || ""} onChange={(e) => setEditingOccasion({ ...editingOccasion, label: e.target.value, slug: !editingOccasion.slug ? sanitizeSlug(e.target.value) : editingOccasion.slug })} required /></div>
-              <div className="admin-form-group"><label className="admin-form-label">Slug *</label><input className="admin-input" value={editingOccasion.slug || ""} onChange={(e) => setEditingOccasion({ ...editingOccasion, slug: sanitizeSlug(e.target.value) })} required /></div>
+              <div className="admin-form-group"><label className="admin-form-label">Occasion Title *</label><input className="admin-input" value={editingOccasion.label || ""} onChange={(e) => setEditingOccasion({ ...editingOccasion, label: e.target.value, slug: sanitizeSlug(e.target.value) })} required /></div>
+              <div className="admin-form-group"><label className="admin-form-label">Slug *</label><input className="admin-input" value={sanitizeSlug(editingOccasion.label || "")} readOnly required /><small className="admin-form-help">Generated automatically from the occasion name.</small></div>
               <div className="admin-form-group"><label className="admin-form-label">Tagline</label><input className="admin-input" value={editingOccasion.tagline || ""} onChange={(e) => setEditingOccasion({ ...editingOccasion, tagline: e.target.value })} /></div>
               <div className="admin-form-group"><label className="admin-form-label">Description</label><textarea className="admin-textarea" rows="3" value={editingOccasion.description || ""} onChange={(e) => setEditingOccasion({ ...editingOccasion, description: e.target.value })} /></div>
               <div className="admin-form-group"><label className="admin-form-label">Image URL</label><div style={{ display: "flex", gap: 8 }}><input className="admin-input" value={editingOccasion.image || ""} onChange={(e) => setEditingOccasion({ ...editingOccasion, image: e.target.value })} /><button type="button" className="btn btn-sm btn-outline" onClick={() => setPickerField("occ-image")}>Choose</button></div></div>
@@ -230,8 +232,8 @@ export default function AdminCategories() {
             <div className="admin-modal-header"><h2>{editingCategory.cat.id ? `Edit ${editingCategory.cat.label}` : "Add Category / Theme"}</h2><button type="button" className="btn-icon" onClick={() => setEditingCategory(null)}><Icon name="close" /></button></div>
             <form onSubmit={handleSaveCategory}>
               <div className="admin-form-group"><label className="admin-form-label">Parent</label><div className="admin-calc-box"><strong>{editingCategory.parentLabel}</strong></div></div>
-              <div className="admin-form-group"><label className="admin-form-label">Category / Theme Name *</label><input className="admin-input" value={editingCategory.cat.label || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, label: e.target.value, slug: !p.cat.slug ? sanitizeSlug(e.target.value) : p.cat.slug } }))} required /></div>
-              <div className="admin-form-group"><label className="admin-form-label">Slug *</label><input className="admin-input" value={editingCategory.cat.slug || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, slug: sanitizeSlug(e.target.value) } }))} required /></div>
+              <div className="admin-form-group"><label className="admin-form-label">Category / Theme Name *</label><input className="admin-input" value={editingCategory.cat.label || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, label: e.target.value, slug: sanitizeSlug(e.target.value) } }))} required /></div>
+              <div className="admin-form-group"><label className="admin-form-label">Slug *</label><input className="admin-input" value={sanitizeSlug(editingCategory.cat.label || "")} readOnly required /><small className="admin-form-help">Generated automatically from the category name.</small></div>
               <div className="admin-form-group"><label className="admin-form-label">Node Type</label><select className="admin-select" value={editingCategory.cat.type || "category"} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, type: e.target.value } }))}><option value="category">Category</option><option value="theme">Theme</option></select></div>
               <div className="admin-form-group"><label className="admin-form-label">Description</label><textarea className="admin-textarea" rows="3" value={editingCategory.cat.description || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, description: e.target.value } }))} /></div>
               <div className="admin-form-group"><label className="admin-form-label">Image URL</label><div style={{ display: "flex", gap: 8 }}><input className="admin-input" value={editingCategory.cat.image || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, image: e.target.value } }))} /><button type="button" className="btn btn-sm btn-outline" onClick={() => setPickerField("cat-image")}>Choose</button></div></div>

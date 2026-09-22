@@ -15,6 +15,15 @@
 
 import { IMAGES } from "./images";
 
+export const PUBLIC_TOP_LEVEL_OCCASIONS = new Set([
+  "wedding",
+  "birthday",
+  "corporate",
+  "kids-family",
+  "anniversary",
+  "festivals-culture",
+]);
+
 let uid = 0;
 function nextId(prefix) {
   uid += 1;
@@ -667,21 +676,21 @@ function applyCatalogImages(nodes) {
 function getLiveOccasions() {
   if (typeof window === "undefined") return OCCASIONS;
   try {
+    const PUBLIC_TOP_LEVEL = new Set([
+      "wedding", "birthday", "corporate", "kids-family", "anniversary", "festivals-culture",
+    ]);
     const rawOcc = localStorage.getItem("nle_catalog_v2_occasions");
-    const parsedOcc = rawOcc ? JSON.parse(rawOcc) : null;
-    // Guard against corrupt/empty admin-edited catalog data in localStorage
-    // (e.g. an interrupted save) silently breaking every occasion page —
-    // fall back to the built-in catalog instead of resolving to nothing.
-    const baseOccasions = Array.isArray(parsedOcc) && parsedOcc.length > 0
-      ? mergeCategoryTree(parsedOcc, OCCASIONS)
-      : OCCASIONS;
-    const rawProds = localStorage.getItem("nle_catalog_v2_products");
+    const hasStoredOccasions = rawOcc !== null;
+    let parsedOcc = null;
+    try { parsedOcc = rawOcc ? JSON.parse(rawOcc) : null; } catch { parsedOcc = []; }
+
+    // Admin/Supabase state is authoritative. Only use the built-in hierarchy
+    // when there is no cloud/cache state at all (first boot/offline fallback).
+    const baseOccasions = hasStoredOccasions && Array.isArray(parsedOcc)
+      ? parsedOcc.filter((o) => PUBLIC_TOP_LEVEL.has(o?.slug))
+      : OCCASIONS.filter((o) => PUBLIC_TOP_LEVEL.has(o.slug));
     const clone = JSON.parse(JSON.stringify(baseOccasions));
 
-    // The built-in occasion tree contains reference catalog products,
-    // but the live catalog is admin-owned. If the live product store exists and
-    // is empty, strip every embedded example product while preserving the full
-    // category hierarchy. Products added by Admin are injected below.
     function stripEmbeddedProducts(nodes) {
       (nodes || []).forEach((node) => {
         node.products = [];
@@ -689,25 +698,19 @@ function getLiveOccasions() {
       });
     }
 
-    applyCatalogImages(clone);
-    if (!rawProds) return clone;
+    // Never overwrite images maintained by Admin → Catalog/Media.
+    if (!hasStoredOccasions) applyCatalogImages(clone);
+
+    const rawProds = localStorage.getItem("nle_catalog_v2_products");
+    if (!rawProds) { stripEmbeddedProducts(clone); return clone; }
     let allProds;
     try { allProds = JSON.parse(rawProds); } catch { allProds = []; }
-    if (!Array.isArray(allProds) || allProds.length === 0) {
-      stripEmbeddedProducts(clone);
-      return clone;
-    }
+    stripEmbeddedProducts(clone);
+    if (!Array.isArray(allProds) || allProds.length === 0) return clone;
+
     allProds.forEach((rawProd) => {
       if (!rawProd || rawProd.status === "archived") return;
-      // Defensive: force type="product" even for records saved by an
-      // older build that didn't stamp it. Without this, resolvePath()
-      // still finds the node but OccasionBrowser can't tell it's a leaf
-      // product and renders CategoryTemplate on it instead — a blank
-      // product page.
       const prod = rawProd.type === "product" ? rawProd : { ...rawProd, type: "product" };
-      // A legacy catalog may have a navigation label such as "Haldi" saved
-      // as a product. If the same slug/name is now a category/theme node,
-      // never render that marker as a sellable package.
       if (isCategoryMarkerProduct(prod, clone)) return;
       let placed = false;
       const targetByPath = findNodeByCategoryPath(clone, prod.categoryPath);
@@ -728,32 +731,17 @@ function getLiveOccasions() {
           placed = true;
           return;
         }
-        if (node.children) node.children.forEach(inject);
+        (node.children || []).forEach(inject);
       }
-      if (!placed) clone.forEach(inject);
-      if (!placed && clone.length > 0) {
-        const targetOcc = clone.find((o) => o.slug === prod.occasionSlug) || clone[0];
-        targetOcc.products = targetOcc.products || [];
-        const idx = targetOcc.products.findIndex((p) => p.slug === prod.slug || p.id === prod.id);
-        if (idx !== -1) targetOcc.products[idx] = { ...targetOcc.products[idx], ...prod };
-        else targetOcc.products.push(prod);
-      }
+      clone.forEach(inject);
     });
-    applyCatalogImages(clone);
     return clone;
   } catch {
-    return OCCASIONS;
+    return OCCASIONS.filter((o) => [
+      "wedding", "birthday", "corporate", "kids-family", "anniversary", "festivals-culture",
+    ].includes(o.slug));
   }
 }
-
-const PUBLIC_TOP_LEVEL_OCCASIONS = new Set([
-  "wedding",
-  "birthday",
-  "corporate",
-  "kids-family",
-  "anniversary",
-  "festivals-culture",
-]);
 
 export function listOccasions() {
   // Keep the public Shop by Occasion collection intentionally limited to the

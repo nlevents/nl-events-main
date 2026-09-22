@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getInvoices, saveClient } from "../../lib/adminStore";
-import { createAdminInquiry, deleteAdminInquiry, fetchAdminInquiries, updateAdminInquiry } from "../../lib/adminApi";
+import { bulkDeleteAdminInquiries, createAdminInquiry, deleteAdminInquiry, fetchAdminInquiries, updateAdminInquiry } from "../../lib/adminApi";
 import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
 
@@ -112,6 +112,8 @@ export default function AdminInquiries() {
   const [moreFilters, setMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkWorking, setBulkWorking] = useState(false);
   const pageSize = 10;
 
   async function refresh({ preserveSelection = true } = {}) {
@@ -253,6 +255,69 @@ export default function AdminInquiries() {
     if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
     try { await deleteAdminInquiry(id); setSelected(null); await refresh({ preserveSelection: false }); showFeedback("Lead deleted."); }
     catch (err) { setError(err.message || "Unable to delete lead."); }
+  }
+  function togglePageSelection(checked) {
+    setSelectedRows((prev) => checked
+      ? Array.from(new Set([...prev, ...pageRows.map((r) => r.id)]))
+      : prev.filter((id) => !pageRows.some((r) => r.id === id)));
+  }
+
+  function selectAllFiltered() {
+    setSelectedRows(filtered.map((r) => r.id));
+  }
+
+  function clearSelection() {
+    setSelectedRows([]);
+    setBulkStatus("");
+  }
+
+  async function handleBulkStatusChange() {
+    if (!selectedRows.length || !bulkStatus) return;
+    setBulkWorking(true);
+    try {
+      await Promise.all(selectedRows.map((id) => updateAdminInquiry(id, { status: bulkStatus })));
+      const count = selectedRows.length;
+      clearSelection();
+      await refresh({ preserveSelection: false });
+      showFeedback(`${count} lead${count === 1 ? "" : "s"} updated.`);
+    } catch (err) {
+      setError(err.message || "Unable to update selected leads.");
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedRows.length) return;
+    const count = selectedRows.length;
+    if (!window.confirm(`Delete ${count} selected lead${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    setBulkWorking(true);
+    try {
+      await bulkDeleteAdminInquiries(selectedRows);
+      if (selected && selectedRows.includes(selected.id)) setSelected(null);
+      clearSelection();
+      await refresh({ preserveSelection: false });
+      showFeedback(`${count} lead${count === 1 ? "" : "s"} deleted.`);
+    } catch (err) {
+      setError(err.message || "Unable to delete selected leads.");
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
+  function exportSelected() {
+    const selectedRecords = filtered.filter((r) => selectedRows.includes(r.id));
+    if (!selectedRecords.length) return;
+    const headers = ["Name", "Phone", "Email", "Event Type", "Event Date", "Location", "Budget", "Source", "Status", "Assigned To", "Next Follow-up"];
+    const rows = selectedRecords.map((r) => [r.name, r.phone, r.email, r.eventType, r.eventDate, r.eventLocation, r.budget, r.sourceDetail, STAGE_LABEL[r.status] || r.status, r.assignedTo, r.nextFollowUp]);
+    const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "nle-selected-leads.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   }
   function getOrCreateClient(r) {
     return saveClient({ name: r.name, phone: r.phone, email: r.email || "", city: r.eventLocation || r.city || "Ranchi", address: r.eventVenue || "", notes: `Lead for ${r.eventType}. Event date: ${r.eventDate || "TBD"}. Guest count: ${r.guestCount || "TBD"}. Requirements: ${r.message || "—"}` });
@@ -552,7 +617,18 @@ export default function AdminInquiries() {
 
         <section className="crm-table-card">
           <div className="crm-table-head"><label>Show <select><option>10</option></select> entries</label><span>Showing {filtered.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filtered.length)} of {filtered.length} leads</span></div>
-          {loading ? <div className="crm-empty">Loading leads…</div> : pageRows.length === 0 ? <div className="crm-empty">No leads match the current filters.</div> : <div className="crm-table-wrap"><table className="crm-table"><thead><tr><th><input type="checkbox" checked={pageRows.length > 0 && pageRows.every((r) => selectedRows.includes(r.id))} onChange={(e) => setSelectedRows(e.target.checked ? Array.from(new Set([...selectedRows, ...pageRows.map((r) => r.id)])) : selectedRows.filter((id) => !pageRows.some((r) => r.id === id)))} /></th><th>#</th><th>Customer</th><th>Event Type</th><th>Event Date</th><th>Location</th><th>Budget</th><th>Source</th><th>Status</th><th>Assigned To</th><th>Next Follow-up</th><th>Actions</th></tr></thead><tbody>
+          {selectedRows.length > 0 && (
+            <div className="crm-bulk-toolbar">
+              <div className="crm-bulk-summary"><strong>{selectedRows.length}</strong> selected</div>
+              {selectedRows.length < filtered.length && <button type="button" className="crm-bulk-link" onClick={selectAllFiltered}>Select all {filtered.length}</button>}
+              <label className="crm-bulk-select"><span>Change status</span><select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} disabled={bulkWorking}><option value="">Select status</option>{STAGES.map((stageOption) => <option key={stageOption.key} value={stageOption.key}>{stageOption.label}</option>)}</select></label>
+              <button type="button" className="crm-bulk-apply" disabled={!bulkStatus || bulkWorking} onClick={handleBulkStatusChange}>{bulkWorking ? "Working…" : "Apply"}</button>
+              <button type="button" className="crm-bulk-secondary" disabled={bulkWorking} onClick={exportSelected}>Export Selected</button>
+              <button type="button" className="crm-bulk-danger" disabled={bulkWorking} onClick={handleBulkDelete}>Delete Selected</button>
+              <button type="button" className="crm-bulk-clear" disabled={bulkWorking} onClick={clearSelection}>Clear</button>
+            </div>
+          )}
+          {loading ? <div className="crm-empty">Loading leads…</div> : pageRows.length === 0 ? <div className="crm-empty">No leads match the current filters.</div> : <div className="crm-table-wrap"><table className="crm-table"><thead><tr><th><input type="checkbox" checked={pageRows.length > 0 && pageRows.every((r) => selectedRows.includes(r.id))} onChange={(e) => togglePageSelection(e.target.checked)} /></th><th>#</th><th>Customer</th><th>Event Type</th><th>Event Date</th><th>Location</th><th>Budget</th><th>Source</th><th>Status</th><th>Assigned To</th><th>Next Follow-up</th><th>Actions</th></tr></thead><tbody>
             {pageRows.map((r, index) => <tr key={r.id} className={selected?.id === r.id ? "selected" : ""} onClick={() => selectRecord(r)}>
               <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedRows.includes(r.id)} onChange={(e) => setSelectedRows((prev) => e.target.checked ? [...prev, r.id] : prev.filter((id) => id !== r.id))} /></td>
               <td>{(page - 1) * pageSize + index + 1}</td>
