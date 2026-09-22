@@ -19,6 +19,7 @@ const CRM_NAV_GROUPS = [
   { title: "Catalog", items: [
     { to: "/admin/products", label: "Catalog", icon: "package" },
     { to: "/admin/media", label: "Media", icon: "image" },
+    { to: "/admin/video-content", label: "YouTube Shorts & Reviews", icon: "youtube" },
   ] },
   { title: "Events & Operations", items: [
     { to: "/admin/events", label: "All Events", icon: "clipboard" },
@@ -57,7 +58,7 @@ const NAV_GROUPS = [
       { to: "/admin/products", label: "Products & Packages", icon: "package" },
       { to: "/admin/categories", label: "Occasions & Categories", icon: "grid" },
       { to: "/admin/media", label: "Media & Pictures", icon: "image" },
-      { to: "/admin/video-content", label: "Instagram & Video Reviews", icon: "sparkle" },
+      { to: "/admin/video-content", label: "YouTube Shorts & Reviews", icon: "sparkle" },
       { to: "/admin/services", label: "Event Services", icon: "tag" },
     ],
   },

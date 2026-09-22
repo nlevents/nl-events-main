@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const state = await readStates(process.env, PUBLIC_KEYS);
-    res.setHeader("Cache-Control", "no-store, max-age=0");
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
     return res.status(200).json({ ok: true, state });
   } catch (err) {
     console.error("Catalog API error:", err);

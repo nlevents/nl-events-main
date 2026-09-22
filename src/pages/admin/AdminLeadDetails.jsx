@@ -175,7 +175,7 @@ export default function AdminLeadDetails() {
 
   function createQuotation() {
     const client = saveClient({ name: record.name, phone: record.phone, email: record.email || "", city: location, address: record.eventVenue || "", notes: `Lead for ${record.eventType}. Event date: ${record.eventDate || "TBD"}. Guest count: ${record.guestCount || "TBD"}. Requirements: ${record.message || "—"}` });
-    navigate("/admin/quotations/new", { state: { clientId: client.id, leadId: record.id, documentType: "quotation", lead: record } });
+    navigate("/admin/invoices/new", { state: { clientId: client.id, leadId: record.id, documentType: "quotation", lead: record } });
   }
 
   return (

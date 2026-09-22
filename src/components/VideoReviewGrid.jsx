@@ -31,11 +31,11 @@ function VideoReviewCard({ item }) {
 }
 
 export default function VideoReviewGrid() {
-  const [items, setItems] = useState(getVideoReviews);
+  const [items, setItems] = useState(() => getVideoReviews().filter((v) => v.active !== false).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)));
 
   useEffect(() => {
     function refresh() {
-      setItems(getVideoReviews());
+      setItems(getVideoReviews().filter((v) => v.active !== false).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)));
     }
     window.addEventListener("nle-catalog-updated", refresh);
     return () => window.removeEventListener("nle-catalog-updated", refresh);
@@ -46,7 +46,7 @@ export default function VideoReviewGrid() {
   return (
     <section className="shop-section" id="video-reviews">
       <div className="container">
-        <div className="shop-head reveal"><h2>YouTube Video</h2></div>
+        <div className="shop-head reveal"><h2>Customer Review Videos</h2></div>
         <div className="video-review-grid reveal">
           {items.map((v) => (
             <VideoReviewCard key={v.id} item={v} />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getInvoices, saveClient } from "../../lib/adminStore";
-import { bulkDeleteAdminInquiries, createAdminInquiry, deleteAdminInquiry, fetchAdminInquiries, updateAdminInquiry } from "../../lib/adminApi";
+import { createAdminInquiry, deleteAdminInquiry, fetchAdminInquiries, updateAdminInquiry } from "../../lib/adminApi";
 import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
 
@@ -112,8 +112,6 @@ export default function AdminInquiries() {
   const [moreFilters, setMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState([]);
-  const [bulkStatus, setBulkStatus] = useState("");
-  const [bulkWorking, setBulkWorking] = useState(false);
   const pageSize = 10;
 
   async function refresh({ preserveSelection = true } = {}) {
@@ -122,6 +120,7 @@ export default function AdminInquiries() {
       const result = await fetchAdminInquiries();
       const next = (result.inquiries || []).map(mapRecord).filter((r) => r.source !== "booking");
       setRecords(next);
+      setSelectedRows((prev) => prev.filter((id) => next.some((row) => row.id === id)));
 
       // Keep an explicitly selected lead open after refresh.
       // Never automatically open the first lead when entering the CRM.
@@ -258,64 +257,58 @@ export default function AdminInquiries() {
   }
   function togglePageSelection(checked) {
     setSelectedRows((prev) => checked
-      ? Array.from(new Set([...prev, ...pageRows.map((r) => r.id)]))
-      : prev.filter((id) => !pageRows.some((r) => r.id === id)));
+      ? Array.from(new Set([...prev, ...pageRows.map((row) => row.id)]))
+      : prev.filter((id) => !pageRows.some((row) => row.id === id))
+    );
   }
-
-  function selectAllFiltered() {
-    setSelectedRows(filtered.map((r) => r.id));
+  function selectAllFiltered() { setSelectedRows((prev) => Array.from(new Set([...prev, ...filtered.map((row) => row.id)]))); }
+  function clearSelection() { setSelectedRows([]); }
+  function selectedRecords() {
+    const ids = new Set(selectedRows);
+    return records.filter((row) => ids.has(row.id));
   }
-
-  function clearSelection() {
-    setSelectedRows([]);
-    setBulkStatus("");
-  }
-
-  async function handleBulkStatusChange() {
-    if (!selectedRows.length || !bulkStatus) return;
-    setBulkWorking(true);
-    try {
-      await Promise.all(selectedRows.map((id) => updateAdminInquiry(id, { status: bulkStatus })));
-      const count = selectedRows.length;
-      clearSelection();
-      await refresh({ preserveSelection: false });
-      showFeedback(`${count} lead${count === 1 ? "" : "s"} updated.`);
-    } catch (err) {
-      setError(err.message || "Unable to update selected leads.");
-    } finally {
-      setBulkWorking(false);
-    }
-  }
-
   async function handleBulkDelete() {
-    if (!selectedRows.length) return;
-    const count = selectedRows.length;
-    if (!window.confirm(`Delete ${count} selected lead${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
-    setBulkWorking(true);
+    const rows = selectedRecords();
+    if (!rows.length) return;
+    if (!window.confirm(`Delete ${rows.length} selected lead${rows.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
     try {
-      await bulkDeleteAdminInquiries(selectedRows);
-      if (selected && selectedRows.includes(selected.id)) setSelected(null);
+      await Promise.all(rows.map((row) => deleteAdminInquiry(row.id)));
+      if (selected && rows.some((row) => row.id === selected.id)) setSelected(null);
       clearSelection();
       await refresh({ preserveSelection: false });
-      showFeedback(`${count} lead${count === 1 ? "" : "s"} deleted.`);
+      showFeedback(`${rows.length} lead${rows.length === 1 ? "" : "s"} deleted.`);
     } catch (err) {
       setError(err.message || "Unable to delete selected leads.");
-    } finally {
-      setBulkWorking(false);
+      await refresh({ preserveSelection: false });
     }
   }
-
-  function exportSelected() {
-    const selectedRecords = filtered.filter((r) => selectedRows.includes(r.id));
-    if (!selectedRecords.length) return;
+  async function handleBulkStatus(status) {
+    if (!status || !selectedRows.length) return;
+    try {
+      await Promise.all(selectedRows.map((id) => updateAdminInquiry(id, { status })));
+      await refresh();
+      showFeedback(`${selectedRows.length} lead${selectedRows.length === 1 ? "" : "s"} updated to ${STAGE_LABEL[status]}.`);
+    } catch (err) { setError(err.message || "Unable to update selected leads."); }
+  }
+  async function handleBulkAssign(assignedTo) {
+    if (!assignedTo || !selectedRows.length) return;
+    try {
+      await Promise.all(selectedRows.map((id) => updateAdminInquiry(id, { assignedTo })));
+      await refresh();
+      showFeedback(`${selectedRows.length} lead${selectedRows.length === 1 ? "" : "s"} assigned to ${assignedTo}.`);
+    } catch (err) { setError(err.message || "Unable to assign selected leads."); }
+  }
+  function exportSelectedCsv() {
+    const rows = selectedRecords();
+    if (!rows.length) return;
     const headers = ["Name", "Phone", "Email", "Event Type", "Event Date", "Location", "Budget", "Source", "Status", "Assigned To", "Next Follow-up"];
-    const rows = selectedRecords.map((r) => [r.name, r.phone, r.email, r.eventType, r.eventDate, r.eventLocation, r.budget, r.sourceDetail, STAGE_LABEL[r.status] || r.status, r.assignedTo, r.nextFollowUp]);
-    const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csvRows = rows.map((r) => [r.name, r.phone, r.email, r.eventType, r.eventDate, r.eventLocation, r.budget, r.sourceDetail, STAGE_LABEL[r.status] || r.status, r.assignedTo, r.nextFollowUp]);
+    const csv = [headers, ...csvRows].map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "nle-selected-leads.csv";
+    a.download = `nle-selected-leads-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -324,7 +317,7 @@ export default function AdminInquiries() {
   }
   function createQuotation(r) {
     const client = getOrCreateClient(r);
-    navigate("/admin/quotations/new", { state: { clientId: client.id, leadId: r.id, documentType: "quotation", lead: r } });
+    navigate("/admin/invoices/new", { state: { clientId: client.id, leadId: r.id, documentType: "quotation", lead: r } });
   }
   async function handleScheduleFollowUp(record) {
     const value = window.prompt("Follow-up date/time (YYYY-MM-DDTHH:mm):", record.nextFollowUp ? String(record.nextFollowUp).slice(0, 16) : "");
@@ -615,20 +608,21 @@ export default function AdminInquiries() {
           {tabs.map(([key, label]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => { setTab(key); setStage(key === "all" ? "all" : key); }}>{label} <span>({counts[key] ?? 0})</span></button>)}
         </div>
 
+        {selectedRows.length > 0 && (
+          <div className="crm-bulk-toolbar" role="region" aria-label="Bulk lead actions">
+            <strong>{selectedRows.length} selected</strong>
+            <button type="button" onClick={selectAllFiltered}>Select all {filtered.length} filtered</button>
+            <label>Status<select defaultValue="" onChange={(e) => { handleBulkStatus(e.target.value); e.target.value = ""; }}><option value="">Change status…</option>{STAGES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
+            <label>Assign<select defaultValue="" onChange={(e) => { handleBulkAssign(e.target.value); e.target.value = ""; }}><option value="">Assign to…</option>{teamMembers.map((member) => <option key={member} value={member}>{member}</option>)}</select></label>
+            <button type="button" onClick={exportSelectedCsv}>Export selected</button>
+            <button type="button" className="danger" onClick={handleBulkDelete}><Icon name="trash" /> Delete selected</button>
+            <button type="button" className="ghost" onClick={clearSelection}>Clear</button>
+          </div>
+        )}
+
         <section className="crm-table-card">
           <div className="crm-table-head"><label>Show <select><option>10</option></select> entries</label><span>Showing {filtered.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filtered.length)} of {filtered.length} leads</span></div>
-          {selectedRows.length > 0 && (
-            <div className="crm-bulk-toolbar">
-              <div className="crm-bulk-summary"><strong>{selectedRows.length}</strong> selected</div>
-              {selectedRows.length < filtered.length && <button type="button" className="crm-bulk-link" onClick={selectAllFiltered}>Select all {filtered.length}</button>}
-              <label className="crm-bulk-select"><span>Change status</span><select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} disabled={bulkWorking}><option value="">Select status</option>{STAGES.map((stageOption) => <option key={stageOption.key} value={stageOption.key}>{stageOption.label}</option>)}</select></label>
-              <button type="button" className="crm-bulk-apply" disabled={!bulkStatus || bulkWorking} onClick={handleBulkStatusChange}>{bulkWorking ? "Working…" : "Apply"}</button>
-              <button type="button" className="crm-bulk-secondary" disabled={bulkWorking} onClick={exportSelected}>Export Selected</button>
-              <button type="button" className="crm-bulk-danger" disabled={bulkWorking} onClick={handleBulkDelete}>Delete Selected</button>
-              <button type="button" className="crm-bulk-clear" disabled={bulkWorking} onClick={clearSelection}>Clear</button>
-            </div>
-          )}
-          {loading ? <div className="crm-empty">Loading leads…</div> : pageRows.length === 0 ? <div className="crm-empty">No leads match the current filters.</div> : <div className="crm-table-wrap"><table className="crm-table"><thead><tr><th><input type="checkbox" checked={pageRows.length > 0 && pageRows.every((r) => selectedRows.includes(r.id))} onChange={(e) => togglePageSelection(e.target.checked)} /></th><th>#</th><th>Customer</th><th>Event Type</th><th>Event Date</th><th>Location</th><th>Budget</th><th>Source</th><th>Status</th><th>Assigned To</th><th>Next Follow-up</th><th>Actions</th></tr></thead><tbody>
+          {loading ? <div className="crm-empty">Loading leads…</div> : pageRows.length === 0 ? <div className="crm-empty">No leads match the current filters.</div> : <div className="crm-table-wrap"><table className="crm-table"><thead><tr><th><input type="checkbox" checked={pageRows.length > 0 && pageRows.every((r) => selectedRows.includes(r.id))} onChange={(e) => togglePageSelection(e.target.checked)} aria-label="Select current page" /></th><th>#</th><th>Customer</th><th>Event Type</th><th>Event Date</th><th>Location</th><th>Budget</th><th>Source</th><th>Status</th><th>Assigned To</th><th>Next Follow-up</th><th>Actions</th></tr></thead><tbody>
             {pageRows.map((r, index) => <tr key={r.id} className={selected?.id === r.id ? "selected" : ""} onClick={() => selectRecord(r)}>
               <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedRows.includes(r.id)} onChange={(e) => setSelectedRows((prev) => e.target.checked ? [...prev, r.id] : prev.filter((id) => id !== r.id))} /></td>
               <td>{(page - 1) * pageSize + index + 1}</td>

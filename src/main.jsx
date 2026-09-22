@@ -27,16 +27,18 @@ const rootFallback = (
 )
 
 if (typeof window !== "undefined") {
-  // Supabase is the catalog source of truth. Hydrate immediately so the
-  // storefront does not spend time showing stale/demo products, then poll
-  // for changes so admin edits appear on other devices without a reload.
-  import('./lib/catalogStore')
-    .then(async ({ hydrateCatalogFromCloud }) => {
-      try { await hydrateCatalogFromCloud(); } catch { /* keep empty/offline fallback */ }
-      const { startPublicCatalogPolling } = await import('./lib/cloudStore');
-      startPublicCatalogPolling(10000);
-    })
-    .catch(() => { /* offline fallback */ });
+  // The public storefront has a local/seed fallback, so cloud hydration does
+  // not need to compete with the first render. Run it when the browser is idle.
+  const hydrate = () =>
+    import('./lib/catalogStore')
+      .then(({ hydrateCatalogFromCloud }) => hydrateCatalogFromCloud())
+      .catch(() => { /* best-effort background hydration */ })
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(hydrate, { timeout: 3000 })
+  } else {
+    window.setTimeout(hydrate, 1500)
+  }
 }
 
 createRoot(document.getElementById('root')).render(

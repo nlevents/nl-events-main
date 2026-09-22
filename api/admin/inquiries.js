@@ -159,13 +159,10 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map((value) => clean(value, 80)).filter(Boolean) : [];
       const id = clean(req.body?.id, 80);
-      const targets = Array.from(new Set(ids.length ? ids : (id ? [id] : [])));
-      if (!targets.length) return res.status(400).json({ ok: false, error: "At least one record id is required." });
-      const filter = targets.map((value) => encodeURIComponent(value)).join(",");
-      await db.query(`inquiries?id=in.(${filter})`, { method: "DELETE", prefer: "return=minimal" });
-      return res.status(200).json({ ok: true, deleted: targets.length });
+      if (!id) return res.status(400).json({ ok: false, error: "Record id is required." });
+      await db.query(`inquiries?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", prefer: "return=minimal" });
+      return res.status(200).json({ ok: true });
     }
 
     return res.status(405).json({ ok: false, error: "Method not allowed" });

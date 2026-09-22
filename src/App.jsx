@@ -40,7 +40,6 @@ const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
 const AdminProductForm = lazy(() => import("./pages/admin/AdminProductForm"));
-const AdminCatalogItemForm = lazy(() => import("./pages/admin/AdminCatalogItemForm"));
 const AdminCategories = lazy(() => import("./pages/admin/AdminCategories"));
 const AdminMedia = lazy(() => import("./pages/admin/AdminMedia"));
 const AdminVideoContent = lazy(() => import("./pages/admin/AdminVideoContent"));
@@ -53,11 +52,8 @@ const AdminClients = lazy(() => import("./pages/admin/AdminClients"));
 const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
 const AdminInvoiceForm = lazy(() => import("./pages/admin/AdminInvoiceForm"));
 const AdminInvoiceView = lazy(() => import("./pages/admin/AdminInvoiceView"));
-const AdminPayments = lazy(() => import("./pages/admin/AdminPayments"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
-const AdminResourcePage = lazy(() => import("./pages/admin/AdminResourcePage"));
-const AdminFinancialReports = lazy(() => import("./pages/admin/AdminFinancialReports"));
 
 function RouteFallback() {
   return <div style={{ minHeight: "60vh" }} aria-hidden="true"></div>;
@@ -77,7 +73,7 @@ export default function App() {
                   <Route path="/admin" element={<AdminAuthProvider><AdminLayout /></AdminAuthProvider>}>
                     <Route index element={<AdminDashboard />} />
                     <Route path="products" element={<AdminProducts />} />
-                    <Route path="products/new" element={<AdminCatalogItemForm />} />
+                    <Route path="products/new" element={<AdminProductForm />} />
                     <Route path="products/:id/edit" element={<AdminProductForm />} />
                     <Route path="categories" element={<AdminCategories />} />
                     <Route path="media" element={<AdminMedia />} />
@@ -94,22 +90,21 @@ export default function App() {
                     <Route path="inquiries" element={<AdminInquiries />} />
                     <Route path="inquiries/:leadId" element={<AdminLeadDetails />} />
                     <Route path="clients" element={<AdminClients />} />
-                    <Route path="invoices" element={<AdminInvoices documentType="invoice" />} />
-                    <Route path="quotations" element={<AdminInvoices documentType="quotation" />} />
-                    <Route path="quotations/new" element={<AdminInvoiceForm />} />
+                    <Route path="invoices" element={<AdminInvoices />} />
+                    <Route path="quotations" element={<AdminInvoices />} />
+                    <Route path="quotations" element={<AdminPlaceholder title="Quotations" />} />
                     <Route path="invoices/new" element={<AdminInvoiceForm />} />
                     <Route path="invoices/:id" element={<AdminInvoiceView />} />
                     <Route path="invoices/:id/edit" element={<AdminInvoiceForm />} />
-                    <Route path="events" element={<AdminResourcePage resource="events" />} />
-                    <Route path="tasks" element={<AdminResourcePage resource="tasks" />} />
-                    <Route path="vendors" element={<AdminResourcePage resource="vendors" />} />
-                    <Route path="candidates" element={<AdminResourcePage resource="candidates" />} />
-                    <Route path="team" element={<AdminResourcePage resource="team" />} />
-                    <Route path="attendance" element={<AdminResourcePage resource="attendance" />} />
-                    <Route path="payroll" element={<AdminResourcePage resource="payroll" />} />
-                    <Route path="payments" element={<AdminPayments />} />
-                    <Route path="expenses" element={<AdminResourcePage resource="expenses" />} />
-                    <Route path="reports/sales" element={<AdminFinancialReports />} />
+                    <Route path="events" element={<AdminPlaceholder title="All Events" />} />
+                    <Route path="tasks" element={<AdminPlaceholder title="Tasks" />} />
+                    <Route path="vendors" element={<AdminPlaceholder title="Vendors" />} />
+                    <Route path="candidates" element={<AdminPlaceholder title="Candidates" />} />
+                    <Route path="team" element={<AdminPlaceholder title="Team" />} />
+                    <Route path="attendance" element={<AdminPlaceholder title="Attendance" />} />
+                    <Route path="payroll" element={<AdminPlaceholder title="Salary & Payroll" />} />
+                    <Route path="payments" element={<AdminPlaceholder title="Payments" />} />
+                    <Route path="expenses" element={<AdminPlaceholder title="Expenses" />} />
                     <Route path="settings" element={<AdminSettings />} />
                   </Route>
                   <Route path="/landing" element={<Landing />} />
@@ -126,6 +121,12 @@ export default function App() {
                     <Route path="/custom-events" element={<Navigate to="/shop-by-occasion" replace />} />
                     <Route path="/shop-by-occasion" element={<ShopByOccasion />} />
                     <Route path="/occasion" element={<ShopByOccasion />} />
+                    <Route path="/occasion/wedding" element={<Wedding />} />
+                    <Route path="/occasion/birthday" element={<Birthday />} />
+                    <Route path="/occasion/anniversary" element={<OccasionLanding type="anniversary" />} />
+                    <Route path="/occasion/festivals-culture" element={<OccasionLanding type="festivals" />} />
+                    <Route path="/occasion/kids-family" element={<OccasionLanding type="family" />} />
+                    <Route path="/occasion/corporate" element={<OccasionLanding type="corporate" />} />
                     <Route path="/occasion/*" element={<OccasionBrowser />} />
                     <Route path="/gallery" element={<Gallery />} />
                     <Route path="/about" element={<About />} />

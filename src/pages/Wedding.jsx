@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
-import { getAddonsForOccasion } from "../lib/catalogStore";
+import { addonsFor } from "../data/addons";
 import ProductCard from "../components/occasion/ProductCard";
 import { pathFor, sortProducts } from "../data/occasions";
 import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
@@ -11,9 +11,9 @@ import usePageMeta from "../hooks/usePageMeta";
 const FUNCTIONS = [
   { label: "Haldi", img: IMAGES.themeJungleLeaves, href: "/occasion/wedding/haldi" },
   { label: "Mehendi", img: IMAGES.themeMehndiHenna, href: "/occasion/wedding/mehndi" },
-  { label: "Sangeet", img: IMAGES.themeStageLights, href: "/occasion/wedding/sangeet-night" },
-  { label: "Wedding", img: IMAGES.heroWedding, href: "/occasion/wedding/mandap-ceremony-decor" },
-  { label: "Reception", img: IMAGES.showcase1, href: "/occasion/wedding/reception-styling" },
+  { label: "Sangeet", img: IMAGES.themeStageLights, href: "/occasion/wedding/sangeet" },
+  { label: "Wedding", img: IMAGES.heroWedding, href: "/occasion/wedding/wedding-ceremony" },
+  { label: "Reception", img: IMAGES.showcase1, href: "/occasion/wedding/reception" },
   { label: "Engagement", img: IMAGES.showcase2, href: "/occasion/wedding/ring-ceremony" },
   { label: "Mayra / Rituals", img: IMAGES.showcase5, href: "/occasion/wedding" },
 ];
@@ -156,14 +156,7 @@ function WeddingServices() {
 }
 
 function WeddingAddons() {
-  const [addons, setAddons] = useState(() => getAddonsForOccasion("wedding"));
-  useEffect(() => {
-    const refresh = () => setAddons(getAddonsForOccasion("wedding"));
-    refresh();
-    window.addEventListener("nle-catalog-updated", refresh);
-    return () => window.removeEventListener("nle-catalog-updated", refresh);
-  }, []);
-  if (!addons.length) return null;
+  const addons = addonsFor([{ slug: "wedding" }]);
   return (
     <section className="wedding-addons-section">
       <div className="wedding-container">

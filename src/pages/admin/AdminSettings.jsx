@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { getSettings, saveSettings, exportAllData, importAllData } from "../../lib/adminStore";
 import { exportFullCatalogData } from "../../lib/catalogStore";
+import { downloadXlsx } from "../../lib/excelExport";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import usePageMeta from "../../hooks/usePageMeta";
 
@@ -10,10 +11,6 @@ export default function AdminSettings() {
   const [settings, setSettings] = useState(() => getSettings());
   const [savedMsg, setSavedMsg] = useState("");
   const [importMsg, setImportMsg] = useState("");
-  const [backupMsg, setBackupMsg] = useState("");
-  const [backupBusy, setBackupBusy] = useState(false);
-  const [includeMedia, setIncludeMedia] = useState(true);
-  const fullBackupInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [oldPw, setOldPw] = useState("");
@@ -45,58 +42,10 @@ export default function AdminSettings() {
   }
 
 
-  async function handleFullBackup() {
-    setBackupBusy(true);
-    setBackupMsg("Preparing a complete backup…");
-    try {
-      const { createCompleteBackup } = await import("../../lib/backupService");
-      const backup = await createCompleteBackup({ includeMedia });
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `nle-complete-backup-${new Date().toISOString().replace(/[:.]/g, "-")}.nlebackup.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      const embedded = (backup.mediaAssets || []).filter((item) => item.status === "embedded").length;
-      setBackupMsg(`Complete backup downloaded. ${embedded} media files were embedded.`);
-    } catch (error) {
-      setBackupMsg(error?.message || "Backup could not be created.");
-    } finally {
-      setBackupBusy(false);
-    }
-  }
-
-  function handleFullRestoreFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const data = JSON.parse(reader.result);
-        const ok = window.confirm("Restore this backup into the current admin data? Existing matching records will be replaced by the backup data. Make sure you have a current backup first.");
-        if (!ok) return;
-        setBackupBusy(true);
-        setBackupMsg("Restoring backup…");
-        const { restoreCompleteBackup } = await import("../../lib/backupService");
-        await restoreCompleteBackup(data, { syncCloud: true });
-        setBackupMsg("Backup restored successfully. Reload the admin panel to refresh every screen.");
-      } catch (error) {
-        setBackupMsg(error?.message || "This backup could not be restored.");
-      } finally {
-        setBackupBusy(false);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  }
-
   function handleExcelExport() {
     const catalog = JSON.parse(exportFullCatalogData());
     const admin = { clients: adminClients(), invoices: adminInvoices(), settings: getSettings() };
-    import("../../lib/excelExport").then(({ downloadXlsx }) => downloadXlsx(
+    downloadXlsx(
       "nle-full-data-backup-" + new Date().toISOString().slice(0, 10) + ".xlsx",
       {
         Products: catalog.products || [],
@@ -114,7 +63,7 @@ export default function AdminSettings() {
         Invoices: admin.invoices,
         Settings: [admin.settings],
       }
-    ));
+    );
     setSavedMsg("Excel backup downloaded.");
     setTimeout(() => setSavedMsg(""), 2500);
   }
@@ -201,30 +150,17 @@ export default function AdminSettings() {
       </form>
 
       <section className="admin-panel">
-        <h2>Complete backup & restore</h2>
+        <h2>Data backup</h2>
         <p className="admin-hint">
-          Create a portable backup of leads, bookings, clients, quotations, invoices, payments, products, packages, services, categories, nested category structure, media metadata, links, page hierarchy, navigation, settings, and the current local/cloud catalog state.
+          Download a complete Excel backup of your catalog, categories, products, media, cities, services, videos, enquiries, clients, invoices, and settings. Keep a copy somewhere safe for your records.
         </p>
-        <label className="admin-backup-option">
-          <input type="checkbox" checked={includeMedia} onChange={(e) => setIncludeMedia(e.target.checked)} />
-          <span>Include downloadable image/video files when they are accessible</span>
-        </label>
-        <div className="admin-modal-actions" style={{ justifyContent: "flex-start", gap: 12, flexWrap: "wrap" }}>
-          <button type="button" className="btn btn-primary" onClick={handleFullBackup} disabled={backupBusy}>{backupBusy ? "Working…" : "Create complete backup"}</button>
-          <button type="button" className="btn btn-line" onClick={() => fullBackupInputRef.current?.click()} disabled={backupBusy}>Restore complete backup…</button>
-          <button type="button" className="btn btn-line" onClick={handleExcelExport}>Download Excel backup</button>
-          <button type="button" className="btn btn-line" onClick={handleExport}>Export data JSON</button>
-          <input ref={fullBackupInputRef} type="file" accept="application/json,.nlebackup" style={{ display: "none" }} onChange={handleFullRestoreFile} />
+        <div className="admin-modal-actions" style={{ justifyContent: "flex-start", gap: 12 }}>
+          <button type="button" className="btn btn-primary" onClick={handleExcelExport}>Download full Excel (.xlsx)</button>
+          <button type="button" className="btn btn-line" onClick={handleExport}>Export backup (.json)</button>
+          <button type="button" className="btn btn-line" onClick={() => fileInputRef.current?.click()}>Import backup…</button>
           <input ref={fileInputRef} type="file" accept="application/json" style={{ display: "none" }} onChange={handleImportFile} />
         </div>
-        {backupMsg && <p className="admin-hint">{backupMsg}</p>}
         {importMsg && <p className="admin-hint">{importMsg}</p>}
-        <div className="admin-backup-grid">
-          <div><strong>Business data</strong><span>Leads · bookings · clients · quotations · invoices · payments · write-offs</span></div>
-          <div><strong>Catalog</strong><span>Products · packages · services · categories · nested hierarchy · pricing</span></div>
-          <div><strong>Media</strong><span>Gallery · banners · videos · thumbnails · image URLs · embedded files when accessible</span></div>
-          <div><strong>Site structure</strong><span>Occasions · navigation · page hierarchy · category navigation · search index</span></div>
-        </div>
       </section>
 
       <form className="admin-panel" onSubmit={handleChangePassword}>

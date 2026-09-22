@@ -17,7 +17,6 @@ import {
   quickLinksFor, heroGalleryFor,
 } from "../../data/occasions";
 import { getAddonsForOccasion } from "../../lib/catalogStore";
-import { reviewsForCategory } from "../../data/categoryReviews";
 
 // Renders ANY level of the tree that isn't a leaf product: the top-level
 // occasion page, a subcategory page, or a theme page. Same component —
@@ -74,7 +73,6 @@ export default function CategoryTemplate({ node, trail }) {
     return () => window.removeEventListener("nle-catalog-updated", refreshAddons);
   }, [topSlug]);
   const heroImages = useMemo(() => heroGalleryFor(node, trail), [node, trail]);
-  const categoryReviews = useMemo(() => reviewsForCategory(node.label), [node.label]);
 
 
   const visibleProducts = useMemo(() => {
@@ -201,24 +199,6 @@ export default function CategoryTemplate({ node, trail }) {
           <Link to="/book-event" className="btn btn-primary">Enquire About {node.label}</Link>
         </div>
 
-      </section>
-
-      <section className="section-tight container occ-category-reviews">
-        <div className="section-head reveal">
-          <h2>Reviews for {node.label}</h2>
-          <p>Sample client-review content for this category, ready to be replaced with verified testimonials.</p>
-        </div>
-        <div className="category-review-rail" aria-label={`${node.label} reviews`}>
-          {categoryReviews.map((review) => (
-            <article className="category-review-card reveal" key={review.id}>
-              <div className="category-review-stars" aria-label={`${review.rating} out of 5 stars`}>★★★★★</div>
-              <p>“{review.quote}”</p>
-              <strong>{review.name}</strong>
-              <span>{review.city} · {review.topic}</span>
-              {review.sample ? <small>Sample review</small> : null}
-            </article>
-          ))}
-        </div>
       </section>
     </>
   );

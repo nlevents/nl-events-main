@@ -13,7 +13,6 @@ const KEYS = {
   clients: "nle-admin-clients",
   invoices: "nle-admin-invoices",
   settings: "nle-admin-settings",
-  resources: "nle-admin-resources",
 };
 
 function readJSON(key, fallback) {
@@ -57,39 +56,6 @@ const DEFAULT_SETTINGS = {
   defaultTerms: "Payment terms and event conditions will be confirmed in writing before the event.",
   logoUrl: "/assets/images/landing/nle-logo.png",
 };
-
-
-export function getAdminResource(type) {
-  const all = readJSON(KEYS.resources, {});
-  return Array.isArray(all[type]) ? all[type] : [];
-}
-
-export function saveAdminResource(type, record) {
-  const all = readJSON(KEYS.resources, {});
-  const list = Array.isArray(all[type]) ? all[type] : [];
-  const now = new Date().toISOString();
-  if (record?.id) {
-    const index = list.findIndex((item) => item.id === record.id);
-    if (index >= 0) list[index] = { ...list[index], ...record, updatedAt: now };
-    else list.push({ ...record, updatedAt: now });
-  } else {
-    list.push({ ...record, id: uid(), createdAt: now, updatedAt: now });
-  }
-  const next = { ...all, [type]: list };
-  writeJSON(KEYS.resources, next);
-  return list[list.length - 1];
-}
-
-export function deleteAdminResource(type, id) {
-  const all = readJSON(KEYS.resources, {});
-  const list = Array.isArray(all[type]) ? all[type] : [];
-  writeJSON(KEYS.resources, { ...all, [type]: list.filter((item) => item.id !== id) });
-}
-
-export function clearAdminResources(type) {
-  const all = readJSON(KEYS.resources, {});
-  writeJSON(KEYS.resources, { ...all, [type]: [] });
-}
 
 // ---------- Settings ----------
 
@@ -147,8 +113,6 @@ export function getInvoices() {
     terms: inv.terms ?? "",
     payments: Array.isArray(inv.payments) ? inv.payments : [],
     writeOff: inv.writeOff || null,
-    sourceQuotationId: inv.sourceQuotationId || "",
-    convertedToInvoiceId: inv.convertedToInvoiceId || "",
   }));
 }
 
@@ -198,8 +162,6 @@ export function saveInvoice(invoice) {
     terms: invoice.terms ?? getSettings().defaultTerms ?? "",
     payments: Array.isArray(invoice.payments) ? invoice.payments : [],
     writeOff: invoice.writeOff || null,
-    sourceQuotationId: invoice.sourceQuotationId || "",
-    convertedToInvoiceId: invoice.convertedToInvoiceId || "",
   };
   delete withTotals.dueDate;
 
@@ -297,19 +259,20 @@ export function setInvoiceStatus(id, status) {
 export function getStats() {
   const invoices = getInvoices();
   const clients = getClients();
-  const financialInvoices = invoices.filter((i) => i.documentType !== "quotation");
-  const totalRevenue = financialInvoices.reduce((sum, i) => sum + (i.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0), 0);
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  const revenueThisMonth = financialInvoices.reduce((sum, i) => sum + (i.payments || []).filter((p) => (p.paymentDate || p.createdAt || "").slice(0, 7) === thisMonth).reduce((s, p) => s + (Number(p.amount) || 0), 0), 0);
-  const outstanding = financialInvoices.filter((i) => getInvoiceBalance(i) > 0.01);
+  const paid = invoices.filter((i) => i.status === "paid");
+  const outstanding = invoices.filter((i) => ["sent", "overdue", "partially_paid"].includes(i.status));
+  const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const revenueThisMonth = paid
+    .filter((i) => (i.issueDate || "").slice(0, 7) === thisMonth)
+    .reduce((s, i) => s + (i.total || 0), 0);
   return {
     totalClients: clients.length,
-    totalInvoices: financialInvoices.length,
-    totalRevenue,
+    totalInvoices: invoices.length,
+    totalRevenue: paid.reduce((s, i) => s + (i.total || 0), 0),
     revenueThisMonth,
-    outstandingAmount: outstanding.reduce((s, i) => s + getInvoiceBalance(i), 0),
+    outstandingAmount: outstanding.reduce((s, i) => s + (i.total || 0), 0),
     outstandingCount: outstanding.length,
-    recentInvoices: [...financialInvoices].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 5),
+    recentInvoices: [...invoices].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 5),
   };
 }
 

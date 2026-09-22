@@ -958,16 +958,13 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 }
 @media (max-width:640px){
   .wedding-container,.wedding-hero-content{width:min(100% - 28px,1240px)}
-  /* Keep the mobile wedding banner to roughly 20–30% of the viewport height.
-     Desktop/tablet hero sizing is intentionally unchanged. */
-  .wedding-hero{height:clamp(170px,28vh,220px);min-height:clamp(170px,28vh,220px)}
-  .wedding-hero-content{height:100%;min-height:0;justify-content:flex-end;padding:18px 0 16px}
-  .wedding-hero-content>span{font-size:7px}
-  .wedding-hero-content h1{font-size:clamp(25px,7.5vw,34px);margin:5px 0 5px;line-height:1}
-  .wedding-hero-content p{font-size:9px;line-height:1.35;max-width:42ch}
-  .wedding-hero-actions{margin-top:9px;gap:7px}
-  .wedding-hero-actions a{padding:7px 10px;font-size:8px}
-  .wedding-hero-stats{display:none}
+  .wedding-hero,.wedding-hero-content{min-height:530px}
+  .wedding-hero-content{justify-content:flex-end;padding:40px 0 30px}
+  .wedding-hero-content>span{font-size:8px}
+  .wedding-hero-content h1{font-size:39px;margin-top:9px}
+  .wedding-hero-content p{font-size:11px}
+  .wedding-hero-stats{gap:16px 22px;margin-top:27px}
+  .wedding-hero-stats b{font-size:13px}.wedding-hero-stats span{font-size:7px}
   .wedding-white-section,.wedding-light-section,.wedding-package-section,.wedding-review-section{padding:29px 0 33px}
   .wedding-section-head{align-items:flex-start;margin-bottom:15px}
   .wedding-section-head h2{font-size:25px}
@@ -1150,15 +1147,13 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 }
 @media (max-width:640px){
   .birthday-container{width:min(100% - 28px,1240px)}
-  /* Same compact mobile treatment as weddings; desktop is untouched. */
-  .birthday-hero{height:clamp(170px,28vh,220px);min-height:clamp(170px,28vh,220px)}
-  .birthday-hero-content{height:100%;min-height:0;justify-content:flex-end;padding:18px 0 16px}
-  .birthday-hero-content>span{font-size:7px}
-  .birthday-hero h1{font-size:clamp(25px,7.5vw,34px);margin:5px 0;line-height:1}
-  .birthday-hero p{font-size:9px;line-height:1.35;max-width:42ch}
-  .birthday-actions{margin-top:9px;gap:7px}
-  .birthday-actions a{padding:7px 10px;font-size:8px}
-  .birthday-hero-features{display:none}
+  .birthday-hero,.birthday-hero-content{min-height:510px}
+  .birthday-hero-content{justify-content:flex-end;padding:36px 0 27px}
+  .birthday-hero h1{font-size:39px;margin-top:9px}
+  .birthday-hero p{font-size:11px}
+  .birthday-hero-features{gap:14px 19px;margin-top:23px}
+  .birthday-hero-features span{font-size:7px}
+  .birthday-hero-features i{font-size:16px}
   .birthday-white-section,.birthday-light-section,.birthday-package-section,.birthday-review-section{padding:29px 0 33px}
   .birthday-section-head{align-items:flex-start;margin-bottom:5px}
   .birthday-section-head h2{font-size:25px}
@@ -1212,31 +1207,4 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
   .occasion-pro-featured-arrow{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;font-size:13px;z-index:5;background:rgba(255,255,255,.96)}
   .occasion-pro-featured-arrow.prev{left:0}
   .occasion-pro-featured-arrow.next{right:0}
-}
-
-/* Keep every horizontal storefront slider swipeable on touch devices. */
-.rail-track,
-.review-carousel,
-.insta-rail,
-.hero-carousel-track,
-.promo-carousel {
-  touch-action: pan-x pinch-zoom;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-}
-
-/* Native touch scrolling for every storefront horizontal rail/slider. */
-.sort-pills,
-.rail-track,
-.promo-track,
-.hscroll,
-.review-carousel,
-.insta-rail,
-.ref-home-slider,
-.wedding-horizontal-rail,
-.birthday-rail,
-.video-home-category-strip {
-  touch-action: pan-x pinch-zoom;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
 }

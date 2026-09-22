@@ -24,7 +24,7 @@ export default function AdminInvoiceForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = getSettings();
-  const requestedType = location.state?.documentType || (location.pathname.startsWith("/admin/quotations") ? "quotation" : "invoice");
+  const requestedType = location.state?.documentType || "invoice";
   const requestedLeadId = location.state?.leadId || "";
   const requestedLead = location.state?.lead || null;
   const existing = id ? getInvoice(id) : null;
@@ -120,11 +120,6 @@ export default function AdminInvoiceForm() {
       terms,
       documentType,
       leadId,
-      // Editing a document must never erase its financial history.
-      payments: existing?.payments || [],
-      writeOff: existing?.writeOff || null,
-      sourceQuotationId: existing?.sourceQuotationId || "",
-      convertedToInvoiceId: existing?.convertedToInvoiceId || "",
     });
     if (leadId) {
       updateAdminInquiry(leadId, documentType === "quotation"

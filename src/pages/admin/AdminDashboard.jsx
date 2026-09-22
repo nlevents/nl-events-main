@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getStats } from "../../lib/adminStore";
-import { getProducts, getOccasions, getMediaItems, getCoupons, getInquiries } from "../../lib/catalogStore";
+import { fetchAdminInquiries } from "../../lib/adminApi";
+import { getProducts, getOccasions, getMediaItems, getCoupons } from "../../lib/catalogStore";
 import { fmtINR } from "../../lib/pricing";
 import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
@@ -16,29 +17,53 @@ export default function AdminDashboard() {
   const [occasions, setOccasions] = useState(getOccasions);
   const [media, setMedia] = useState(getMediaItems);
   const [coupons, setCoupons] = useState(getCoupons);
-  const [inquiries, setInquiries] = useState(getInquiries);
+  const [inquiries, setInquiries] = useState([]);
+  const [leadsLoading, setLeadsLoading] = useState(true);
 
-  function refresh() {
+  async function refresh() {
     setStats(getStats());
     setProducts(getProducts());
     setOccasions(getOccasions());
     setMedia(getMediaItems());
     setCoupons(getCoupons());
-    setInquiries(getInquiries());
+    try {
+      const result = await fetchAdminInquiries();
+      const rows = (result.inquiries || [])
+        .filter((row) => row.source !== "booking")
+        .map((row) => ({
+          ...row,
+          name: row.name || "Anonymous Client",
+          phone: row.phone || "",
+          eventType: row.event_type || "Event",
+          budget: row.budget || "—",
+          status: row.status || "new_lead",
+          createdAt: row.created_at || "",
+        }));
+      setInquiries(rows);
+    } catch {
+      // The dashboard is protected, but keep the rest of the dashboard usable
+      // if the CRM API is temporarily unavailable.
+      setInquiries([]);
+    } finally {
+      setLeadsLoading(false);
+    }
   }
 
   useEffect(() => {
-    function onUpdate() {
-      refresh();
-    }
+    refresh();
+    const timer = window.setInterval(refresh, 15000);
+    function onUpdate() { refresh(); }
     window.addEventListener("nle-catalog-updated", onUpdate);
-    return () => window.removeEventListener("nle-catalog-updated", onUpdate);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("nle-catalog-updated", onUpdate);
+    };
   }, []);
 
   const addonProducts = products.filter((p) => p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services"));
   const regularProducts = products.filter((p) => !addonProducts.includes(p));
   const activeProducts = regularProducts.filter((p) => p.status !== "archived");
-  const newLeads = inquiries.filter((i) => i.status === "new");
+  const newLeads = inquiries.filter((i) => ["new", "new_lead"].includes(i.status));
 
   return (
     <div className="admin-page">
@@ -132,8 +157,10 @@ export default function AdminDashboard() {
             <h2>Recent Leads & Quotes</h2>
             <Link to="/admin/inquiries">View All Leads →</Link>
           </div>
-          {inquiries.length === 0 ? (
-            <p className="admin-empty">No inquiries yet.</p>
+          {leadsLoading ? (
+            <p className="admin-empty">Loading live leads…</p>
+          ) : inquiries.length === 0 ? (
+            <p className="admin-empty">No leads in CRM yet.</p>
           ) : (
             <table className="admin-table admin-table-sm">
               <thead>
@@ -145,7 +172,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {inquiries.slice(0, 5).map((inq) => (
+                {[...inquiries].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).slice(0, 5).map((inq) => (
                   <tr key={inq.id}>
                     <td>
                       <strong>{inq.name}</strong>

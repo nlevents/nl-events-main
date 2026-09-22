@@ -94,23 +94,6 @@ export async function hydratePublicState() {
   return state;
 }
 
-let publicCatalogPollStarted = false;
-
-export function startPublicCatalogPolling(intervalMs = 10000) {
-  if (publicCatalogPollStarted || typeof window === "undefined") return () => {};
-  publicCatalogPollStarted = true;
-  let timer = null;
-  const poll = async () => {
-    if (document.visibilityState === "hidden") return;
-    try { await hydratePublicState(); } catch { /* keep the last good cache */ }
-  };
-  timer = window.setInterval(poll, intervalMs);
-  return () => {
-    if (timer) window.clearInterval(timer);
-    publicCatalogPollStarted = false;
-  };
-}
-
 export async function hydrateAdminState() {
   const token = getAdminAccessToken();
   if (!token) return {};
@@ -142,13 +125,4 @@ export async function bootstrapAdminState() {
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ state: payload }),
   });
-}
-
-export async function fetchAdminCloudState() {
-  const token = getAdminAccessToken();
-  if (!token) throw new Error("Admin session expired. Please log in again.");
-  const data = await request(`${API_BASE}/admin/state`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return data?.state || {};
 }

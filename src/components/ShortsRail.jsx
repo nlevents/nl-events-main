@@ -102,7 +102,7 @@ function ShortsLightbox({ video, onClose }) {
 }
 
 export default function ShortsRail() {
-  const [videos, setVideos] = useState(getInstaVideos);
+  const [videos, setVideos] = useState(() => getInstaVideos().filter((v) => v.active !== false).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)));
   const [active, setActive] = useState(null);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
@@ -110,7 +110,7 @@ export default function ShortsRail() {
 
   useEffect(() => {
     function refresh() {
-      setVideos(getInstaVideos());
+      setVideos(getInstaVideos().filter((v) => v.active !== false).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)));
     }
     window.addEventListener("nle-catalog-updated", refresh);
     return () => window.removeEventListener("nle-catalog-updated", refresh);

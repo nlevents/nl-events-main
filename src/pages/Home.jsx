@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
-import { getAddons } from "../lib/catalogStore";
+import { GLOBAL_ADDONS } from "../data/addons";
 import { onImgError } from "../lib/imageFallback";
 import usePageMeta from "../hooks/usePageMeta";
 const ShortsRail = lazy(() => import("../components/ShortsRail"));
@@ -236,19 +236,10 @@ function PopularPackagesSection() {
 }
 
 function AddonsSection() {
-  const [addons, setAddons] = useState(() => getAddons().filter((item) => item.active !== false && item.productCount > 0));
-
-  useEffect(() => {
-    const refresh = () => setAddons(getAddons().filter((item) => item.active !== false && item.productCount > 0));
-    refresh();
-    window.addEventListener("nle-catalog-updated", refresh);
-    return () => window.removeEventListener("nle-catalog-updated", refresh);
-  }, []);
-
-  if (!addons.length) return null;
-
-  const items = addons.map((item) => ({
+  const items = GLOBAL_ADDONS.map((item) => ({
     ...item,
+    // Service data stores the thumbnail as `image`, while the shared
+    // HorizontalCards component reads `img`.
     img: item.image,
     sub: item.subLabel,
     href: item.href,
@@ -443,14 +434,16 @@ export default function Home() {
       <HomeUSPs />
       <FinalCTA />
 
-      {/* Everything from Shorts onward is intentionally kept in the existing website order. */}
-      <DeferredHomeContent>
+      {/* Homepage media order is intentional: YouTube Shorts → Customer Reviews → Review Videos.
+          Render these directly instead of observing a display:contents wrapper,
+          so the media sections cannot be skipped by IntersectionObserver. */}
+      <Suspense fallback={null}>
         <ShortsRail />
-      </DeferredHomeContent>
+      </Suspense>
       <CustomerReviews />
-      <DeferredHomeContent>
+      <Suspense fallback={null}>
         <VideoReviewGrid />
-      </DeferredHomeContent>
+      </Suspense>
       <HomeTrustSections />
     </main>
   );

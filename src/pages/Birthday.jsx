@@ -5,11 +5,11 @@ import usePageMeta from "../hooks/usePageMeta";
 
 const CATEGORIES = [
   ["Kids Birthday", "Age 1–12", IMAGES.typeKidsBirthday, "/occasion/birthday/kids-birthday"],
-  ["Teen Birthday", "Age 13–18", IMAGES.themeStageLights, "/occasion/birthday/milestone-birthday"],
+  ["Teen Birthday", "Age 13–18", IMAGES.themeStageLights, "/occasion/birthday"],
   ["Adult Birthday", "Age 18+", IMAGES.pkgPremiumBirthday, "/occasion/birthday/milestone-birthday"],
   ["Milestone Birthday", "20th, 30th, 40th, 50th+", IMAGES.pkgPremiumBirthday, "/occasion/birthday/milestone-birthday"],
   ["Surprise Birthday", "Make it Special", IMAGES.galBirthday2, "/occasion/birthday"],
-  ["Theme Parties", "Custom Themes", IMAGES.themeBalloonArch, "/occasion/birthday/kids-birthday"],
+  ["Theme Parties", "Custom Themes", IMAGES.themeBalloonArch, "/occasion/birthday/kids-special"],
 ];
 
 const SERVICES = [
