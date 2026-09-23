@@ -24,7 +24,7 @@ export default function HeroImageCarousel({ images, alt }) {
     <div className="hero-media-carousel" aria-hidden="true">
       {list.map((src, i) => (
         <div className={"hero-media-slide" + (i === idx ? " is-active" : "")} key={src + i}>
-          <img src={src} alt={i === 0 ? alt || "" : ""} draggable="false" loading={i === 0 ? "eager" : "lazy"}  onError={onImgError}/>
+          <img src={src} alt={i === 0 ? alt || "" : ""} draggable="false" loading={i === 0 ? "eager" : "lazy"} decoding="async" onError={onImgError}/>
         </div>
       ))}
       {list.length > 1 && (

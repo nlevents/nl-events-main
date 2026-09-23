@@ -14,6 +14,7 @@ export const PUBLIC_STATE_KEYS = [
   "nle_catalog_v2_video_reviews",
   "nle_catalog_v2_cities",
   "nle_catalog_v2_addons",
+  "nle_catalog_v2_birthday_age_categories",
 ];
 
 export const ADMIN_STATE_KEYS = [

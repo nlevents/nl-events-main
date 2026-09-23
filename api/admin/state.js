@@ -6,6 +6,7 @@ const KEYS = [
   "nle_catalog_v2_insta_videos", "nle_catalog_v2_video_reviews", "nle_catalog_v2_cities", "nle_catalog_v2_addons",
   "nle_catalog_v2_coupons", "nle_catalog_v2_inquiries", "nle_catalog_v2_blackouts",
   "nle-admin-clients", "nle-admin-invoices", "nle-admin-settings",
+  "nle_catalog_v2_birthday_age_categories",
 ];
 
 async function auth(req, res) {

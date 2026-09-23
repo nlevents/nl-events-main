@@ -57,6 +57,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/admin/products", label: "Products & Packages", icon: "package" },
       { to: "/admin/categories", label: "Occasions & Categories", icon: "grid" },
+      { to: "/admin/birthday-age-categories", label: "Birthday Age Cards", icon: "star" },
       { to: "/admin/media", label: "Media & Pictures", icon: "image" },
       { to: "/admin/video-content", label: "YouTube Shorts & Reviews", icon: "sparkle" },
       { to: "/admin/services", label: "Event Services", icon: "tag" },

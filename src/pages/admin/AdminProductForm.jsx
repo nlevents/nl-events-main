@@ -41,6 +41,7 @@ export default function AdminProductForm() {
     rating: 4.8,
     reviewCount: 32,
     image: "/assets/images/categories/wedding.webp",
+    images: ["/assets/images/categories/wedding.webp"],
     status: "active",
     includes: [
       "Full Stage & Mandap Setup",
@@ -75,8 +76,16 @@ export default function AdminProductForm() {
     if (isEditing) {
       const p = getProduct(id);
       if (p) {
+        const galleryImages = Array.from(new Set([
+          ...(Array.isArray(p.gallery) ? p.gallery : []),
+          ...(Array.isArray(p.images) ? p.images : []),
+          ...(p.image ? [p.image] : []),
+        ].filter(Boolean)));
         setFormData({
           ...p,
+          images: galleryImages,
+          gallery: galleryImages,
+          image: galleryImages[0] || p.image || "/assets/images/categories/wedding.webp",
           isAddon: Boolean(p.isAddon || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")),
           price: p.price || 0,
           originalPrice: p.originalPrice || "",
@@ -205,8 +214,16 @@ export default function AdminProductForm() {
 
     try {
       setSaving(true);
+      const galleryImages = Array.from(new Set([
+        ...(Array.isArray(formData.gallery) ? formData.gallery : []),
+        ...(Array.isArray(formData.images) ? formData.images : []),
+        ...(formData.image ? [formData.image] : []),
+      ].filter(Boolean)));
       const saved = await saveProductToCloud({
         ...formData,
+        image: galleryImages[0] || formData.image,
+        images: galleryImages,
+        gallery: galleryImages,
         ...(isAddonMode ? { isAddon: true, occasionSlug: "event-services" } : {}),
         id: formData.id || (isEditing ? id : undefined),
       });
@@ -632,6 +649,26 @@ export default function AdminProductForm() {
               </div>
             </div>
 
+            {(formData.images || []).length > 0 && (
+              <div className="admin-image-gallery" aria-label="Product images">
+                {(formData.images || []).map((url, index) => (
+                  <div key={`${url}-${index}`} className={`admin-image-gallery-item${url === formData.image ? " active" : ""}`}>
+                    <button type="button" title="Use as main image" onClick={() => { const reordered = [url, ...(formData.images || []).filter((img) => img !== url)]; setFormData({ ...formData, image: url, images: reordered, gallery: reordered }); }}>
+                      <img src={url} alt={`${formData.name || "Product"} ${index + 1}`} />
+                    </button>
+                    {(formData.images || []).length > 1 && (
+                      <button type="button" className="admin-image-gallery-remove" title="Remove image" onClick={() => {
+                        const next = formData.images.filter((_, i) => i !== index);
+                        setFormData({ ...formData, images: next, gallery: next, image: formData.image === url ? (next[0] || "") : formData.image });
+                      }}>×</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="admin-hint" style={{ marginTop: 8 }}>Add multiple product pictures. The first/main picture is used as the product thumbnail.</p>
+
             <div className="admin-form-group" style={{ marginTop: "12px" }}>
               <label className="admin-form-label">Image URL</label>
               <input
@@ -691,8 +728,13 @@ export default function AdminProductForm() {
       {/* Picture Picker Modal */}
       <MediaPickerModal
         isOpen={pickerOpen}
+        multiple
         onClose={() => setPickerOpen(false)}
-        onSelect={(url) => setFormData({ ...formData, image: url })}
+        onSelect={(selection) => {
+          const urls = Array.isArray(selection) ? selection : [selection];
+          const next = Array.from(new Set([...(formData.images || []), ...urls].filter(Boolean)));
+          setFormData({ ...formData, images: next, gallery: next, image: next[0] || formData.image });
+        }}
       />
 
       {/* Live Preview Modal */}

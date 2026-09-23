@@ -160,8 +160,10 @@ h3,.h3{ font-family:var(--font-display); font-weight:500; line-height:1.2; }
 /* ---------- Header ---------- */
 .site-header{
   position:sticky; top:0; z-index:200;
-  background:color-mix(in srgb, var(--background) 88%, transparent);
-  backdrop-filter:blur(14px);
+  /* Keep the translucent header look without forcing a full-page backdrop
+     blur on every scroll frame. Backdrop-filter is especially expensive on
+     Linux/Chrome and was the main source of scroll jank on local dev. */
+  background:color-mix(in srgb, var(--background) 96%, transparent);
   border-bottom:1px solid var(--border-soft);
   height:var(--nav-h);
 }
@@ -405,6 +407,7 @@ h3,.h3{ font-family:var(--font-display); font-weight:500; line-height:1.2; }
 .hero-media-slide{
   position:absolute; inset:0; opacity:0;
   transition:opacity 1.1s ease;
+  will-change:opacity;
 }
 .hero-media-slide.is-active{ opacity:1; }
 .hero-media-slide img{ width:100%; height:100%; object-fit:cover; }
@@ -472,7 +475,7 @@ h3,.h3{ font-family:var(--font-display); font-weight:500; line-height:1.2; }
   grid-template-columns:repeat(2,1fr);
   gap:12px;
 }
-.type-card{
+.type-card{contain:paint;
   position:relative;
   border-radius:var(--radius-m);
   overflow:hidden;
@@ -496,7 +499,7 @@ h3,.h3{ font-family:var(--font-display); font-weight:500; line-height:1.2; }
 
 /* ---------- Package cards ---------- */
 .pkg-grid{ display:grid; grid-template-columns:1fr; gap:20px; }
-.pkg-card{
+.pkg-card{contain:paint;
   border:1px solid var(--border-soft);
   border-radius:var(--radius-m);
   overflow:hidden;
@@ -843,7 +846,7 @@ h3,.h3{ font-family:var(--font-display); font-weight:500; line-height:1.2; }
 .divider{ height:1px; background:var(--border-soft); border:0; margin:0; }
 .bottom-cta{
   position:fixed; left:0; right:0; bottom:0; z-index:150;
-  background:color-mix(in srgb, var(--background) 94%, transparent); backdrop-filter:blur(14px);
+  background:color-mix(in srgb, var(--background) 96%, transparent);
   border-top:1px solid var(--border-soft);
   box-shadow:0 -12px 30px -18px rgba(3,21,45,.35);
   padding:14px 20px calc(14px + env(safe-area-inset-bottom));

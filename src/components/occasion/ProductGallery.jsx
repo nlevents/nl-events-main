@@ -77,7 +77,7 @@ export default function ProductGallery({ images, alt }) {
         onTouchEnd={onTouchEnd}
       >
         <button type="button" className="pd-gallery-zoom" aria-label="View full-size image" onClick={() => setLightbox(true)}>
-          <img src={list[active]} alt={alt}  onError={onImgError}/>
+          <img src={list[active]} alt={alt}  loading="lazy" decoding="async" onError={onImgError}/>
         </button>
         {list.length > 1 && (
           <>
@@ -116,7 +116,7 @@ export default function ProductGallery({ images, alt }) {
               aria-selected={i === active}
               onClick={() => setActive(i)}
             >
-              <img src={src} alt=""  onError={onImgError}/>
+              <img src={src} alt=""  loading="lazy" decoding="async" onError={onImgError}/>
             </button>
           ))}
         </div>
@@ -127,7 +127,7 @@ export default function ProductGallery({ images, alt }) {
           <button type="button" className="pd-lightbox-close" aria-label="Close" onClick={() => setLightbox(false)}>
             <Icon name="close" />
           </button>
-          <img src={list[active]} alt={alt}  onError={onImgError}/>
+          <img src={list[active]} alt={alt}  loading="lazy" decoding="async" onError={onImgError}/>
           {list.length > 1 && (
             <>
               <button type="button" className="pd-lightbox-nav prev" aria-label="Previous image" onClick={prev}>

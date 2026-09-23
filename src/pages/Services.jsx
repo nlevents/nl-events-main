@@ -29,7 +29,7 @@ export default function Services() {
         <div className="service-row">
           {SERVICES.map((s) => (
             <article className="service-item reveal" key={s.tag}>
-              <div className="s-media"><img src={s.img} alt={s.alt}  onError={onImgError}/></div>
+              <div className="s-media"><img src={s.img} alt={s.alt}  loading="lazy" decoding="async" onError={onImgError}/></div>
               <div>
                 <span className="s-num">{s.num} — {s.tag}</span>
                 <h3>{s.tag}</h3>

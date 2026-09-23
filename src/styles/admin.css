@@ -733,3 +733,26 @@
 .financial-report-page{max-width:none!important}.financial-report-controls{display:flex;gap:8px}.financial-report-controls select{height:38px;border:1px solid #dfe5ec;border-radius:6px;background:#fff;padding:0 10px}.financial-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.financial-stat-grid>div{background:#fff;border:1px solid #e1e6ec;border-radius:9px;padding:17px;position:relative}.financial-stat-grid span{display:grid;place-items:center;width:34px;height:34px;background:#fff4dc;border-radius:50%;color:#c18d25;float:left;margin-right:11px}.financial-stat-grid span svg{width:17px}.financial-stat-grid small{display:block;color:#718096;font-size:11px}.financial-stat-grid strong{display:block;color:#152b48;font-size:20px;margin-top:4px}.financial-report-grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}.financial-bars{padding:4px 0}.financial-bar-row{display:grid;grid-template-columns:75px 1fr 90px;align-items:center;gap:10px;margin:13px 0}.financial-bar-row>span{font-size:10px;color:#69788c}.financial-bar-row>div{height:12px;background:#edf1f5;border-radius:20px;overflow:hidden}.financial-bar-row i{display:block;height:100%;background:#d49a16;border-radius:20px}.financial-bar-row strong{font-size:10px;text-align:right;color:#34465d}.financial-status-list>div{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #edf0f3}.financial-status-list>div:last-child{border-bottom:0}.financial-status-list strong{font-size:13px;color:#273a53}
 @media(max-width:1100px){.catalog-stat-grid{grid-template-columns:repeat(3,1fr)}.catalog-workspace{grid-template-columns:240px minmax(0,1fr)}.catalog-ref-tabs{grid-template-columns:repeat(3,1fr)}.catalog-form-grid.four{grid-template-columns:1fr 1fr}.financial-report-grid{grid-template-columns:1fr}}
 @media(max-width:800px){.catalog-ref-page{padding:18px 12px 50px!important}.catalog-ref-head{flex-direction:column}.catalog-workspace{grid-template-columns:1fr}.catalog-category-panel{order:0}.catalog-items-panel{order:1}.catalog-stat-grid{grid-template-columns:1fr 1fr}.catalog-toolbar{flex-wrap:wrap}.catalog-search{min-width:100%}.catalog-kind-cards,.catalog-form-grid.two,.catalog-form-grid.three{grid-template-columns:1fr}.catalog-modal-backdrop{padding:8px}.catalog-modal{margin:0}.financial-stat-grid{grid-template-columns:1fr 1fr}.financial-report-controls{width:100%}}
+
+.admin-image-gallery{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.admin-image-gallery-item{position:relative;width:64px;height:64px;border:2px solid transparent;border-radius:8px;overflow:visible}.admin-image-gallery-item.active{border-color:var(--accent)}.admin-image-gallery-item>button:first-child{display:block;width:100%;height:100%;padding:0;border:0;background:none;border-radius:6px;overflow:hidden;cursor:pointer}.admin-image-gallery-item img{display:block;width:100%;height:100%;object-fit:cover}.admin-image-gallery-remove{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border:0;border-radius:50%;background:#b33;color:#fff;cursor:pointer;line-height:20px;padding:0}.admin-media-picker-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(193,151,67,.2)}
+
+/* Birthday age cards — scoped to the dedicated admin manager. */
+.birthday-age-admin-list{ display:flex; flex-direction:column; gap:10px; }
+.birthday-age-admin-item{ display:flex; align-items:center; gap:14px; padding:12px; border:1px solid var(--border-soft); border-radius:var(--radius-s); background:var(--surface); }
+.birthday-age-admin-item.is-inactive{ opacity:.58; }
+.birthday-age-admin-thumb{ width:88px; height:62px; object-fit:cover; border-radius:7px; border:1px solid var(--border-soft); flex:0 0 auto; }
+.birthday-age-admin-copy{ min-width:0; flex:1; display:flex; flex-direction:column; gap:3px; }
+.birthday-age-admin-copy strong{ font-size:14px; }
+.birthday-age-admin-copy span{ color:var(--text-secondary); font-size:12.5px; }
+.birthday-age-admin-copy code{ color:var(--text-secondary); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.birthday-age-admin-actions{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.birthday-age-admin-modal{ max-width:620px; }
+.birthday-age-admin-image-field{ display:grid; grid-template-columns:100px 1fr; gap:12px; align-items:start; }
+.birthday-age-admin-preview{ width:100px; height:74px; border:1px solid var(--border-soft); border-radius:7px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:var(--surface-secondary); color:var(--text-secondary); }
+.birthday-age-admin-preview img{ width:100%; height:100%; object-fit:cover; }
+@media (max-width: 700px){
+  .birthday-age-admin-item{ align-items:flex-start; flex-wrap:wrap; }
+  .birthday-age-admin-copy{ min-width:calc(100% - 102px); }
+  .birthday-age-admin-actions{ width:100%; justify-content:flex-start; }
+  .birthday-age-admin-image-field{ grid-template-columns:1fr; }
+}

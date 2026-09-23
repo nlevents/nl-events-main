@@ -133,7 +133,7 @@ export default function CategoryNav() {
                         </div>
                         {cat.featured && (
                           <Link to={cat.featured.href} className="mega-featured" onClick={() => setOpenKey(null)}>
-                            <img src={cat.featured.img} alt={cat.featured.title} loading="lazy"  onError={onImgError}/>
+                            <img src={cat.featured.img} alt={cat.featured.title} loading="lazy" decoding="async"  onError={onImgError}/>
                             <div className="mega-featured-copy">
                               <span>{cat.featured.title}</span>
                               <small>{cat.featured.subtitle}</small>

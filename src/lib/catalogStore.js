@@ -25,6 +25,7 @@ const KEYS = {
   videoReviews: STORE_KEY_PREFIX + "video_reviews",
   cities: STORE_KEY_PREFIX + "cities",
   addons: STORE_KEY_PREFIX + "addons",
+  birthdayAgeCategories: STORE_KEY_PREFIX + "birthday_age_categories",
   version: STORE_KEY_PREFIX + "version",
   demoVideosPurged: STORE_KEY_PREFIX + "demo_videos_purged",
   realShortsSeeded: STORE_KEY_PREFIX + "real_shorts_seeded",
@@ -40,6 +41,15 @@ const KEYS = {
 
 const STORE_VERSION = "4.7-service-occasion-split";
 const REFERENCE_HIERARCHY_MIGRATION = "2";
+
+const DEFAULT_BIRTHDAY_AGE_CATEGORIES = [
+  { id: "birthday-kids", title: "Kids Birthday", subtitle: "Age 1–12", image: IMAGES.typeKidsBirthday, href: "/occasion/birthday/kids-birthday", active: true, sortOrder: 1 },
+  { id: "birthday-teen", title: "Teen Birthday", subtitle: "Age 13–18", image: IMAGES.themeStageLights, href: "/occasion/birthday", active: true, sortOrder: 2 },
+  { id: "birthday-adult", title: "Adult Birthday", subtitle: "Age 18+", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/milestone-birthday", active: true, sortOrder: 3 },
+  { id: "birthday-milestone", title: "Milestone Birthday", subtitle: "20th, 30th, 40th, 50th+", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/milestone-birthday", active: true, sortOrder: 4 },
+  { id: "birthday-surprise", title: "Surprise Birthday", subtitle: "Make it Special", image: IMAGES.galBirthday2, href: "/occasion/birthday", active: true, sortOrder: 5 },
+  { id: "birthday-themes", title: "Theme Parties", subtitle: "Custom Themes", image: IMAGES.themeBalloonArch, href: "/occasion/birthday/kids-birthday", active: true, sortOrder: 6 },
+];
 
 
 // Real-photo presentation bank used for the storefront catalogue. The supplied
@@ -561,6 +571,10 @@ function initializeSeedsIfNeeded() {
     }
   });
 
+  if (!localStorage.getItem(KEYS.birthdayAgeCategories)) {
+    writeStorage(KEYS.birthdayAgeCategories, JSON.parse(JSON.stringify(DEFAULT_BIRTHDAY_AGE_CATEGORIES)));
+  }
+
   const currentVersion = localStorage.getItem(KEYS.version);
   // Keep video seeding independent from the main catalog version. Older builds
   // could already have the current store version while the separate YouTube
@@ -797,12 +811,30 @@ initializeSeedsIfNeeded();
 // 1. PRODUCTS MANAGEMENT
 // =============================================================================
 
+let productsCacheRaw = null;
+let productsCacheValue = null;
+let occasionsCacheRaw = null;
+let occasionsCacheValue = null;
+
 export function getProducts() {
   initializeSeedsIfNeeded();
-  return readStorage(KEYS.products, []).map((product) => ({
-    ...product,
-    image: sanitizeUrl(product?.image) || IMAGES.pkgDreamWedding,
-  }));
+  const raw = localStorage.getItem(KEYS.products) || "";
+  if (productsCacheValue && productsCacheRaw === raw) return productsCacheValue;
+  productsCacheRaw = raw;
+  productsCacheValue = readStorage(KEYS.products, []).map((product) => {
+    const gallery = Array.from(new Set([
+      ...(Array.isArray(product?.gallery) ? product.gallery : []),
+      ...(Array.isArray(product?.images) ? product.images : []),
+      ...(product?.image ? [product.image] : []),
+    ].map((url) => sanitizeUrl(url)).filter(Boolean)));
+    return {
+      ...product,
+      image: gallery[0] || IMAGES.pkgDreamWedding,
+      images: gallery,
+      gallery,
+    };
+  });
+  return productsCacheValue;
 }
 
 export function getProduct(idOrSlug) {
@@ -833,6 +865,16 @@ export function saveProduct(product) {
     duration: sanitizeText(product.duration || ""),
     requiresTimeSlot: product.requiresTimeSlot !== false,
     image: sanitizeUrl(product.image) || IMAGES.pkgDreamWedding,
+    images: Array.from(new Set([
+      ...(Array.isArray(product.images) ? product.images : []),
+      ...(Array.isArray(product.gallery) ? product.gallery : []),
+      ...(product.image ? [product.image] : []),
+    ].map((url) => sanitizeUrl(url)).filter(Boolean))),
+    gallery: Array.from(new Set([
+      ...(Array.isArray(product.gallery) ? product.gallery : []),
+      ...(Array.isArray(product.images) ? product.images : []),
+      ...(product.image ? [product.image] : []),
+    ].map((url) => sanitizeUrl(url)).filter(Boolean))),
     status: ["active", "draft", "archived", "featured"].includes(product.status) ? product.status : "active",
     includes: Array.isArray(product.includes) ? product.includes.map(sanitizeText).filter(Boolean) : [],
     notIncluded: Array.isArray(product.notIncluded) ? product.notIncluded.map(sanitizeText).filter(Boolean) : [],
@@ -952,9 +994,53 @@ function sanitizeCategoryNode(node) {
   };
 }
 
+export function getBirthdayAgeCategories() {
+  initializeSeedsIfNeeded();
+  const raw = localStorage.getItem(KEYS.birthdayAgeCategories);
+  const stored = raw ? readStorage(KEYS.birthdayAgeCategories, null) : null;
+  const list = Array.isArray(stored) ? stored : DEFAULT_BIRTHDAY_AGE_CATEGORIES;
+  return list
+    .map((item, index) => ({
+      id: item.id || uid("birthday-card"),
+      title: sanitizeText(item.title || "Birthday Category"),
+      subtitle: sanitizeText(item.subtitle || ""),
+      image: sanitizeUrl(item.image) || IMAGES.typeKidsBirthday,
+      href: sanitizeUrl(item.href) || "/occasion/birthday",
+      active: item.active !== false,
+      sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export function saveBirthdayAgeCategories(items) {
+  const safe = (Array.isArray(items) ? items : [])
+    .map((item, index) => ({
+      id: item.id || uid("birthday-card"),
+      title: sanitizeText(item.title || "Birthday Category"),
+      subtitle: sanitizeText(item.subtitle || ""),
+      image: sanitizeUrl(item.image) || IMAGES.typeKidsBirthday,
+      href: sanitizeUrl(item.href) || "/occasion/birthday",
+      active: item.active !== false,
+      sortOrder: index + 1,
+    }));
+  persist(KEYS.birthdayAgeCategories, safe);
+  dispatchCatalogUpdate();
+  return safe;
+}
+
+export async function saveBirthdayAgeCategoriesToCloud(items) {
+  const saved = saveBirthdayAgeCategories(items);
+  await syncCloudState(KEYS.birthdayAgeCategories, saved);
+  return saved;
+}
+
 export function getOccasions() {
   initializeSeedsIfNeeded();
-  return readStorage(KEYS.occasions, SEED_OCCASIONS).map(sanitizeCategoryNode);
+  const raw = localStorage.getItem(KEYS.occasions) || "";
+  if (occasionsCacheValue && occasionsCacheRaw === raw) return occasionsCacheValue;
+  occasionsCacheRaw = raw;
+  occasionsCacheValue = readStorage(KEYS.occasions, SEED_OCCASIONS).map(sanitizeCategoryNode);
+  return occasionsCacheValue;
 }
 
 export function getOccasion(slug) {
@@ -999,6 +1085,18 @@ export function deleteOccasion(slug) {
   persist(KEYS.occasions, next);
   dispatchCatalogUpdate();
   return true;
+}
+
+export async function saveOccasionToCloud(occasion) {
+  const saved = saveOccasion(occasion);
+  await syncCloudState(KEYS.occasions, getOccasions());
+  return saved;
+}
+
+export async function deleteOccasionFromCloud(slug) {
+  const deleted = deleteOccasion(slug);
+  await syncCloudState(KEYS.occasions, getOccasions());
+  return deleted;
 }
 
 export function saveCategory(parentOccasionSlug, category) {
@@ -1067,6 +1165,20 @@ export function deleteCategory(parentOccasionSlug, categorySlug, parentCategoryS
   persist(KEYS.occasions, occasions);
   dispatchCatalogUpdate();
   return true;
+}
+
+export async function saveCategoryToCloud(parentOccasionSlug, category) {
+  const saved = saveCategory(parentOccasionSlug, category);
+  if (!saved) throw new Error("Unable to save category.");
+  await syncCloudState(KEYS.occasions, getOccasions());
+  return saved;
+}
+
+export async function deleteCategoryFromCloud(parentOccasionSlug, categorySlug, parentCategorySlug = null) {
+  const deleted = deleteCategory(parentOccasionSlug, categorySlug, parentCategorySlug);
+  if (!deleted) throw new Error("Unable to delete category.");
+  await syncCloudState(KEYS.occasions, getOccasions());
+  return deleted;
 }
 
 /**
@@ -1154,16 +1266,31 @@ export function uploadMediaFile(file, title = "") {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const dataUrl = e.target.result;
-      const mediaItem = saveMediaItem({
-        title: title || file.name.replace(/\.[^/.]+$/, ""),
-        url: dataUrl,
-        alt: title || file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        tags: ["upload"],
-      });
-      resolve(mediaItem);
+      const source = new Image();
+      source.onload = () => {
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(source.naturalWidth || source.width, source.naturalHeight || source.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((source.naturalWidth || source.width) * scale));
+        canvas.height = Math.max(1, Math.round((source.naturalHeight || source.height) * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Unable to process image.")); return; }
+        ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/webp", 0.82);
+        const mediaItem = saveMediaItem({
+          title: title || file.name.replace(/\.[^/.]+$/, ""),
+          url: dataUrl,
+          alt: title || file.name,
+          fileSize: file.size,
+          mimeType: "image/webp",
+          width: canvas.width,
+          height: canvas.height,
+          tags: ["upload"],
+        });
+        resolve(mediaItem);
+      };
+      source.onerror = () => reject(new Error("Failed to decode image file."));
+      source.src = e.target.result;
     };
     reader.onerror = () => reject(new Error("Failed to read image file."));
     reader.readAsDataURL(file);

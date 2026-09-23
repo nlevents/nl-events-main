@@ -28,7 +28,7 @@ function localApiPlugin() {
         try {
           const file = path.resolve(process.cwd(), relative)
           if (!fs.existsSync(file)) return next()
-          const mod = await import(`${pathToFileURL(file).href}?dev=${Date.now()}`)
+          const mod = await import(pathToFileURL(file).href)
           const body = await new Promise((resolve, reject) => {
             if (req.method === 'GET' || req.method === 'HEAD') return resolve({})
             let raw = ''

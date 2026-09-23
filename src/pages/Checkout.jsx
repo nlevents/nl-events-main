@@ -168,7 +168,7 @@ export default function Checkout() {
               <h2 style={{ fontSize: 22, marginBottom: 18 }}>Review your booking</h2>
               {items.map((it) => (
                 <div className="review-line" key={it.id}>
-                  {it.image ? <img src={it.image} alt="" onError={onImgError} /> : null}
+                  {it.image ? <img src={it.image} alt="" loading="lazy" decoding="async" onError={onImgError} /> : null}
                   <div className="review-line-body">
                     <h4>{it.name}{it.quantity > 1 ? " × " + it.quantity : ""}</h4>
                     <p>{describeBooking(it) || "—"}</p>

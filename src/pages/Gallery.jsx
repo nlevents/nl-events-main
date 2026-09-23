@@ -86,7 +86,7 @@ export default function Gallery() {
               onClick={() => setLightboxIndex(i)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLightboxIndex(i); } }}
             >
-              <img src={item.img} alt={item.alt}  onError={onImgError}/>
+              <img src={item.img} alt={item.alt}  loading="lazy" decoding="async" onError={onImgError}/>
             </div>
           ))}
         </div>
@@ -102,7 +102,7 @@ export default function Gallery() {
       <div className={"lightbox" + (active ? " is-open" : "")} role="dialog" aria-modal="true" aria-label="Image viewer" onClick={(e) => { if (e.target === e.currentTarget) setLightboxIndex(-1); }}>
         <button className="lightbox-close" type="button" aria-label="Close" onClick={() => setLightboxIndex(-1)}>&times;</button>
         <button className="lightbox-nav lightbox-prev" type="button" aria-label="Previous image" onClick={() => setLightboxIndex((i) => (i - 1 + visible.length) % visible.length)}>&#8249;</button>
-        {active && <img id="lightboxImg" src={active.img} alt={active.alt}  onError={onImgError}/>}
+        {active && <img id="lightboxImg" src={active.img} alt={active.alt}  loading="lazy" decoding="async" onError={onImgError}/>}
         <button className="lightbox-nav lightbox-next" type="button" aria-label="Next image" onClick={() => setLightboxIndex((i) => (i + 1) % visible.length)}>&#8250;</button>
         <div className="lightbox-caption">{active ? active.alt : ""}</div>
       </div>

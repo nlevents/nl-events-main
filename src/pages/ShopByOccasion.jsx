@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { IMAGES } from "../data/images";
 import { listOccasions } from "../data/occasions";
 import usePageMeta from "../hooks/usePageMeta";
@@ -13,8 +14,14 @@ export default function ShopByOccasion() {
   );
   useReveal([]);
 
-  const occasions = listOccasions();
+  const [, setCatalogVersion] = useState(0);
+  useEffect(() => {
+    const onUpdate = () => setCatalogVersion((v) => v + 1);
+    window.addEventListener("nle-catalog-updated", onUpdate);
+    return () => window.removeEventListener("nle-catalog-updated", onUpdate);
+  }, []);
 
+  const occasions = listOccasions();
   return (
     <>
       <section className="hero hero-sm occ-hero">

@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/style.css'
 import './styles/responsive.css'
@@ -29,6 +28,28 @@ const rootFallback = (
 if (typeof window !== "undefined") {
   // The public storefront has a local/seed fallback, so cloud hydration does
   // not need to compete with the first render. Run it when the browser is idle.
+  const PUBLIC_CATALOG_KEYS = new Set([
+    "nle_catalog_v2_products",
+    "nle_catalog_v2_occasions",
+    "nle_catalog_v2_media",
+    "nle_catalog_v2_gallery",
+    "nle_catalog_v2_insta_videos",
+    "nle_catalog_v2_video_reviews",
+    "nle_catalog_v2_cities",
+    "nle_catalog_v2_addons",
+    "nle_catalog_v2_birthday_age_categories",
+  ]);
+
+  // Admin and public pages can be open in separate tabs. localStorage changes
+  // already cross the tab boundary, but the existing UI refresh event does not.
+  // Bridge that native browser event into the catalog's normal update event so
+  // category/product additions, edits and deletions appear immediately.
+  window.addEventListener("storage", (event) => {
+    if (event.key && PUBLIC_CATALOG_KEYS.has(event.key)) {
+      window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
+    }
+  });
+
   const hydrate = () =>
     import('./lib/catalogStore')
       .then(({ hydrateCatalogFromCloud }) => hydrateCatalogFromCloud())
@@ -42,9 +63,7 @@ if (typeof window !== "undefined") {
 }
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <ErrorBoundary fallback={rootFallback}>
-      <App />
-    </ErrorBoundary>
-  </StrictMode>,
+  <ErrorBoundary fallback={rootFallback}>
+    <App />
+  </ErrorBoundary>,
 )

@@ -664,18 +664,24 @@ function applyCatalogImages(nodes) {
   return nodes;
 }
 
+let liveOccasionsCache = null;
+let liveOccasionsCacheKey = "";
+
 function getLiveOccasions() {
   if (typeof window === "undefined") return OCCASIONS;
   try {
     const rawOcc = localStorage.getItem("nle_catalog_v2_occasions");
-    const parsedOcc = rawOcc ? JSON.parse(rawOcc) : null;
-    // Guard against corrupt/empty admin-edited catalog data in localStorage
-    // (e.g. an interrupted save) silently breaking every occasion page —
-    // fall back to the built-in catalog instead of resolving to nothing.
-    const baseOccasions = Array.isArray(parsedOcc) && parsedOcc.length > 0
-      ? mergeCategoryTree(parsedOcc, OCCASIONS)
-      : OCCASIONS;
     const rawProds = localStorage.getItem("nle_catalog_v2_products");
+    const cacheKey = `${rawOcc || ""}\u0000${rawProds || ""}`;
+    if (liveOccasionsCache && liveOccasionsCacheKey === cacheKey) return liveOccasionsCache;
+    let parsedOcc = null;
+    try { parsedOcc = rawOcc != null ? JSON.parse(rawOcc) : null; } catch { parsedOcc = null; }
+    // The admin catalog is the source of truth. Do not merge the built-in
+    // seed tree back into an existing admin tree: doing that resurrects
+    // occasions/categories that an admin deliberately deleted. Only use the
+    // seed tree when this browser has never received a catalog tree.
+    const hasStoredTree = Array.isArray(parsedOcc);
+    const baseOccasions = hasStoredTree ? parsedOcc : OCCASIONS;
     const clone = JSON.parse(JSON.stringify(baseOccasions));
 
     // The built-in occasion tree contains reference catalog products,
@@ -689,12 +695,20 @@ function getLiveOccasions() {
       });
     }
 
-    applyCatalogImages(clone);
-    if (!rawProds) return clone;
+    // Preserve images stored by Admin. Seed presentation images are only
+    // applied when there is no admin-owned catalog tree yet.
+    if (!hasStoredTree) applyCatalogImages(clone);
+    if (!rawProds) {
+      liveOccasionsCacheKey = cacheKey;
+      liveOccasionsCache = clone;
+      return clone;
+    }
     let allProds;
     try { allProds = JSON.parse(rawProds); } catch { allProds = []; }
     if (!Array.isArray(allProds) || allProds.length === 0) {
       stripEmbeddedProducts(clone);
+      liveOccasionsCacheKey = cacheKey;
+      liveOccasionsCache = clone;
       return clone;
     }
     allProds.forEach((rawProd) => {
@@ -731,38 +745,25 @@ function getLiveOccasions() {
         if (node.children) node.children.forEach(inject);
       }
       if (!placed) clone.forEach(inject);
-      if (!placed && clone.length > 0) {
-        const targetOcc = clone.find((o) => o.slug === prod.occasionSlug) || clone[0];
-        targetOcc.products = targetOcc.products || [];
-        const idx = targetOcc.products.findIndex((p) => p.slug === prod.slug || p.id === prod.id);
-        if (idx !== -1) targetOcc.products[idx] = { ...targetOcc.products[idx], ...prod };
-        else targetOcc.products.push(prod);
-      }
+      // Never place an orphaned product into an unrelated occasion. If its
+      // admin-selected category/occasion was deleted, keep the product in
+      // the admin catalog for re-categorisation, but do not expose it under
+      // another public occasion.
     });
-    applyCatalogImages(clone);
+    if (!hasStoredTree) applyCatalogImages(clone);
+    liveOccasionsCacheKey = cacheKey;
+    liveOccasionsCache = clone;
     return clone;
   } catch {
     return OCCASIONS;
   }
 }
 
-const PUBLIC_TOP_LEVEL_OCCASIONS = new Set([
-  "wedding",
-  "birthday",
-  "corporate",
-  "kids-family",
-  "anniversary",
-  "festivals-culture",
-]);
-
 export function listOccasions() {
-  // Keep the public Shop by Occasion collection intentionally limited to the
-  // six primary occasion families. Baby Shower, Newborn Welcome and
-  // Annaprashan remain available as nested Kids & Family categories / legacy
-  // routes, but they are no longer separate top-level occasions.
-  return getLiveOccasions().filter(
-    (o) => !o.addonOnly && PUBLIC_TOP_LEVEL_OCCASIONS.has(o.slug),
-  );
+  // Admin-managed occasions are the public source of truth. Every normal
+  // occasion created in Catalog is therefore available in Shop by Occasion;
+  // only internal Event Services branches marked addonOnly stay hidden.
+  return getLiveOccasions().filter((o) => !o.addonOnly);
 }
 
 export function findOccasion(slug) {

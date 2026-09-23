@@ -57,7 +57,7 @@ export default function PromoCarousel({ slides }) {
       >
         {slides.map((s, i) => (
           <div className="promo-slide" key={i} onClick={() => scrollToIndex(i)}>
-            <img src={s.img} alt={s.alt} draggable="false"  onError={onImgError}/>
+            <img src={s.img} alt={s.alt} draggable="false" decoding="async"  onError={onImgError}/>
             <div className="promo-copy">
               <span className="tag-pill">{s.tag}</span>
               <h3>{s.title}</h3>

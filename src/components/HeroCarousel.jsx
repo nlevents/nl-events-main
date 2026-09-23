@@ -116,6 +116,7 @@ export default function HeroCarousel({ slides }) {
                   draggable="false"
                   loading={i === 0 ? "eager" : "lazy"}
                   fetchpriority={i === 0 ? "high" : undefined}
+                  decoding="async"
                 />
               </Link>
             ) : (
@@ -124,6 +125,7 @@ export default function HeroCarousel({ slides }) {
                 alt={s.alt || ""}
                 draggable="false"
                 loading={i === 0 ? "eager" : "lazy"}
+                decoding="async"
                 fetchpriority={i === 0 ? "high" : undefined}
               />
             )}

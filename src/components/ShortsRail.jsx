@@ -50,7 +50,7 @@ function ShortThumbCard({ video, onOpen }) {
   return (
     <button type="button" className="insta-card" onClick={() => onOpen(video)} aria-label="Play video">
       {thumbSrc ? (
-        <img src={thumbSrc} alt={video.caption || "Short video"} loading="lazy" />
+        <img src={thumbSrc} alt={video.caption || "Short video"} loading="lazy" decoding="async" />
       ) : (
         <div className="insta-card-fallback" aria-hidden="true" />
       )}

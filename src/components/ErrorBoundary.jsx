@@ -21,7 +21,20 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // Swap for real error reporting (Sentry, etc.) if/when one is added.
+    // Dynamic route chunks can become stale after a deployment. When the
+    // browser navigates back to a lazily loaded page, recover once instead
+    // of leaving the whole site on the generic error screen.
+    const message = String(error?.message || "");
+    const isChunkError = /chunk|dynamically imported module|failed to fetch/i.test(message);
+    if (isChunkError && typeof window !== "undefined") {
+      const recoveryKey = "nle-chunk-recovery";
+      if (!sessionStorage.getItem(recoveryKey)) {
+        sessionStorage.setItem(recoveryKey, "1");
+        window.location.reload();
+        return;
+      }
+      sessionStorage.removeItem(recoveryKey);
+    }
     // eslint-disable-next-line no-console
     console.error("Caught by ErrorBoundary:", error, info);
   }

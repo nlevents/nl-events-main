@@ -2,16 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
 import usePageMeta from "../hooks/usePageMeta";
-import { getAddonsForOccasion } from "../lib/catalogStore";
+import { getAddonsForOccasion, getBirthdayAgeCategories } from "../lib/catalogStore";
 
-const CATEGORIES = [
-  ["Kids Birthday", "Age 1–12", IMAGES.typeKidsBirthday, "/occasion/birthday/kids-birthday"],
-  ["Teen Birthday", "Age 13–18", IMAGES.themeStageLights, "/occasion/birthday"],
-  ["Adult Birthday", "Age 18+", IMAGES.pkgPremiumBirthday, "/occasion/birthday/milestone-birthday"],
-  ["Milestone Birthday", "20th, 30th, 40th, 50th+", IMAGES.pkgPremiumBirthday, "/occasion/birthday/milestone-birthday"],
-  ["Surprise Birthday", "Make it Special", IMAGES.galBirthday2, "/occasion/birthday"],
-  ["Theme Parties", "Custom Themes", IMAGES.themeBalloonArch, "/occasion/birthday/kids-special"],
-];
 
 const SERVICES = [
   ["Decor", "Themes & Setups", "✧", IMAGES.typeDecor],
@@ -122,17 +114,28 @@ function BirthdayHero() {
 }
 
 function BirthdayCategories() {
+  const [categories, setCategories] = useState(() => getBirthdayAgeCategories());
+
+  useEffect(() => {
+    const refresh = () => setCategories(getBirthdayAgeCategories());
+    refresh();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+
+  const visibleCategories = categories.filter((item) => item.active !== false);
+
   return (
     <section className="birthday-white-section">
       <div className="birthday-container">
         <SectionHead eyebrow="BIRTHDAY CELEBRATIONS" title="Birthday Celebrations for Every Age" />
         <p className="birthday-intro">From kids' theme parties to milestone celebrations, we bring your ideas to life.</p>
         <Rail>
-          {CATEGORIES.map(([title, sub, image, href]) => (
-            <Link to={href} className="birthday-category-card" key={title}>
-              <img src={image} alt={title} loading="lazy" decoding="async" />
-              <strong>{title}</strong>
-              <span>{sub}</span>
+          {visibleCategories.map((item) => (
+            <Link to={item.href} className="birthday-category-card" key={item.id}>
+              <img src={item.image} alt={item.title} loading="lazy" decoding="async" />
+              <strong>{item.title}</strong>
+              <span>{item.subtitle}</span>
               <b>→</b>
             </Link>
           ))}

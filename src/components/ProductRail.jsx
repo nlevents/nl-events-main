@@ -62,7 +62,7 @@ export default function ProductRail({ title, viewAllHref, items, tone }) {
                 <Link className="rail-card" to={p.href} key={p.id || p.name}>
                   <div className="rail-card-media">
                     {p.badge ? <span className="special-badge">{p.badge}</span> : null}
-                    <img src={p.img} alt={p.name} loading="lazy"  onError={onImgError}/>
+                    <img src={p.img} alt={p.name} loading="lazy" decoding="async"  onError={onImgError}/>
                   </div>
                   <div className="rail-card-body">
                     <h4>{p.name}</h4>

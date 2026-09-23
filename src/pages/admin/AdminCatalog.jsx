@@ -3,10 +3,10 @@ import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
 import {
   getOccasions,
-  saveCategory,
-  deleteCategory,
-  saveOccasion,
-  deleteOccasion,
+  saveCategoryToCloud,
+  deleteCategoryFromCloud,
+  saveOccasionToCloud,
+  deleteOccasionFromCloud,
   getProducts,
   getAddonCategoryOptions,
   saveProductToCloud,
@@ -222,16 +222,20 @@ export default function AdminCatalog() {
       cat: { ...occasion },
     });
   }
-  function removeOccasion(occasion) {
+  async function removeOccasion(occasion) {
     if (!window.confirm(`Delete "${occasion.label}" and all of its nested categories?`)) return;
-    deleteOccasion(occasion.slug);
-    const remaining = getOccasions().filter((o) => !o.addonOnly);
-    if (activeOccasion === occasion.slug) {
-      setActiveOccasion(remaining[0]?.slug || "wedding");
-      setActiveCategoryPath([]);
+    try {
+      await deleteOccasionFromCloud(occasion.slug);
+      const remaining = getOccasions().filter((o) => !o.addonOnly);
+      if (activeOccasion === occasion.slug) {
+        setActiveOccasion(remaining[0]?.slug || "wedding");
+        setActiveCategoryPath([]);
+      }
+      refresh();
+      flash(`Deleted "${occasion.label}".`);
+    } catch (err) {
+      setError(err.message || "Unable to delete occasion from the cloud.");
     }
-    refresh();
-    flash(`Deleted "${occasion.label}".`);
   }
   function openCategoryEditor(occasionSlug, trail = [], mode = "create") {
     const node = trail[trail.length - 1];
@@ -248,26 +252,31 @@ export default function AdminCatalog() {
     const parent = trail[trail.length - 1];
     setCategoryModal({ occasionSlug, parentCategorySlug: parent.slug, parentLabel: trail.map((n) => n.label).join(" › "), cat: { label: "", slug: "", description: "", image: parent.image || DEFAULT_IMAGE, type: "category", children: [] } });
   }
-  function saveCategoryForm(e) {
+  async function saveCategoryForm(e) {
     e.preventDefault(); setError("");
     const c = categoryModal.cat;
     if (!c.label.trim()) return setError(categoryModal.isOccasion ? "Occasion name is required." : "Category name is required.");
     try {
       if (categoryModal.isOccasion) {
-        saveOccasion({ ...c, slug: sanitizeSlug(c.slug || c.label) });
+        await saveOccasionToCloud({ ...c, slug: sanitizeSlug(c.slug || c.label) });
       } else {
-        saveCategory(categoryModal.occasionSlug, { ...c, slug: sanitizeSlug(c.slug || c.label), parentCategorySlug: categoryModal.parentCategorySlug || null });
+        await saveCategoryToCloud(categoryModal.occasionSlug, { ...c, slug: sanitizeSlug(c.slug || c.label), parentCategorySlug: categoryModal.parentCategorySlug || null });
       }
       refresh(); setCategoryModal(null); flash(`Saved ${categoryModal.isOccasion ? "occasion" : "category"} "${c.label}".`);
-    } catch (err) { setError(err.message || "Unable to save category."); }
+    } catch (err) { setError(err.message || "Unable to save category to the cloud."); }
   }
-  function removeCategory(occasionSlug, trail) {
+  async function removeCategory(occasionSlug, trail) {
     const node = trail[trail.length - 1];
     const parent = trail[trail.length - 2];
     if (!window.confirm(`Delete "${node.label}" and its nested categories?`)) return;
-    deleteCategory(occasionSlug, node.slug, parent?.slug || null); refresh();
-    if (activeCategoryPath.join("/") === trail.map((n) => n.slug).join("/")) setActiveCategoryPath(parent ? trail.slice(0, -1).map((n) => n.slug) : []);
-    flash(`Deleted "${node.label}".`);
+    try {
+      await deleteCategoryFromCloud(occasionSlug, node.slug, parent?.slug || null);
+      refresh();
+      if (activeCategoryPath.join("/") === trail.map((n) => n.slug).join("/")) setActiveCategoryPath(parent ? trail.slice(0, -1).map((n) => n.slug) : []);
+      flash(`Deleted "${node.label}".`);
+    } catch (err) {
+      setError(err.message || "Unable to delete category from the cloud.");
+    }
   }
   function toggleNode(key) { setExpanded((p) => ({ ...p, [key]: p[key] === false })); }
 

@@ -13,7 +13,7 @@ export default function PackageCard({ tag, img, alt, name, desc, price, href, li
     <article className="pkg-card">
       <div className="pkg-media">
         <span className="pkg-tag">{tag}</span>
-        <img src={img} alt={alt || name + " package"}  onError={onImgError}/>
+        <img src={img} alt={alt || name + " package"}  loading="lazy" decoding="async" onError={onImgError}/>
       </div>
       <div className="pkg-body">
         <h3>{name}</h3>

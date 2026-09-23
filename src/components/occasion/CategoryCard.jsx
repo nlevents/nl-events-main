@@ -11,7 +11,7 @@ export default function CategoryCard({ node, href }) {
   return (
     <Link className="occ-cat-card reveal" to={href}>
       <span className="occ-cat-pic">
-        <img src={node.image} alt={node.label} loading="lazy"  onError={onImgError}/>
+        <img src={node.image} alt={node.label} loading="lazy" decoding="async"  onError={onImgError}/>
       </span>
       <span className="occ-cat-body">
         <h4>{node.label}</h4>

@@ -1,14 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getMediaItems, uploadMediaFile, saveMediaItem } from "../../lib/catalogStore";
 import Icon from "../Icon";
 
-export default function MediaPickerModal({ isOpen, onClose, onSelect }) {
+export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple = false }) {
   const [activeTab, setActiveTab] = useState("library"); // 'library' | 'upload' | 'url'
   const [urlInput, setUrlInput] = useState("");
   const [titleInput, setTitleInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) setSelectedIds([]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -21,13 +26,16 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect }) {
   );
 
   async function handleFileUpload(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setError("");
     setUploading(true);
     try {
-      const saved = await uploadMediaFile(file, titleInput || file.name);
-      onSelect(saved.url);
+      const saved = [];
+      for (const file of files) {
+        saved.push(await uploadMediaFile(file, titleInput || file.name));
+      }
+      onSelect(multiple ? saved.map((item) => item.url) : saved[0].url);
       onClose();
     } catch (err) {
       setError(err.message || "Failed to upload image.");
@@ -105,10 +113,14 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect }) {
                 {filtered.map((item) => (
                   <div
                     key={item.id}
-                    className="admin-media-picker-item"
+                    className={`admin-media-picker-item${selectedIds.includes(item.id) ? " selected" : ""}`}
                     onClick={() => {
-                      onSelect(item.url);
-                      onClose();
+                      if (!multiple) {
+                        onSelect(item.url);
+                        onClose();
+                        return;
+                      }
+                      setSelectedIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]);
                     }}
                     title={item.title}
                   >
@@ -116,6 +128,16 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect }) {
                     <span className="admin-media-picker-label">{item.title}</span>
                   </div>
                 ))}
+              </div>
+            )}
+            {multiple && filtered.length > 0 && (
+              <div className="admin-modal-actions">
+                <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelectedIds([])}>Clear</button>
+                <button type="button" className="btn btn-sm btn-primary" disabled={!selectedIds.length} onClick={() => {
+                  const urls = filtered.filter((item) => selectedIds.includes(item.id)).map((item) => item.url);
+                  onSelect(urls);
+                  onClose();
+                }}>Use Selected ({selectedIds.length})</button>
               </div>
             )}
           </div>
@@ -137,6 +159,7 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect }) {
               <span>PNG, JPG, WebP, GIF up to 5MB</span>
               <input
                 type="file"
+                multiple={multiple}
                 accept="image/png, image/jpeg, image/webp, image/gif"
                 onChange={handleFileUpload}
                 disabled={uploading}

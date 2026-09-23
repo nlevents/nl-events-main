@@ -38,7 +38,7 @@ export default function ProductCard({ product, href, variant = "default" }) {
       <div className="occ-prod-media">
         <Link to={href} className="occ-prod-media-link" aria-label={"View " + product.name}>
           {discount > 0 && <span className="occ-prod-discount">{discount}% OFF</span>}
-          <img src={product.image} alt={product.name} loading="lazy"  onError={onImgError}/>
+          <img src={product.image} alt={product.name} loading="lazy" decoding="async"  onError={onImgError}/>
         </Link>
         {variant !== "occasion-market" && (
           <button type="button" className="occ-prod-quick" aria-label={(isQuoteOnly ? "Request quote for " : "Book ") + product.name} onClick={quickAdd}>+</button>

@@ -43,6 +43,7 @@ const AdminCatalog = lazy(() => import("./pages/admin/AdminCatalog"));
 const AdminFinancialReports = lazy(() => import("./pages/admin/AdminFinancialReports"));
 const AdminProductForm = lazy(() => import("./pages/admin/AdminProductForm"));
 const AdminCategories = lazy(() => import("./pages/admin/AdminCategories"));
+const AdminBirthdayAgeCategories = lazy(() => import("./pages/admin/AdminBirthdayAgeCategories"));
 const AdminMedia = lazy(() => import("./pages/admin/AdminMedia"));
 const AdminVideoContent = lazy(() => import("./pages/admin/AdminVideoContent"));
 const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons"));
@@ -78,6 +79,7 @@ export default function App() {
                     <Route path="products/new" element={<AdminProductForm />} />
                     <Route path="products/:id/edit" element={<AdminProductForm />} />
                     <Route path="categories" element={<AdminCategories />} />
+                    <Route path="birthday-age-categories" element={<AdminBirthdayAgeCategories />} />
                     <Route path="media" element={<AdminMedia />} />
                     <Route path="video-content" element={<AdminVideoContent />} />
                     <Route path="coupons" element={<AdminCoupons />} />
