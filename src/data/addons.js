@@ -45,6 +45,26 @@ export const GLOBAL_ADDONS = [
 ];
 
 export const EXTRA_ADDONS_BY_OCCASION = {
+  birthday: [
+    {
+      slug: "birthday-entertainment",
+      label: "Birthday Entertainment",
+      subLabel: "Hosts, games & kids entertainment",
+      image: IMAGES.galConcert2,
+      price: 0,
+      icon: "sparkle",
+      href: "/occasion/event-services/artists",
+    },
+    {
+      slug: "kids-activities",
+      label: "Kids Activities",
+      subLabel: "Games, activities & fun zones",
+      image: IMAGES.themeBalloonCelebration,
+      price: 0,
+      icon: "star",
+      href: "/occasion/event-services/wedding-activity",
+    },
+  ],
   wedding: [
     {
       slug: "wedding-activity",

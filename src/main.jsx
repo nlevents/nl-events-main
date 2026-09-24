@@ -55,11 +55,22 @@ if (typeof window !== "undefined") {
       .then(({ hydrateCatalogFromCloud }) => hydrateCatalogFromCloud())
       .catch(() => { /* best-effort background hydration */ })
 
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(hydrate, { timeout: 3000 })
-  } else {
-    window.setTimeout(hydrate, 1500)
-  }
+  // Do not compete with the first interaction/navigation for CPU, JSON parsing,
+  // localStorage writes, or network bandwidth. Public catalog hydration is only
+  // a cache refresh; the storefront already has its local/seed fallback.
+  const scheduleHydration = () => {
+    if (document.visibilityState === "hidden") {
+      document.addEventListener("visibilitychange", scheduleHydration, { once: true });
+      return;
+    }
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(hydrate, { timeout: 10000 });
+    } else {
+      window.setTimeout(hydrate, 8000);
+    }
+  };
+
+  window.setTimeout(scheduleHydration, 8000);
 }
 
 createRoot(document.getElementById('root')).render(

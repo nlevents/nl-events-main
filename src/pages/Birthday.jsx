@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
 import usePageMeta from "../hooks/usePageMeta";
-import { getAddonsForOccasion, getBirthdayAgeCategories } from "../lib/catalogStore";
+import { addonsFor } from "../data/addons";
+import { BIRTHDAY_AGE_CATEGORIES } from "../data/birthdayAgeCategories";
+import { birthdayThemeLinks } from "../data/occasions";
 
 
 const SERVICES = [
@@ -114,13 +116,30 @@ function BirthdayHero() {
 }
 
 function BirthdayCategories() {
-  const [categories, setCategories] = useState(() => getBirthdayAgeCategories());
+  const [categories, setCategories] = useState(BIRTHDAY_AGE_CATEGORIES);
 
   useEffect(() => {
-    const refresh = () => setCategories(getBirthdayAgeCategories());
-    refresh();
-    window.addEventListener("nle-catalog-updated", refresh);
-    return () => window.removeEventListener("nle-catalog-updated", refresh);
+    let cancelled = false;
+    const loadLiveCategories = () =>
+      import("../lib/catalogStore")
+        .then(({ getBirthdayAgeCategories }) => {
+          if (!cancelled) setCategories(getBirthdayAgeCategories());
+        })
+        .catch(() => {});
+
+    const schedule = () => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(loadLiveCategories, { timeout: 5000 });
+      } else {
+        window.setTimeout(loadLiveCategories, 1200);
+      }
+    };
+    schedule();
+    window.addEventListener("nle-catalog-updated", loadLiveCategories);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nle-catalog-updated", loadLiveCategories);
+    };
   }, []);
 
   const visibleCategories = categories.filter((item) => item.active !== false);
@@ -132,7 +151,7 @@ function BirthdayCategories() {
         <p className="birthday-intro">From kids' theme parties to milestone celebrations, we bring your ideas to life.</p>
         <Rail>
           {visibleCategories.map((item) => (
-            <Link to={item.href} className="birthday-category-card" key={item.id}>
+            <Link to={item.href} className="birthday-category-card" key={item.id} onPointerEnter={() => import("./OccasionBrowser").catch(() => {})} onFocus={() => import("./OccasionBrowser").catch(() => {})}>
               <img src={item.image} alt={item.title} loading="lazy" decoding="async" />
               <strong>{item.title}</strong>
               <span>{item.subtitle}</span>
@@ -146,12 +165,28 @@ function BirthdayCategories() {
 }
 
 function BirthdayServices() {
-  const [services, setServices] = useState(() => getAddonsForOccasion("birthday"));
+  const [services, setServices] = useState(() => addonsFor([{ slug: "birthday" }]));
   useEffect(() => {
-    const refresh = () => setServices(getAddonsForOccasion("birthday"));
-    refresh();
+    let cancelled = false;
+    const refresh = () =>
+      import("../lib/catalogStore")
+        .then(({ getAddonsForOccasion }) => {
+          if (!cancelled) setServices(getAddonsForOccasion("birthday"));
+        })
+        .catch(() => {});
+    const schedule = () => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(refresh, { timeout: 5000 });
+      } else {
+        window.setTimeout(refresh, 1200);
+      }
+    };
+    schedule();
     window.addEventListener("nle-catalog-updated", refresh);
-    return () => window.removeEventListener("nle-catalog-updated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nle-catalog-updated", refresh);
+    };
   }, []);
   const items = services.length ? services.map((service, i) => [service.label, service.subLabel, service.image || SERVICES[i % SERVICES.length]?.[3]]) : SERVICES;
   return (
@@ -175,14 +210,43 @@ function BirthdayServices() {
 }
 
 function PopularThemes() {
+  const [liveThemes, setLiveThemes] = useState(() => birthdayThemeLinks());
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      if (!cancelled) {
+        const next = birthdayThemeLinks();
+        if (next.length) setLiveThemes(next);
+      }
+    };
+    const schedule = () => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(refresh, { timeout: 4000 });
+      } else {
+        window.setTimeout(refresh, 800);
+      }
+    };
+    schedule();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nle-catalog-updated", refresh);
+    };
+  }, []);
+
+  const themes = liveThemes.length
+    ? liveThemes.map((item) => [item.label, item.image, item.href])
+    : THEMES.map(([title, image]) => [title, image, "/occasion/birthday"]);
+
   return (
     <section className="birthday-white-section">
       <div className="birthday-container">
         <SectionHead eyebrow="POPULAR BIRTHDAY THEMES" title="Themes They’ll Love" link={{ label: "View All Themes", href: "/occasion/birthday" }} />
         <p className="birthday-intro">Explore our most-loved themes for kids and adults.</p>
         <Rail className="birthday-theme-rail">
-          {THEMES.map(([title, image]) => (
-            <Link to="/occasion/birthday" className="birthday-theme-card" key={title}>
+          {themes.map(([title, image, href]) => (
+            <Link to={href} className="birthday-theme-card" key={href + title}>
               <img src={image} alt={title} loading="lazy" decoding="async" />
               <strong>{title}</strong>
               <b>→</b>

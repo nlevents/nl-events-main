@@ -1167,6 +1167,36 @@ export function quickLinksFor(node, trail) {
   return allQuickLinksFor(node, trail).slice(0, 6);
 }
 
+// Birthday landing-page theme cards. These are resolved from the live
+// catalog so an admin-created theme (for example, Spider-Man) opens the
+// exact theme route instead of sending the visitor back to /occasion/birthday.
+// Only real theme nodes are included here; each theme route then renders only
+// the products attached to that theme.
+export function birthdayThemeLinks(limit = 8) {
+  const birthday = findOccasion("birthday");
+  if (!birthday) return [];
+
+  const out = [];
+  function walk(node, trail) {
+    if (!node || out.length >= limit) return;
+    const nextTrail = [...trail, node];
+    if (node.type === "theme") {
+      out.push({
+        label: node.label,
+        image: node.image || node.heroImg,
+        href: pathFor(nextTrail),
+        slug: node.slug,
+        type: node.type,
+      });
+      return;
+    }
+    (node.children || []).forEach((child) => walk(child, nextTrail));
+  }
+
+  walk(birthday, []);
+  return out;
+}
+
 // Images for the auto-playing hero carousel at the top of a category page.
 // Uses a hand-curated `node.heroGallery` where one is set (see Wedding),
 // otherwise auto-derives 4-5 images starting with the node's own hero/cover

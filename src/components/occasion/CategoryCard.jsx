@@ -9,7 +9,12 @@ import { onImgError } from "../../lib/imageFallback";
 export default function CategoryCard({ node, href }) {
   const count = countProducts(node);
   return (
-    <Link className="occ-cat-card reveal" to={href}>
+    <Link
+      className="occ-cat-card reveal"
+      to={href}
+      onPointerEnter={() => import("../../pages/OccasionBrowser").catch(() => {})}
+      onFocus={() => import("../../pages/OccasionBrowser").catch(() => {})}
+    >
       <span className="occ-cat-pic">
         <img src={node.image} alt={node.label} loading="lazy" decoding="async"  onError={onImgError}/>
       </span>

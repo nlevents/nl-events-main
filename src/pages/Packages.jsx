@@ -110,7 +110,7 @@ export default function Packages() {
   return (
     <>
       <section className="hero hero-sm occ-hero">
-        <div className="hero-media"><img src={IMAGES.heroPackages} alt="All packages — Next Level Events"  onError={onImgError}/></div>
+        <div className="hero-media"><img src={IMAGES.heroPackages} alt="All packages — Next Level Events"  loading="eager" fetchPriority="high" decoding="async" onError={onImgError}/></div>
         <div className="hero-content">
           <span className="eyebrow">Packages</span>
           <h1>All Packages</h1>

@@ -64,6 +64,15 @@ const RECENT_WORK = [
 
 const RECENT_FILTERS = ["All", "Weddings", "Birthdays", "Corporate", "Kids", "Other Events"];
 
+function prefetchOccasionRoute(href) {
+  if (href === "/occasion/birthday") {
+    import("./Birthday").catch(() => {});
+  } else if (href && href.startsWith("/occasion/")) {
+    import("./OccasionBrowser").catch(() => {});
+  }
+}
+
+
 
 const HOME_FAQS = [
   { q: "How far in advance should I book?", a: "We recommend booking 6–8 weeks ahead for weddings and 2–3 weeks for birthdays or smaller celebrations, though we do accommodate shorter timelines when possible." },
@@ -151,7 +160,7 @@ function CelebrationSection() {
         </div>
         <div className="ref-home-celebration-grid">
           {CELEBRATIONS.map((item) => (
-            <Link to={item.href} className="ref-home-celebration-card" key={item.label}>
+            <Link to={item.href} className="ref-home-celebration-card" key={item.label} onPointerEnter={() => prefetchOccasionRoute(item.href)} onFocus={() => prefetchOccasionRoute(item.href)}>
               <span className="ref-home-celebration-image">
                 <img src={item.img} alt={item.label} data-context={item.label} loading="lazy" decoding="async" onError={onImgError} />
               </span>

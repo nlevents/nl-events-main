@@ -8,7 +8,6 @@
 export const PUBLIC_STATE_KEYS = [
   "nle_catalog_v2_products",
   "nle_catalog_v2_occasions",
-  "nle_catalog_v2_media",
   "nle_catalog_v2_gallery",
   "nle_catalog_v2_insta_videos",
   "nle_catalog_v2_video_reviews",
@@ -86,12 +85,25 @@ export function queueCloudSync(key, data) {
 export async function hydratePublicState() {
   const data = await request(`${API_BASE}/catalog`);
   const state = data?.state || {};
+  let changed = false;
+
   Object.entries(state).forEach(([key, value]) => {
-    if (PUBLIC_STATE_KEYS.includes(key)) {
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* cache only */ }
-    }
+    if (!PUBLIC_STATE_KEYS.includes(key)) return;
+    try {
+      const nextRaw = JSON.stringify(value);
+      if (localStorage.getItem(key) !== nextRaw) {
+        localStorage.setItem(key, nextRaw);
+        changed = true;
+      }
+    } catch { /* cache only */ }
   });
-  window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
+
+  // Do not force every mounted storefront component to re-read its catalog
+  // just because a background refresh completed. Only notify when data really
+  // changed.
+  if (changed) {
+    window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
+  }
   return state;
 }
 

@@ -25,7 +25,7 @@ export default function ShopByOccasion() {
   return (
     <>
       <section className="hero hero-sm occ-hero">
-        <div className="hero-media"><img src={IMAGES.heroPackages} alt="Shop by Occasion — Next Level Events"  onError={onImgError}/></div>
+        <div className="hero-media"><img src={IMAGES.heroPackages} alt="Shop by Occasion — Next Level Events"  loading="eager" fetchPriority="high" decoding="async" onError={onImgError}/></div>
         <div className="hero-content">
           <span className="eyebrow">Shop by Occasion</span>
           <h1>Find Your Celebration</h1>

@@ -96,7 +96,7 @@ function HorizontalRail({ children, className = "" }) {
 function WeddingHero() {
   return (
     <section className="wedding-hero">
-      <img src={IMAGES.heroWedding} alt="Wedding celebration by Next Level Events" />
+      <img src={IMAGES.heroWedding} alt="Wedding celebration by Next Level Events" fetchPriority="high" decoding="async" />
       <div className="wedding-hero-overlay" />
       <div className="wedding-hero-content">
         <span>OUR WEDDING COLLECTION</span>
@@ -125,7 +125,7 @@ function WeddingFunctions() {
         <HorizontalRail>
           {FUNCTIONS.map((item) => (
             <Link to={item.href} className="wedding-function-card" key={item.label}>
-              <img src={item.img} alt={item.label} />
+              <img src={item.img} alt={item.label} loading="lazy" decoding="async" />
               <span>{item.label}</span>
               <b>→</b>
             </Link>
@@ -152,7 +152,7 @@ function WeddingServices() {
         <HorizontalRail>
           {items.map(([label, sub, img]) => (
             <Link to="/occasion/event-services" className="wedding-service-card" key={label}>
-              <img src={img} alt={label} />
+              <img src={img} alt={label} loading="lazy" decoding="async" />
               <strong>{label}</strong>
               <span>{sub}</span>
             </Link>
@@ -179,7 +179,7 @@ function WeddingAddons() {
         <div className="wedding-addon-grid">
           {addons.map((addon) => (
             <Link to={addon.href} className="wedding-addon-card" key={addon.id || addon.slug}>
-              <div className="wedding-addon-image"><img src={addon.image} alt={addon.label} /><span>✦</span></div>
+              <div className="wedding-addon-image"><img src={addon.image} alt={addon.label} loading="lazy" decoding="async" /><span>✦</span></div>
               <div className="wedding-addon-copy">
                 <h3>{addon.label}</h3>
                 <p>{addon.subLabel}</p>
@@ -207,7 +207,7 @@ function FeaturedPackages() {
           <button type="button" className="wedding-slider-arrow prev" onClick={() => go(index - 1)} aria-label="Previous package">←</button>
           <article className="wedding-package-card">
             <div className="wedding-package-image-wrap">
-              <img src={active.image} alt={active.name} />
+              <img src={active.image} alt={active.name} loading="lazy" decoding="async" />
               <span className="wedding-package-count">{index + 1} / {PACKAGES.length}</span>
             </div>
             <div className="wedding-package-copy">
@@ -404,7 +404,7 @@ function WeddingMoments() {
         <HorizontalRail className="wedding-moments-rail">
           {MOMENTS.map(([label, img, video]) => (
             <Link to="/gallery" className="wedding-moment-card" key={label}>
-              <img src={img} alt={label} />
+              <img src={img} alt={label} loading="lazy" decoding="async" />
               {video && <span className="wedding-play">▶</span>}
               <strong>{label}</strong>
             </Link>
@@ -423,7 +423,7 @@ function WeddingReviews() {
         <div className="wedding-review-grid">
           {REVIEWS.map((review) => (
             <article className="wedding-review-card" key={review.name}>
-              <img src={review.image} alt="" />
+              <img src={review.image} alt="" loading="lazy" decoding="async" />
               <div>
                 <strong>{review.name}</strong>
                 <span>{review.city}</span>
@@ -441,7 +441,7 @@ function WeddingReviews() {
 function WeddingCTA() {
   return (
     <section className="wedding-final-cta">
-      <img src={IMAGES.galWedding2} alt="Elegant wedding dinner setting" />
+      <img src={IMAGES.galWedding2} alt="Elegant wedding dinner setting" loading="lazy" decoding="async" />
       <div className="wedding-final-overlay" />
       <div className="wedding-container">
         <span>LET'S PLAN YOUR DREAM WEDDING</span>

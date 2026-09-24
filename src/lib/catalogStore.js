@@ -41,6 +41,7 @@ const KEYS = {
 
 const STORE_VERSION = "4.7-service-occasion-split";
 const REFERENCE_HIERARCHY_MIGRATION = "2";
+let seedsInitialized = false;
 
 const DEFAULT_BIRTHDAY_AGE_CATEGORIES = [
   { id: "birthday-kids", title: "Kids Birthday", subtitle: "Age 1–12", image: IMAGES.typeKidsBirthday, href: "/occasion/birthday/kids-birthday", active: true, sortOrder: 1 },
@@ -525,6 +526,8 @@ function seedReferenceDemoProductsIfNeeded() {
 }
 
 function initializeSeedsIfNeeded() {
+  if (seedsInitialized) return;
+  seedsInitialized = true;
   // Migrate featured service cards from the old global scope to explicit
   // wedding/birthday availability. Pyro/SFX is wedding-only; photography and
   // artists are useful for both occasions. This keeps the storefront separated
@@ -815,6 +818,10 @@ let productsCacheRaw = null;
 let productsCacheValue = null;
 let occasionsCacheRaw = null;
 let occasionsCacheValue = null;
+let birthdayAgeCacheRaw = null;
+let birthdayAgeCacheValue = null;
+let addonsCacheRaw = null;
+let addonsCacheValue = null;
 
 export function getProducts() {
   initializeSeedsIfNeeded();
@@ -996,10 +1003,12 @@ function sanitizeCategoryNode(node) {
 
 export function getBirthdayAgeCategories() {
   initializeSeedsIfNeeded();
-  const raw = localStorage.getItem(KEYS.birthdayAgeCategories);
+  const raw = localStorage.getItem(KEYS.birthdayAgeCategories) || "";
+  if (birthdayAgeCacheValue && birthdayAgeCacheRaw === raw) return birthdayAgeCacheValue;
+  birthdayAgeCacheRaw = raw;
   const stored = raw ? readStorage(KEYS.birthdayAgeCategories, null) : null;
   const list = Array.isArray(stored) ? stored : DEFAULT_BIRTHDAY_AGE_CATEGORIES;
-  return list
+  birthdayAgeCacheValue = list
     .map((item, index) => ({
       id: item.id || uid("birthday-card"),
       title: sanitizeText(item.title || "Birthday Category"),
@@ -1010,6 +1019,7 @@ export function getBirthdayAgeCategories() {
       sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder);
+  return birthdayAgeCacheValue;
 }
 
 export function saveBirthdayAgeCategories(items) {
@@ -1672,8 +1682,12 @@ export function deleteCity(name) {
 
 export function getAddons() {
   initializeSeedsIfNeeded();
-  const list = readStorage(KEYS.addons, []);
-  return list.map(enrichAddon);
+  const raw = localStorage.getItem(KEYS.addons) || "";
+  if (addonsCacheValue && addonsCacheRaw === raw) return addonsCacheValue;
+  addonsCacheRaw = raw;
+  const list = raw ? readStorage(KEYS.addons, []) : [];
+  addonsCacheValue = list.map(enrichAddon);
+  return addonsCacheValue;
 }
 
 // Attaches live data derived from the linked sub-category — current

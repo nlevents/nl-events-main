@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { resolvePath } from "../data/occasions";
-import CategoryTemplate from "../components/occasion/CategoryTemplate";
-import ProductTemplate from "../components/occasion/ProductTemplate";
+const CategoryTemplate = lazy(() => import("../components/occasion/CategoryTemplate"));
+const ProductTemplate = lazy(() => import("../components/occasion/ProductTemplate"));
 import NotFound from "./NotFound";
 
 // Single route (path="/occasion/*") for the entire Shop-by-Occasion tree.
@@ -29,6 +29,11 @@ export default function OccasionBrowser() {
   if (!resolved) return <NotFound />;
 
   const { node, trail } = resolved;
-  if (node.type === "product") return <ProductTemplate node={node} trail={trail} />;
-  return <CategoryTemplate node={node} trail={trail} />;
+  return (
+    <Suspense fallback={<div style={{ minHeight: "60vh" }} aria-hidden="true" />}>
+      {node.type === "product"
+        ? <ProductTemplate node={node} trail={trail} />
+        : <CategoryTemplate node={node} trail={trail} />}
+    </Suspense>
+  );
 }

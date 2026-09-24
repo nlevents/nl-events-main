@@ -136,7 +136,7 @@ function CartLine({ item }) {
   return (
     <div className="cart-line">
       {safeImage ? (
-        safeHref ? <Link to={safeHref}><img src={safeImage} alt={item.name} className="cart-line-img" onError={onImgError}/></Link> : <img src={safeImage} alt={item.name} className="cart-line-img" onError={onImgError}/>
+        safeHref ? <Link to={safeHref}><img src={safeImage} alt={item.name} className="cart-line-img" loading="lazy" decoding="async" onError={onImgError}/></Link> : <img src={safeImage} alt={item.name} className="cart-line-img" loading="lazy" decoding="async" onError={onImgError}/>
       ) : null}
 
       <div className="cart-line-body">

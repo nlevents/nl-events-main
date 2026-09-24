@@ -1,22 +1,22 @@
 // Centralized image bank — swap these for real client photos.
 const UNSPLASH = "https://images.unsplash.com/";
 function img(id, w) {
-  return UNSPLASH + id + "?auto=format&fit=crop&w=" + (w || 1200) + "&q=80";
+  return UNSPLASH + id + "?auto=format&fit=crop&w=" + (w || 1100) + "&q=75";
 }
 
 export const IMAGES = {
-  heroHome: img("photo-1519741497674-611481863552", 1800),
-  heroServices: img("photo-1519225421980-715cb0215aed", 1800),
-  heroWedding: img("photo-1519741497674-611481863552", 1800),
-  heroBirthday: img("photo-1530103862676-de8c9debad1d", 1800),
-  heroConcert: img("photo-1470229722913-7c0e2dbbafd3", 1800),
-  heroCorporate: img("photo-1511578314322-379afb476865", 1800),
-  heroCustom: img("photo-1478146059778-26028b07395a", 1800),
-  heroPackages: img("photo-1478146059778-26028b07395a", 1800),
-  heroGallery: img("photo-1464366400600-7168b8af9bc3", 1800),
-  heroAbout: img("photo-1522673607200-164d1b6ce486", 1800),
-  heroContact: img("photo-1519671482749-fd09be7ccebf", 1800),
-  heroBook: img("photo-1511795409834-ef04bbd61622", 1800),
+  heroHome: img("photo-1519741497674-611481863552", 1600),
+  heroServices: img("photo-1519225421980-715cb0215aed", 1600),
+  heroWedding: img("photo-1519741497674-611481863552", 1600),
+  heroBirthday: img("photo-1530103862676-de8c9debad1d", 1600),
+  heroConcert: img("photo-1470229722913-7c0e2dbbafd3", 1600),
+  heroCorporate: img("photo-1511578314322-379afb476865", 1600),
+  heroCustom: img("photo-1478146059778-26028b07395a", 1600),
+  heroPackages: img("photo-1478146059778-26028b07395a", 1600),
+  heroGallery: img("photo-1464366400600-7168b8af9bc3", 1600),
+  heroAbout: img("photo-1522673607200-164d1b6ce486", 1600),
+  heroContact: img("photo-1519671482749-fd09be7ccebf", 1600),
+  heroBook: img("photo-1511795409834-ef04bbd61622", 1600),
 
   typeWedding: "/assets/images/categories/wedding.webp",
   typeBirthday: "/assets/images/categories/birthday-decor.webp",
@@ -32,8 +32,8 @@ export const IMAGES = {
   typeKidsBirthday: "/assets/images/categories/kids-birthday.webp",
   typeAnnaprashan: img("photo-1478146059778-26028b07395a"),
   typeFestival: img("photo-1573455494060-c5595004fb6c"),
-  heroAnnaprashan: img("photo-1478146059778-26028b07395a", 1800),
-  heroFestival: img("photo-1573455494060-c5595004fb6c", 1800),
+  heroAnnaprashan: img("photo-1478146059778-26028b07395a", 1600),
+  heroFestival: img("photo-1573455494060-c5595004fb6c", 1600),
 
   heroCompactHome: img("photo-1519225421980-715cb0215aed", 1200),
   promo1: img("photo-1519741497674-611481863552", 1000),

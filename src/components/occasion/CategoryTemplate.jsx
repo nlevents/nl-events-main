@@ -16,7 +16,7 @@ import {
   sortProducts, isAvailableInCity, PRICE_BUCKETS, toRailItem, collectProductEntries,
   quickLinksFor, heroGalleryFor,
 } from "../../data/occasions";
-import { getAddonsForOccasion } from "../../lib/catalogStore";
+import { addonsFor } from "../../data/addons";
 
 const SHOP_REVIEWS = {
   wedding: { quote: "The wedding setup looked exactly like the vision we shared. Every function felt beautifully coordinated.", name: "Priya & Karan" },
@@ -89,14 +89,31 @@ export default function CategoryTemplate({ node, trail }) {
   // from the catalog store rather than the static data file, and kept in
   // sync with "nle-catalog-updated" so admin edits show without a reload.
   const topSlug = Array.isArray(trail) && trail.length > 0 ? trail[0].slug : null;
-  const [addonItems, setAddonItems] = useState(() => getAddonsForOccasion(topSlug));
+  // Use the lightweight static service list for the first paint. The full
+  // admin/catalog store is loaded only when the browser is idle, so opening a
+  // category does not have to parse the entire admin data layer synchronously.
+  const [addonItems, setAddonItems] = useState(() => topSlug ? addonsFor([{ slug: topSlug }]) : []);
   useEffect(() => {
-    function refreshAddons() {
-      setAddonItems(getAddonsForOccasion(topSlug));
-    }
-    refreshAddons();
+    let cancelled = false;
+    const refreshAddons = () =>
+      import("../../lib/catalogStore")
+        .then(({ getAddonsForOccasion }) => {
+          if (!cancelled) setAddonItems(getAddonsForOccasion(topSlug));
+        })
+        .catch(() => {});
+    const schedule = () => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(refreshAddons, { timeout: 5000 });
+      } else {
+        window.setTimeout(refreshAddons, 1200);
+      }
+    };
+    schedule();
     window.addEventListener("nle-catalog-updated", refreshAddons);
-    return () => window.removeEventListener("nle-catalog-updated", refreshAddons);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nle-catalog-updated", refreshAddons);
+    };
   }, [topSlug]);
   const heroImages = useMemo(() => heroGalleryFor(node, trail), [node, trail]);
 
@@ -135,8 +152,12 @@ export default function CategoryTemplate({ node, trail }) {
   // the shopper's current city, drawn from everywhere under this node.
   const popularInCity = useMemo(() => {
     const entries = collectProductEntries(node, trail).filter((e) => isAvailableInCity(e.product, city));
+    const trailBySlug = new Map(entries.map((e) => [e.product.slug, e.trail]));
     const top = sortProducts(entries.map((e) => e.product), "popular").slice(0, 8);
-    return top.map((p) => toRailItem(p, entries.find((e) => e.product.slug === p.slug).trail));
+    return top.map((p) => {
+      const itemTrail = trailBySlug.get(p.slug);
+      return itemTrail ? toRailItem(p, itemTrail) : null;
+    }).filter(Boolean);
   }, [node, trail, city]);
 
   // "Similar Products" — items from sibling categories/themes that hold
@@ -148,8 +169,12 @@ export default function CategoryTemplate({ node, trail }) {
     relatedFromParent.forEach((sib) => {
       entries.push(...collectProductEntries(sib, [...trail.slice(0, -1), sib]));
     });
+    const trailBySlug = new Map(entries.map((e) => [e.product.slug, e.trail]));
     const top = sortProducts(entries.map((e) => e.product), "popular").slice(0, 8);
-    return top.map((p) => toRailItem(p, entries.find((e) => e.product.slug === p.slug).trail));
+    return top.map((p) => {
+      const itemTrail = trailBySlug.get(p.slug);
+      return itemTrail ? toRailItem(p, itemTrail) : null;
+    }).filter(Boolean);
   }, [parent, relatedFromParent, trail]);
 
   return (

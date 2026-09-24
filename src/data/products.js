@@ -1,5 +1,4 @@
 import { IMAGES } from "./images";
-import { getProducts as getCatalogProducts } from "../lib/catalogStore";
 
 export const CATEGORY_DATA = {
   weddings: {
@@ -49,42 +48,21 @@ export const CATEGORY_DATA = {
    This file intentionally contains no hard-coded product data. */
 export const PRODUCTS = {};
 
-function getLiveProductsMap() {
-  const map = { ...PRODUCTS };
-  try {
-    getCatalogProducts().forEach((p) => {
-      if (!p) return;
-      // Products filed under the "Event Services" branch (occasionSlug or
-      // categoryPath[0] === "event-services") are services, not standalone
-      // packages. They must only appear on their own product page and in
-      // the "Popular Services" strip under an occasion's subcategories —
-      // never in the generic Home "Popular Packages" rail or the flagship
-      // Packages listing, both of which read from this flat map.
-      const isAddon = p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
-      if (isAddon) return;
-      if (p.slug) map[p.slug] = { ...p, id: p.slug };
-      if (p.id) map[p.id] = { ...p, id: p.id };
-    });
-  } catch { /* catalog falls back to its local seed/cache */ }
-  return map;
-}
-
 export function getProduct(id) {
   if (typeof id !== "string") return null;
-  const liveMap = getLiveProductsMap();
-  return Object.prototype.hasOwnProperty.call(liveMap, id) ? liveMap[id] : null;
+  return Object.prototype.hasOwnProperty.call(PRODUCTS, id) ? PRODUCTS[id] : null;
 }
 
 export function listProducts() {
-  const liveMap = getLiveProductsMap();
   const seen = new Set();
-  const list = [];
-  for (const k of Object.keys(liveMap)) {
-    const item = liveMap[k];
-    const key = item.slug || item.id;
-    if (!seen.has(key)) { seen.add(key); list.push(item); }
-  }
-  return list;
+  return Object.keys(PRODUCTS)
+    .map((key) => PRODUCTS[key])
+    .filter((item) => {
+      const id = item?.slug || item?.id;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
 }
 
 export function listSimilar(id, limit) {

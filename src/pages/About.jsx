@@ -11,7 +11,7 @@ export default function About() {
   return (
     <>
       <section className="hero hero-sm">
-        <div className="hero-media"><img src={IMAGES.heroAbout} alt="Next Level Events team styling a premium celebration"  onError={onImgError}/></div>
+        <div className="hero-media"><img src={IMAGES.heroAbout} alt="Next Level Events team styling a premium celebration" fetchPriority="high" decoding="async" onError={onImgError}/></div>
         <div className="hero-content">
           <span className="eyebrow">About Us</span>
           <h1>Our Story</h1>
@@ -28,7 +28,7 @@ export default function About() {
             <p style={{ color: "var(--text-secondary)", marginTop: 14 }}>Today that means weddings across multiple cities, milestone birthdays, corporate launches and concerts — each one designed with the same editorial attention to detail, whatever the scale.</p>
           </div>
           <div className="gal-item" style={{ aspectRatio: "4/3", borderRadius: "var(--radius-m)", overflow: "hidden" }}>
-            <img src={IMAGES.about2} alt="Event styling detail work"  onError={onImgError}/>
+            <img src={IMAGES.about2} alt="Event styling detail work"  loading="lazy" decoding="async" onError={onImgError}/>
           </div>
         </div>
 
