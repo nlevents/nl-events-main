@@ -18,6 +18,10 @@ export const PUBLIC_STATE_KEYS = [
 
 export const ADMIN_STATE_KEYS = [
   ...PUBLIC_STATE_KEYS,
+  // Media is intentionally excluded from PUBLIC_STATE_KEYS because the
+  // public storefront must not download the entire admin media library.
+  // It still must be writable/readable by authenticated admin requests.
+  "nle_catalog_v2_media",
   "nle_catalog_v2_coupons",
   "nle_catalog_v2_inquiries",
   "nle_catalog_v2_blackouts",
