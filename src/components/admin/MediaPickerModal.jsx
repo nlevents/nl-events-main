@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getMediaItems, uploadMediaFile, saveMediaItem } from "../../lib/catalogStore";
+import { getMediaItems, uploadMediaFile, saveMediaItemToCloud } from "../../lib/catalogStore";
 import Icon from "../Icon";
 
 export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple = false }) {
@@ -44,20 +44,24 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple =
     }
   }
 
-  function handleUrlSubmit(e) {
+  async function handleUrlSubmit(e) {
     e.preventDefault();
     if (!urlInput.trim()) {
       setError("Please provide a valid image URL.");
       return;
     }
-    const saved = saveMediaItem({
-      title: titleInput || "Imported Image",
-      url: urlInput.trim(),
-      alt: titleInput || "Imported photo",
-      tags: ["url-import"],
-    });
-    onSelect(saved.url);
-    onClose();
+    try {
+      const saved = await saveMediaItemToCloud({
+        title: titleInput || "Imported Image",
+        url: urlInput.trim(),
+        alt: titleInput || "Imported photo",
+        tags: ["url-import"],
+      });
+      onSelect(saved.url);
+      onClose();
+    } catch (err) {
+      setError(err.message || "Unable to save this image to the cloud.");
+    }
   }
 
   return (

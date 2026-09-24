@@ -1251,6 +1251,18 @@ export function deleteMediaItem(id) {
   return true;
 }
 
+export async function saveMediaItemToCloud(item) {
+  const saved = saveMediaItem(item);
+  await syncCloudState(KEYS.media, getMediaItems());
+  return saved;
+}
+
+export async function deleteMediaItemFromCloud(id) {
+  const deleted = deleteMediaItem(id);
+  await syncCloudState(KEYS.media, getMediaItems());
+  return deleted;
+}
+
 /**
  * Safely processes and stores an uploaded file as a WebP / Data URL.
  */
@@ -1297,7 +1309,9 @@ export function uploadMediaFile(file, title = "") {
           height: canvas.height,
           tags: ["upload"],
         });
-        resolve(mediaItem);
+        syncCloudState(KEYS.media, getMediaItems())
+          .then(() => resolve(mediaItem))
+          .catch((err) => reject(new Error(`Image uploaded locally, but cloud save failed: ${err.message || "please try again"}`)));
       };
       source.onerror = () => reject(new Error("Failed to decode image file."));
       source.src = e.target.result;
@@ -1347,6 +1361,18 @@ export function deleteGalleryItem(id) {
   persist(KEYS.gallery, next);
   dispatchCatalogUpdate();
   return true;
+}
+
+export async function saveGalleryItemToCloud(item) {
+  const saved = saveGalleryItem(item);
+  await syncCloudState(KEYS.gallery, getGalleryItems());
+  return saved;
+}
+
+export async function deleteGalleryItemFromCloud(id) {
+  const deleted = deleteGalleryItem(id);
+  await syncCloudState(KEYS.gallery, getGalleryItems());
+  return deleted;
 }
 
 // =============================================================================

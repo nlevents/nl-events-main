@@ -83,7 +83,7 @@ export function queueCloudSync(key, data) {
 }
 
 export async function hydratePublicState() {
-  const data = await request(`${API_BASE}/catalog`);
+  const data = await request(`${API_BASE}/catalog`, { cache: "no-store" });
   const state = data?.state || {};
   let changed = false;
 

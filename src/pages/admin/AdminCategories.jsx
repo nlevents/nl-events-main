@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getOccasions,
-  saveOccasion,
-  deleteOccasion,
-  saveCategory,
-  deleteCategory,
+  saveOccasionToCloud,
+  deleteOccasionFromCloud,
+  saveCategoryToCloud,
+  deleteCategoryFromCloud,
   getProducts,
 } from "../../lib/catalogStore";
 import { sanitizeSlug } from "../../lib/sanitize";
@@ -81,12 +81,12 @@ export default function AdminCategories() {
     });
   }
 
-  function handleSaveOccasion(e) {
+  async function handleSaveOccasion(e) {
     e.preventDefault();
     setError("");
     if (!editingOccasion?.label?.trim()) return setError("Occasion title is required.");
     try {
-      saveOccasion({ ...editingOccasion, slug: sanitizeSlug(editingOccasion.slug || editingOccasion.label) });
+      await saveOccasionToCloud({ ...editingOccasion, slug: sanitizeSlug(editingOccasion.slug || editingOccasion.label) });
       refresh();
       setEditingOccasion(null);
       flash(`Saved occasion "${editingOccasion.label}".`);
@@ -95,13 +95,13 @@ export default function AdminCategories() {
     }
   }
 
-  function handleSaveCategory(e) {
+  async function handleSaveCategory(e) {
     e.preventDefault();
     setError("");
     const cat = editingCategory?.cat;
     if (!cat?.label?.trim()) return setError("Category label is required.");
     try {
-      saveCategory(editingCategory.occasionSlug, {
+      await saveCategoryToCloud(editingCategory.occasionSlug, {
         ...cat,
         slug: sanitizeSlug(cat.slug || cat.label),
         parentCategorySlug: editingCategory.parentCategorySlug || null,
@@ -114,11 +114,16 @@ export default function AdminCategories() {
     }
   }
 
-  function handleDeleteCategory(occasionSlug, trail) {
+  async function handleDeleteCategory(occasionSlug, trail) {
     const node = trail[trail.length - 1];
     const parent = trail.length > 1 ? trail[trail.length - 2] : null;
     if (!window.confirm(`Delete "${node.label}" and everything nested under it? This cannot be undone.`)) return;
-    deleteCategory(occasionSlug, node.slug, parent?.slug || null);
+    try {
+      await deleteCategoryFromCloud(occasionSlug, node.slug, parent?.slug || null);
+    } catch (err) {
+      setError(err.message || "Failed to delete category from the cloud.");
+      return;
+    }
     refresh();
     flash(`Deleted "${node.label}".`);
   }
@@ -196,7 +201,7 @@ export default function AdminCategories() {
                 <button type="button" className="btn btn-sm btn-outline" onClick={() => openAddCategory(occ.slug, [], occ.image)}><Icon name="plus" /> Add category</button>
                 <button type="button" className="btn-icon" title="Edit occasion" onClick={() => setEditingOccasion({ ...occ })}><Icon name="edit" /></button>
                 <a href={`/occasion/${occ.slug}`} target="_blank" rel="noreferrer" className="btn-icon" title="View"><Icon name="eye" /></a>
-                <button type="button" className="btn-icon btn-icon-danger" title="Delete occasion" onClick={() => { if (window.confirm(`Delete "${occ.label}" and all nested categories?`)) { deleteOccasion(occ.slug); refresh(); } }}><Icon name="trash" /></button>
+                <button type="button" className="btn-icon btn-icon-danger" title="Delete occasion" onClick={async () => { if (window.confirm(`Delete "${occ.label}" and all nested categories?`)) { try { await deleteOccasionFromCloud(occ.slug); refresh(); } catch (err) { setError(err.message || "Failed to delete occasion from the cloud."); } } }}><Icon name="trash" /></button>
               </div>
             </div>
             <div className="admin-subcategory-list">

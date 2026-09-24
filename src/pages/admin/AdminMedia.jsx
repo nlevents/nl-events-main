@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import {
   getMediaItems,
   uploadMediaFile,
-  saveMediaItem,
-  deleteMediaItem,
+  saveMediaItemToCloud,
+  deleteMediaItemFromCloud,
   getGalleryItems,
-  saveGalleryItem,
-  deleteGalleryItem,
+  saveGalleryItemToCloud,
+  deleteGalleryItemFromCloud,
   getProducts,
 } from "../../lib/catalogStore";
 import Icon from "../../components/Icon";
@@ -74,11 +74,11 @@ export default function AdminMedia() {
     }
   }
 
-  function handleImportUrl(e) {
+  async function handleImportUrl(e) {
     e.preventDefault();
     if (!urlInput.trim()) return;
     try {
-      const saved = saveMediaItem({
+      const saved = await saveMediaItemToCloud({
         title: titleInput || "Imported Photo",
         url: urlInput.trim(),
         alt: titleInput || "Photo",
@@ -100,37 +100,49 @@ export default function AdminMedia() {
     setTimeout(() => setCopiedId(""), 2000);
   }
 
-  function handleDeleteMedia(id, title) {
-    if (window.confirm(`Delete "${title}" from Media Library?`)) {
-      deleteMediaItem(id);
+  async function handleDeleteMedia(id, title) {
+    if (!window.confirm(`Delete "${title}" from Media Library?`)) return;
+    try {
+      await deleteMediaItemFromCloud(id);
       refresh();
       setFeedback(`Deleted picture.`);
       setTimeout(() => setFeedback(""), 3000);
+    } catch (err) {
+      setError(err.message || "Failed to delete picture from the cloud.");
     }
   }
 
-  function handleAddGalleryItem(e) {
+  async function handleAddGalleryItem(e) {
     e.preventDefault();
     if (!newGalImg.trim()) {
       setError("Please provide an image URL for gallery item.");
       return;
     }
-    saveGalleryItem({
-      img: newGalImg.trim(),
-      alt: newGalAlt.trim() || "Event showcase",
-      category: newGalCat,
-      tall: newGalTall,
-    });
-    refresh();
-    setNewGalImg("");
-    setNewGalAlt("");
-    setFeedback("Added photo to public Gallery!");
-    setTimeout(() => setFeedback(""), 3000);
+    try {
+      await saveGalleryItemToCloud({
+        img: newGalImg.trim(),
+        alt: newGalAlt.trim() || "Event showcase",
+        category: newGalCat,
+        tall: newGalTall,
+      });
+      refresh();
+      setNewGalImg("");
+      setNewGalAlt("");
+      setFeedback("Added photo to public Gallery!");
+      setTimeout(() => setFeedback(""), 3000);
+    } catch (err) {
+      setError(err.message || "Failed to save gallery item to the cloud.");
+    }
   }
 
-  function handleDeleteGallery(id) {
+  async function handleDeleteGallery(id) {
     if (window.confirm("Remove this photo from the public Gallery?")) {
-      deleteGalleryItem(id);
+      try {
+        await deleteGalleryItemFromCloud(id);
+      } catch (err) {
+        setError(err.message || "Failed to remove gallery item from the cloud.");
+        return;
+      }
       refresh();
       setFeedback("Removed gallery photo.");
       setTimeout(() => setFeedback(""), 3000);
