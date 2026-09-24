@@ -18,16 +18,19 @@ export async function readStates(env, keys) {
 export async function writeState(env, key, data, userId = null) {
   const db = getServerSupabase(env);
   if (!db) throw new Error("Supabase is not configured on the server.");
-  try {
-    const rows = await db.query(`app_state?key=eq.${encodeURIComponent(key)}`, {
-      method: "PATCH",
-      body: { data, updated_at: new Date().toISOString(), updated_by: userId },
-    });
-    if (Array.isArray(rows) && rows.length) return rows[0];
-  } catch { /* row may not exist */ }
-  const rows = await db.query("app_state", {
+
+  // Upsert atomically on the unique `key` column. The old PATCH-then-POST
+  // approach could race with another admin save and, when the row did not
+  // exist yet, could also attempt a duplicate insert.
+  const rows = await db.query("app_state?on_conflict=key", {
     method: "POST",
-    body: { key, data, updated_by: userId },
+    prefer: "resolution=merge-duplicates,return=representation",
+    body: {
+      key,
+      data,
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    },
   });
   return rows?.[0] || rows;
 }

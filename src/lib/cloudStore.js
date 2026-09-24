@@ -18,13 +18,10 @@ export const PUBLIC_STATE_KEYS = [
 
 export const ADMIN_STATE_KEYS = [
   ...PUBLIC_STATE_KEYS,
-  // Media is intentionally excluded from PUBLIC_STATE_KEYS because the
-  // public storefront must not download the entire admin media library.
-  // It still must be writable/readable by authenticated admin requests.
-  "nle_catalog_v2_media",
   "nle_catalog_v2_coupons",
   "nle_catalog_v2_inquiries",
   "nle_catalog_v2_blackouts",
+  "nle_catalog_v2_media",
   "nle-admin-clients",
   "nle-admin-invoices",
   "nle-admin-settings",
@@ -65,25 +62,44 @@ async function request(url, options = {}) {
 // Fire-and-forget persistence. The UI remains responsive, while the server
 // becomes the durable copy. Failures are logged instead of pretending the
 // database write succeeded.
-export async function syncCloudState(key, data) {
+// Serialize writes per state key. Several admin actions can update the same
+// catalog bucket in quick succession (and the local optimistic write also
+// triggers a background sync). Without a per-key queue, an older request can
+// finish after a newer request and put stale data back into Supabase.
+const cloudWriteChains = new Map();
+
+function enqueueCloudWrite(key, data) {
   const token = getAdminAccessToken();
-  if (!token) throw new Error("Admin session expired. Please log in again.");
-  if (!ADMIN_STATE_KEYS.includes(key)) throw new Error("This data bucket cannot be saved from the admin panel.");
-  return request(`${API_BASE}/admin/state`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ key, data }),
-  });
+  if (!token) return Promise.reject(new Error("Admin session expired. Please log in again."));
+  if (!ADMIN_STATE_KEYS.includes(key)) return Promise.reject(new Error("This data bucket cannot be saved from the admin panel."));
+
+  const previous = cloudWriteChains.get(key) || Promise.resolve();
+  const next = previous
+    .catch(() => {})
+    .then(() => request(`${API_BASE}/admin/state`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ key, data }),
+    }));
+
+  cloudWriteChains.set(key, next);
+  next.finally(() => {
+    if (cloudWriteChains.get(key) === next) cloudWriteChains.delete(key);
+  }).catch(() => {});
+  return next;
+}
+
+export function syncCloudState(key, data) {
+  return enqueueCloudWrite(key, data);
 }
 
 export function queueCloudSync(key, data) {
   const token = getAdminAccessToken();
-  if (!token || !ADMIN_STATE_KEYS.includes(key)) return;
-  request(`${API_BASE}/admin/state`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ key, data }),
-  }).catch((err) => console.warn(`Cloud sync failed for ${key}:`, err.message));
+  if (!token || !ADMIN_STATE_KEYS.includes(key)) return Promise.resolve(null);
+  return enqueueCloudWrite(key, data).catch((err) => {
+    console.warn(`Cloud sync failed for ${key}:`, err.message);
+    return null;
+  });
 }
 
 export async function hydratePublicState() {
