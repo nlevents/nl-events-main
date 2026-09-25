@@ -15,6 +15,14 @@ export async function readStates(env, keys) {
   return Object.fromEntries((rows || []).map((r) => [r.key, r.data]));
 }
 
+
+export async function readStateUpdatedAt(env, key) {
+  const db = getServerSupabase(env);
+  if (!db) return null;
+  const rows = await db.query(`app_state?key=eq.${encodeURIComponent(key)}&select=key,updated_at`, { method: "GET" });
+  return rows?.[0]?.updated_at ?? null;
+}
+
 export async function writeState(env, key, data, userId = null) {
   const db = getServerSupabase(env);
   if (!db) throw new Error("Supabase is not configured on the server.");

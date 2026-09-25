@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 
 const API_ROUTES = {
   '/api/catalog': './api/catalog.js',
+  '/api/catalog/products': './api/catalog/products.js',
   '/api/inquiry': './api/inquiry.js',
   '/api/create-booking': './api/create-booking.js',
   '/api/bookingNotifications': './api/bookingNotifications.js',
@@ -87,10 +88,12 @@ export default defineConfig(({ mode }) => {
   const cloudName = (process.env.VITE_CLOUDINARY_CLOUD_NAME || env.VITE_CLOUDINARY_CLOUD_NAME || DEFAULT_CLOUD_NAME).trim()
   const uploadPreset = (process.env.VITE_CLOUDINARY_UPLOAD_PRESET || env.VITE_CLOUDINARY_UPLOAD_PRESET || DEFAULT_UPLOAD_PRESET).trim()
 
-  console.log(`\n=== BUILD DIAGNOSTIC: CLOUDINARY_CONFIG ===`)
+  console.log(`
+=== BUILD DIAGNOSTIC: CLOUDINARY_CONFIG ===`)
   console.log(`cloudNamePresent=${Boolean(cloudName)}`)
   console.log(`uploadPresetPresent=${Boolean(uploadPreset)}`)
-  console.log(`===========================================\n`)
+  console.log(`===========================================
+`)
 
   return {
     define: {

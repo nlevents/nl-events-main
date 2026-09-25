@@ -3,6 +3,7 @@
 // application to run fully on Netlify without requiring a separate API host.
 
 import catalogHandler from "../../api/catalog.js";
+import catalogProductsHandler from "../../api/catalog/products.js";
 import inquiryHandler from "../../api/inquiry.js";
 import createBookingHandler from "../../api/create-booking.js";
 import adminBootstrapHandler from "../../api/admin/bootstrap.js";
@@ -13,6 +14,7 @@ import accountProfileHandler from "../../api/account/profile.js";
 
 const ROUTES = new Map([
   ["catalog", catalogHandler],
+  ["catalog/products", catalogProductsHandler],
   ["inquiry", inquiryHandler],
   ["create-booking", createBookingHandler],
   ["admin/bootstrap", adminBootstrapHandler],

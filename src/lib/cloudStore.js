@@ -29,6 +29,7 @@ export const ADMIN_STATE_KEYS = [
 
 const ADMIN_SESSION_KEY = "nle-admin-supabase-session";
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
+const PRODUCTS_CLOUD_VERSION_KEY = "nle_catalog_v2_products_cloud_version";
 
 function getAdminAccessToken() {
   try {
@@ -103,12 +104,15 @@ export function queueCloudSync(key, data) {
 }
 
 export async function hydratePublicState() {
+  // The bootstrap endpoint contains only lightweight public state plus the
+  // product version. This prevents the ~2.7 MB product catalog from being
+  // downloaded on every page load.
   const data = await request(`${API_BASE}/catalog`, { cache: "no-store" });
   const state = data?.state || {};
   let changed = false;
 
   Object.entries(state).forEach(([key, value]) => {
-    if (!PUBLIC_STATE_KEYS.includes(key)) return;
+    if (!PUBLIC_STATE_KEYS.includes(key) || key === "nle_catalog_v2_products") return;
     try {
       const nextRaw = JSON.stringify(value);
       if (localStorage.getItem(key) !== nextRaw) {
@@ -118,13 +122,41 @@ export async function hydratePublicState() {
     } catch { /* cache only */ }
   });
 
-  // Do not force every mounted storefront component to re-read its catalog
-  // just because a background refresh completed. Only notify when data really
-  // changed.
+  const cloudProductVersion = data?.versions?.products || "";
+  let localProductVersion = "";
+  try {
+    localProductVersion = localStorage.getItem(PRODUCTS_CLOUD_VERSION_KEY) || "";
+  } catch { /* cache only */ }
+
+  // Fetch the large product payload only on first load or after an admin
+  // changes the cloud product bucket.
+  const localProducts = (() => {
+    try { return localStorage.getItem("nle_catalog_v2_products"); } catch { return null; }
+  })();
+
+  if (!localProducts || (cloudProductVersion && localProductVersion !== cloudProductVersion)) {
+    const productPayload = await request(`${API_BASE}/catalog/products`, { cache: "default" });
+    const products = productPayload?.data;
+    if (products !== undefined) {
+      try {
+        const nextRaw = JSON.stringify(products);
+        if (localProducts !== nextRaw) {
+          localStorage.setItem("nle_catalog_v2_products", nextRaw);
+          changed = true;
+        }
+        if (cloudProductVersion) {
+          localStorage.setItem(PRODUCTS_CLOUD_VERSION_KEY, cloudProductVersion);
+        }
+      } catch { /* cache only */ }
+    }
+  } else if (cloudProductVersion && !localProductVersion) {
+    try { localStorage.setItem(PRODUCTS_CLOUD_VERSION_KEY, cloudProductVersion); } catch { /* cache only */ }
+  }
+
   if (changed) {
     window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
   }
-  return state;
+  return { ...state, ...(localProducts ? {} : {}) };
 }
 
 export async function hydrateAdminState() {
