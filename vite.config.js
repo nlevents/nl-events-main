@@ -80,21 +80,34 @@ function localApiPlugin() {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   Object.assign(process.env, env)
+
+  const cloudName = process.env.VITE_CLOUDINARY_CLOUD_NAME || env.VITE_CLOUDINARY_CLOUD_NAME || ''
+  const uploadPreset = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || env.VITE_CLOUDINARY_UPLOAD_PRESET || ''
+
+  console.log(`\n=== BUILD DIAGNOSTIC: CLOUDINARY_CONFIG ===`)
+  console.log(`cloudNamePresent=${Boolean(cloudName?.trim())}`)
+  console.log(`uploadPresetPresent=${Boolean(uploadPreset?.trim())}`)
+  console.log(`===========================================\n`)
+
   return {
-  plugins: [react(), localApiPlugin()],
-  build: {
-    target: 'es2018',
-    cssCodeSplit: true,
-    sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/')) return 'react-vendor'
-          }
+    define: {
+      'import.meta.env.VITE_CLOUDINARY_CLOUD_NAME': JSON.stringify(cloudName),
+      'import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET': JSON.stringify(uploadPreset),
+    },
+    plugins: [react(), localApiPlugin()],
+    build: {
+      target: 'es2018',
+      cssCodeSplit: true,
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/')) return 'react-vendor'
+            }
+          },
         },
       },
     },
-  },
   }
 })
