@@ -81,12 +81,15 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   Object.assign(process.env, env)
 
-  const cloudName = process.env.VITE_CLOUDINARY_CLOUD_NAME || env.VITE_CLOUDINARY_CLOUD_NAME || ''
-  const uploadPreset = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || env.VITE_CLOUDINARY_UPLOAD_PRESET || ''
+  const DEFAULT_CLOUD_NAME = 'jh0tqpsv'
+  const DEFAULT_UPLOAD_PRESET = 'nle_development'
+
+  const cloudName = (process.env.VITE_CLOUDINARY_CLOUD_NAME || env.VITE_CLOUDINARY_CLOUD_NAME || DEFAULT_CLOUD_NAME).trim()
+  const uploadPreset = (process.env.VITE_CLOUDINARY_UPLOAD_PRESET || env.VITE_CLOUDINARY_UPLOAD_PRESET || DEFAULT_UPLOAD_PRESET).trim()
 
   console.log(`\n=== BUILD DIAGNOSTIC: CLOUDINARY_CONFIG ===`)
-  console.log(`cloudNamePresent=${Boolean(cloudName?.trim())}`)
-  console.log(`uploadPresetPresent=${Boolean(uploadPreset?.trim())}`)
+  console.log(`cloudNamePresent=${Boolean(cloudName)}`)
+  console.log(`uploadPresetPresent=${Boolean(uploadPreset)}`)
   console.log(`===========================================\n`)
 
   return {

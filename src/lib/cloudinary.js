@@ -5,17 +5,21 @@
 // folder and resource limits in the Cloudinary console.
 // ============================================================================
 
+const DEFAULT_CLOUD_NAME = "jh0tqpsv";
+const DEFAULT_UPLOAD_PRESET = "nle_development";
+
 function getCloudConfig() {
-  const cloudName = String(
+  const envCloudName =
     (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_CLOUDINARY_CLOUD_NAME) ||
     (typeof window !== "undefined" && window.__ENV__ && window.__ENV__.VITE_CLOUDINARY_CLOUD_NAME) ||
-    ""
-  ).trim();
-  const uploadPreset = String(
+    "";
+  const envUploadPreset =
     (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET) ||
     (typeof window !== "undefined" && window.__ENV__ && window.__ENV__.VITE_CLOUDINARY_UPLOAD_PRESET) ||
-    ""
-  ).trim();
+    "";
+
+  const cloudName = String(envCloudName || DEFAULT_CLOUD_NAME).trim();
+  const uploadPreset = String(envUploadPreset || DEFAULT_UPLOAD_PRESET).trim();
   return { cloudName, uploadPreset };
 }
 
