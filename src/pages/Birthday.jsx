@@ -29,36 +29,6 @@ const THEMES = [
   ["Golden Glam", IMAGES.pkgPremiumBirthday],
 ];
 
-const PACKAGES = [
-  {
-    name: "Basic Birthday Package",
-    image: IMAGES.pkgBirthdayBash,
-    price: "₹15,000",
-    subtitle: "A simple, beautiful setup for a memorable celebration.",
-    includes: ["Theme Based Decor", "Basic Props", "Balloon Setup", "Setup & Dismantle"],
-  },
-  {
-    name: "Standard Birthday Package",
-    image: IMAGES.themeJungleLeaves,
-    price: "₹35,000",
-    subtitle: "A complete themed celebration with the essentials covered.",
-    includes: ["Custom Theme Decor", "Entry Setup", "Photobooth", "Basic Entertainment", "Setup & Dismantle"],
-  },
-  {
-    name: "Premium Birthday Package",
-    image: IMAGES.pkgPremiumBirthday,
-    price: "₹75,000",
-    subtitle: "Premium styling and entertainment for a standout party.",
-    includes: ["Unique & Premium Theme", "Grand Entry", "Entertainment (DJ / Artist)", "Photography", "Complete Event Management"],
-  },
-  {
-    name: "Luxury Birthday Package",
-    image: IMAGES.showcase1,
-    price: "₹1,50,000",
-    subtitle: "A fully managed birthday experience with bespoke details.",
-    includes: ["Bespoke Theme Design", "Premium Props & Setup", "Live Entertainment", "Photography & Videography", "Full Event Planning"],
-  },
-];
 
 const MOMENTS = [
   ["Kids Birthday Magic", IMAGES.galBirthday1, false],
@@ -258,42 +228,6 @@ function PopularThemes() {
   );
 }
 
-function BirthdayPackages() {
-  const [index, setIndex] = useState(0);
-  const active = PACKAGES[index];
-  const move = (delta) => setIndex((value) => (value + delta + PACKAGES.length) % PACKAGES.length);
-
-  return (
-    <section className="birthday-package-section">
-      <div className="birthday-container">
-        <SectionHead eyebrow="HANDPICKED BIRTHDAY PACKAGES" title="Ready-to-Celebrate Packages" link={{ label: "View All Packages", href: "/packages" }} />
-        <p className="birthday-intro">Choose a package and let our team handle the setup, styling and coordination.</p>
-        <div className="birthday-package-slider">
-          <button type="button" className="birthday-slider-arrow" onClick={() => move(-1)} aria-label="Previous package">←</button>
-          <article className="birthday-package-card">
-            <div className="birthday-package-image">
-              <img src={active.image} alt={active.name} loading="lazy" decoding="async" />
-              <span>{index + 1} / {PACKAGES.length}</span>
-            </div>
-            <div className="birthday-package-copy">
-              <span className="birthday-kicker">BIRTHDAY EXPERIENCE</span>
-              <h3>{active.name}</h3>
-              <p>{active.subtitle}</p>
-              <strong className="birthday-price">{active.price} <small>Starting from</small></strong>
-              <ul>{active.includes.map((item) => <li key={item}>✓ {item}</li>)}</ul>
-              <div className="birthday-package-actions">
-                <Link to="/packages" className="birthday-gold-btn">View Package <b>→</b></Link>
-                <Link to="/book-event" className="birthday-text-btn">Enquire Now</Link>
-              </div>
-            </div>
-          </article>
-          <button type="button" className="birthday-slider-arrow" onClick={() => move(1)} aria-label="Next package">→</button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function BirthdayMoments() {
   return (
     <section className="birthday-white-section">
@@ -367,7 +301,6 @@ export default function Birthday() {
       <BirthdayCategories />
       <BirthdayServices />
       <PopularThemes />
-      <BirthdayPackages />
       <BirthdayMoments />
       <BirthdayReviews />
       <BirthdayCTA />

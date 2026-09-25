@@ -11,6 +11,7 @@ import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { GLOBAL_ADDONS as SEED_GLOBAL_ADDONS, EXTRA_ADDONS_BY_OCCASION as SEED_EXTRA_ADDONS, SEED_ADDON_PRODUCTS } from "../data/addons";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
 import { queueCloudSync, syncCloudState, hydratePublicState } from "./cloudStore";
+import { uploadImageBlob, uploadImageUrl } from "./cloudinary";
 
 const STORE_KEY_PREFIX = "nle_catalog_v2_";
 const KEYS = {
@@ -45,11 +46,12 @@ let seedsInitialized = false;
 
 const DEFAULT_BIRTHDAY_AGE_CATEGORIES = [
   { id: "birthday-kids", title: "Kids Birthday", subtitle: "Age 1–12", image: IMAGES.typeKidsBirthday, href: "/occasion/birthday/kids-birthday", active: true, sortOrder: 1 },
-  { id: "birthday-teen", title: "Teen Birthday", subtitle: "Age 13–18", image: IMAGES.themeStageLights, href: "/occasion/birthday", active: true, sortOrder: 2 },
-  { id: "birthday-adult", title: "Adult Birthday", subtitle: "Age 18+", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/milestone-birthday", active: true, sortOrder: 3 },
-  { id: "birthday-milestone", title: "Milestone Birthday", subtitle: "20th, 30th, 40th, 50th+", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/milestone-birthday", active: true, sortOrder: 4 },
-  { id: "birthday-surprise", title: "Surprise Birthday", subtitle: "Make it Special", image: IMAGES.galBirthday2, href: "/occasion/birthday", active: true, sortOrder: 5 },
-  { id: "birthday-themes", title: "Theme Parties", subtitle: "Custom Themes", image: IMAGES.themeBalloonArch, href: "/occasion/birthday/kids-birthday", active: true, sortOrder: 6 },
+  { id: "birthday-fifth", title: "Fifth Birthday", subtitle: "Age 5", image: IMAGES.pkgBirthdayBash, href: "/occasion/birthday/fifth-birthday", active: true, sortOrder: 2 },
+  { id: "birthday-teen", title: "Teen Birthday", subtitle: "Age 13–18", image: IMAGES.themeStageLights, href: "/occasion/birthday/teen-birthday", active: true, sortOrder: 3 },
+  { id: "birthday-adult", title: "Adult Birthday", subtitle: "Age 18+", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/adult-birthday", active: true, sortOrder: 4 },
+  { id: "birthday-milestone", title: "Milestone Birthday", subtitle: "20th, 30th, 40th, 50th+", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/milestone-birthday", active: true, sortOrder: 5 },
+  { id: "birthday-surprise", title: "Surprise Birthday", subtitle: "Make it Special", image: IMAGES.galBirthday2, href: "/occasion/birthday/surprise-birthday", active: true, sortOrder: 6 },
+  { id: "birthday-themes", title: "Theme Parties", subtitle: "Custom Themes", image: IMAGES.themeBalloonArch, href: "/occasion/birthday/kids-birthday", active: true, sortOrder: 7 },
 ];
 
 
@@ -92,11 +94,35 @@ function readStorage(key, fallback) {
   }
 }
 
+// Keys ordered from largest/most-evictable to smallest. Only non-critical
+// cache keys are in this list — critical catalog state (occasions, products)
+// is never auto-evicted.
+const EVICTABLE_KEYS_ON_QUOTA = [
+  STORE_KEY_PREFIX + "media",
+  STORE_KEY_PREFIX + "gallery",
+  STORE_KEY_PREFIX + "insta_videos",
+  STORE_KEY_PREFIX + "video_reviews",
+];
+
 function writeStorage(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (err) {
+    if (err instanceof DOMException && (err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22)) {
+      // Evict large non-critical caches one-by-one and retry.
+      for (const evictKey of EVICTABLE_KEYS_ON_QUOTA) {
+        if (evictKey === key) continue; // never evict the key we're writing
+        if (localStorage.getItem(evictKey) !== null) {
+          localStorage.removeItem(evictKey);
+          try {
+            localStorage.setItem(key, JSON.stringify(value));
+            console.warn(`Storage quota freed by evicting ${evictKey}. Write succeeded for ${key}.`);
+            return true;
+          } catch { /* keep evicting */ }
+        }
+      }
+    }
     console.error("Storage write error:", err);
     return false;
   }
@@ -108,7 +134,12 @@ function writeStorage(key, value) {
 // -only so a fresh browser's demo/seed data can never overwrite real cloud
 // data before the admin has even logged in.
 function persist(key, value) {
-  writeStorage(key, value);
+  const written = writeStorage(key, value);
+  if (!written) {
+    // If the local write still failed after quota eviction, throw so the
+    // calling admin action can surface an error instead of silently losing data.
+    throw new Error("Unable to save: local storage is full. Please clear your browser cache and try again.");
+  }
   queueCloudSync(key, value);
 }
 
@@ -128,7 +159,24 @@ export async function hydrateCatalogFromCloud() {
   }
 }
 
+let productsCacheRaw = null;
+let productsCacheValue = null;
+let occasionsCacheRaw = null;
+let occasionsCacheValue = null;
+let birthdayAgeCacheRaw = null;
+let birthdayAgeCacheValue = null;
+let addonsCacheRaw = null;
+let addonsCacheValue = null;
+
 export function dispatchCatalogUpdate() {
+  productsCacheRaw = null;
+  productsCacheValue = null;
+  occasionsCacheRaw = null;
+  occasionsCacheValue = null;
+  birthdayAgeCacheRaw = null;
+  birthdayAgeCacheValue = null;
+  addonsCacheRaw = null;
+  addonsCacheValue = null;
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
   }
@@ -633,7 +681,10 @@ function initializeSeedsIfNeeded() {
     const currentTree = readStorage(KEYS.occasions, []);
     function refreshImages(nodes) {
       (nodes || []).forEach((node) => {
-        node.image = realCatalogImageFor(node.slug, 0);
+        // Never overwrite admin-configured or custom/Cloudinary images
+        if (!node.image) {
+          node.image = realCatalogImageFor(node.slug, 0);
+        }
         refreshImages(node.children);
       });
     }
@@ -646,7 +697,7 @@ function initializeSeedsIfNeeded() {
     if (Array.isArray(storedProducts) && storedProducts.length) {
       let changed = false;
       storedProducts.forEach((product, index) => {
-        if (!product?.isDemo) return;
+        if (!product?.isDemo || (product.image && product.image.includes("cloudinary"))) return;
         const next = realCatalogImageFor(product.categorySlug || product.occasionSlug, index);
         if (product.image !== next) {
           product.image = next;
@@ -814,29 +865,21 @@ initializeSeedsIfNeeded();
 // 1. PRODUCTS MANAGEMENT
 // =============================================================================
 
-let productsCacheRaw = null;
-let productsCacheValue = null;
-let occasionsCacheRaw = null;
-let occasionsCacheValue = null;
-let birthdayAgeCacheRaw = null;
-let birthdayAgeCacheValue = null;
-let addonsCacheRaw = null;
-let addonsCacheValue = null;
-
 export function getProducts() {
   initializeSeedsIfNeeded();
   const raw = localStorage.getItem(KEYS.products) || "";
   if (productsCacheValue && productsCacheRaw === raw) return productsCacheValue;
   productsCacheRaw = raw;
   productsCacheValue = readStorage(KEYS.products, []).map((product) => {
+    const primaryImage = sanitizeUrl(product?.image) || (Array.isArray(product?.images) && sanitizeUrl(product.images[0])) || (Array.isArray(product?.gallery) && sanitizeUrl(product.gallery[0])) || IMAGES.pkgDreamWedding;
     const gallery = Array.from(new Set([
-      ...(Array.isArray(product?.gallery) ? product.gallery : []),
+      primaryImage,
       ...(Array.isArray(product?.images) ? product.images : []),
-      ...(product?.image ? [product.image] : []),
+      ...(Array.isArray(product?.gallery) ? product.gallery : []),
     ].map((url) => sanitizeUrl(url)).filter(Boolean)));
     return {
       ...product,
-      image: gallery[0] || IMAGES.pkgDreamWedding,
+      image: primaryImage,
       images: gallery,
       gallery,
     };
@@ -853,35 +896,30 @@ export function saveProduct(product) {
   const list = getProducts();
   const now = new Date().toISOString();
 
-  const safeProduct = {
-    ...product,
-    catalogKind: ["product", "package", "service"].includes(product.catalogKind) ? product.catalogKind : (product.isAddon ? "service" : "product"),
-    // Must always be "product": the occasion tree walker uses this to
-    // decide whether a node renders ProductTemplate (the product detail
-    // page) or CategoryTemplate (a listing page). Without it, clicking a
-    // product opens CategoryTemplate on an empty node — a blank page.
-    type: "product",
-    slug: sanitizeSlug(product.slug || product.name || "package"),
-    name: sanitizeText(product.name || "Untitled Package"),
-    price: sanitizeNumber(product.price, 0, 10000000, 9999),
-    originalPrice: product.originalPrice ? sanitizeNumber(product.originalPrice, 0, 10000000) : null,
-    rating: sanitizeNumber(product.rating, 1, 5, 4.8),
-    reviewCount: sanitizeNumber(product.reviewCount, 0, 10000, 0),
-    description: sanitizeText(product.description || ""),
-    setupRequirements: sanitizeText(product.setupRequirements || ""),
-    duration: sanitizeText(product.duration || ""),
-    requiresTimeSlot: product.requiresTimeSlot !== false,
-    image: sanitizeUrl(product.image) || IMAGES.pkgDreamWedding,
-    images: Array.from(new Set([
+    const primaryImage = sanitizeUrl(product.image) || (Array.isArray(product.images) && sanitizeUrl(product.images[0])) || (Array.isArray(product.gallery) && sanitizeUrl(product.gallery[0])) || IMAGES.pkgDreamWedding;
+    const galleryList = Array.from(new Set([
+      primaryImage,
       ...(Array.isArray(product.images) ? product.images : []),
       ...(Array.isArray(product.gallery) ? product.gallery : []),
-      ...(product.image ? [product.image] : []),
-    ].map((url) => sanitizeUrl(url)).filter(Boolean))),
-    gallery: Array.from(new Set([
-      ...(Array.isArray(product.gallery) ? product.gallery : []),
-      ...(Array.isArray(product.images) ? product.images : []),
-      ...(product.image ? [product.image] : []),
-    ].map((url) => sanitizeUrl(url)).filter(Boolean))),
+    ].map((url) => sanitizeUrl(url)).filter(Boolean)));
+
+    const safeProduct = {
+      ...product,
+      catalogKind: ["product", "package", "service"].includes(product.catalogKind) ? product.catalogKind : (product.isAddon ? "service" : "product"),
+      type: "product",
+      slug: sanitizeSlug(product.slug || product.name || "package"),
+      name: sanitizeText(product.name || "Untitled Package"),
+      price: sanitizeNumber(product.price, 0, 10000000, 9999),
+      originalPrice: product.originalPrice ? sanitizeNumber(product.originalPrice, 0, 10000000) : null,
+      rating: sanitizeNumber(product.rating, 1, 5, 4.8),
+      reviewCount: sanitizeNumber(product.reviewCount, 0, 10000, 0),
+      description: sanitizeText(product.description || ""),
+      setupRequirements: sanitizeText(product.setupRequirements || ""),
+      duration: sanitizeText(product.duration || ""),
+      requiresTimeSlot: product.requiresTimeSlot !== false,
+      image: primaryImage,
+      images: galleryList,
+      gallery: galleryList,
     status: ["active", "draft", "archived", "featured"].includes(product.status) ? product.status : "active",
     includes: Array.isArray(product.includes) ? product.includes.map(sanitizeText).filter(Boolean) : [],
     notIncluded: Array.isArray(product.notIncluded) ? product.notIncluded.map(sanitizeText).filter(Boolean) : [],
@@ -897,6 +935,7 @@ export function saveProduct(product) {
   // Category hierarchy is the source of truth. setupType is intentionally
   // ignored so legacy records cannot recreate the old flat filter.
   delete safeProduct.setupType;
+  delete safeProduct.isDemo;
 
   const existingIdx = list.findIndex((p) => p.id === safeProduct.id || (safeProduct.slug && p.slug === safeProduct.slug));
   if (existingIdx !== -1) {
@@ -1008,13 +1047,22 @@ export function getBirthdayAgeCategories() {
   birthdayAgeCacheRaw = raw;
   const stored = raw ? readStorage(KEYS.birthdayAgeCategories, null) : null;
   const list = Array.isArray(stored) ? stored : DEFAULT_BIRTHDAY_AGE_CATEGORIES;
+  const canonicalBirthdayHrefs = {
+    "birthday-kids": "/occasion/birthday/kids-birthday",
+    "birthday-fifth": "/occasion/birthday/fifth-birthday",
+    "birthday-teen": "/occasion/birthday/teen-birthday",
+    "birthday-adult": "/occasion/birthday/adult-birthday",
+    "birthday-milestone": "/occasion/birthday/milestone-birthday",
+    "birthday-surprise": "/occasion/birthday/surprise-birthday",
+    "birthday-themes": "/occasion/birthday/kids-birthday",
+  };
   birthdayAgeCacheValue = list
     .map((item, index) => ({
       id: item.id || uid("birthday-card"),
       title: sanitizeText(item.title || "Birthday Category"),
       subtitle: sanitizeText(item.subtitle || ""),
       image: sanitizeUrl(item.image) || IMAGES.typeKidsBirthday,
-      href: sanitizeUrl(item.href) || "/occasion/birthday",
+      href: canonicalBirthdayHrefs[item.id] || sanitizeUrl(item.href) || "/occasion/birthday",
       active: item.active !== false,
       sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
     }))
@@ -1023,13 +1071,22 @@ export function getBirthdayAgeCategories() {
 }
 
 export function saveBirthdayAgeCategories(items) {
+  const canonicalBirthdayHrefs = {
+    "birthday-kids": "/occasion/birthday/kids-birthday",
+    "birthday-fifth": "/occasion/birthday/fifth-birthday",
+    "birthday-teen": "/occasion/birthday/teen-birthday",
+    "birthday-adult": "/occasion/birthday/adult-birthday",
+    "birthday-milestone": "/occasion/birthday/milestone-birthday",
+    "birthday-surprise": "/occasion/birthday/surprise-birthday",
+    "birthday-themes": "/occasion/birthday/kids-birthday",
+  };
   const safe = (Array.isArray(items) ? items : [])
     .map((item, index) => ({
       id: item.id || uid("birthday-card"),
       title: sanitizeText(item.title || "Birthday Category"),
       subtitle: sanitizeText(item.subtitle || ""),
       image: sanitizeUrl(item.image) || IMAGES.typeKidsBirthday,
-      href: sanitizeUrl(item.href) || "/occasion/birthday",
+      href: canonicalBirthdayHrefs[item.id] || sanitizeUrl(item.href) || "/occasion/birthday",
       active: item.active !== false,
       sortOrder: index + 1,
     }));
@@ -1137,14 +1194,19 @@ export function saveCategory(parentOccasionSlug, category) {
       parentCat.children.push(safeCat);
     }
   } else {
-    // Direct child of occasion
-    occ.children = occ.children || [];
-    const idx = occ.children.findIndex((c) => c.slug === safeCat.slug || c.id === safeCat.id);
-    if (idx !== -1) {
-      occ.children[idx] = { ...occ.children[idx], ...safeCat };
+    // Check if the category already exists anywhere in the occasion tree
+    const existing = findCategoryRecursive(occ, safeCat.slug) || (safeCat.id ? findCategoryRecursive(occ, safeCat.id) : null);
+    if (existing) {
+      Object.assign(existing, safeCat);
     } else {
-      safeCat.id = safeCat.id || uid("cat");
-      occ.children.push(safeCat);
+      occ.children = occ.children || [];
+      const idx = occ.children.findIndex((c) => c.slug === safeCat.slug || c.id === safeCat.id);
+      if (idx !== -1) {
+        occ.children[idx] = { ...occ.children[idx], ...safeCat };
+      } else {
+        safeCat.id = safeCat.id || uid("cat");
+        occ.children.push(safeCat);
+      }
     }
   }
 
@@ -1252,7 +1314,22 @@ export function deleteMediaItem(id) {
 }
 
 export async function saveMediaItemToCloud(item) {
-  const saved = saveMediaItem(item);
+  const input = { ...item };
+  if (input.url && !/^https:\/\/res\.cloudinary\.com\//i.test(String(input.url))) {
+    // URL imports are copied into Cloudinary so the catalog never depends on
+    // third-party image hosts for its managed media.
+    if (/^https?:\/\//i.test(String(input.url))) {
+      const uploaded = await uploadImageUrl(String(input.url));
+      input.url = uploaded.secure_url;
+      input.cloudinaryPublicId = uploaded.public_id || "";
+      input.width = uploaded.width || input.width;
+      input.height = uploaded.height || input.height;
+      input.fileSize = uploaded.bytes || input.fileSize;
+      input.mimeType = uploaded.secure_format ? `image/${uploaded.secure_format}` : input.mimeType;
+      input.tags = [...(Array.isArray(input.tags) ? input.tags : []), "cloudinary"];
+    }
+  }
+  const saved = saveMediaItem(input);
   await syncCloudState(KEYS.media, getMediaItems());
   return saved;
 }
@@ -1264,7 +1341,7 @@ export async function deleteMediaItemFromCloud(id) {
 }
 
 /**
- * Safely processes and stores an uploaded file as a WebP / Data URL.
+ * Safely processes an uploaded file as WebP and stores only its Cloudinary URL in the catalog.
  */
 export function uploadMediaFile(file, title = "") {
   return new Promise((resolve, reject) => {
@@ -1273,14 +1350,12 @@ export function uploadMediaFile(file, title = "") {
       return;
     }
 
-    // Validate MIME type
     const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!validTypes.includes(file.type)) {
       reject(new Error("Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed."));
       return;
     }
 
-    // Max 5MB
     if (file.size > 5 * 1024 * 1024) {
       reject(new Error("Image size exceeds maximum limit of 5MB."));
       return;
@@ -1298,20 +1373,32 @@ export function uploadMediaFile(file, title = "") {
         const ctx = canvas.getContext("2d");
         if (!ctx) { reject(new Error("Unable to process image.")); return; }
         ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/webp", 0.82);
-        const mediaItem = saveMediaItem({
-          title: title || file.name.replace(/\.[^/.]+$/, ""),
-          url: dataUrl,
-          alt: title || file.name,
-          fileSize: file.size,
-          mimeType: "image/webp",
-          width: canvas.width,
-          height: canvas.height,
-          tags: ["upload"],
-        });
-        syncCloudState(KEYS.media, getMediaItems())
-          .then(() => resolve(mediaItem))
-          .catch((err) => reject(new Error(`Image uploaded locally, but cloud save failed: ${err.message || "please try again"}`)));
+
+        // IMPORTANT: never put image bytes/base64 into app_state. Upload the
+        // optimized blob to Cloudinary first, then persist only the URL.
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            reject(new Error("Unable to encode image."));
+            return;
+          }
+          try {
+            const uploaded = await uploadImageBlob(blob, `${(title || file.name).replace(/[^a-z0-9_-]+/gi, "-")}.webp`);
+            const mediaItem = await saveMediaItemToCloud({
+              title: title || file.name.replace(/\.[^/.]+$/, ""),
+              url: uploaded.secure_url,
+              cloudinaryPublicId: uploaded.public_id || "",
+              alt: title || file.name,
+              fileSize: uploaded.bytes || blob.size,
+              mimeType: uploaded.secure_format ? `image/${uploaded.secure_format}` : "image/webp",
+              width: uploaded.width || canvas.width,
+              height: uploaded.height || canvas.height,
+              tags: ["upload", "cloudinary"],
+            });
+            resolve(mediaItem);
+          } catch (err) {
+            reject(err);
+          }
+        }, "image/webp", 0.82);
       };
       source.onerror = () => reject(new Error("Failed to decode image file."));
       source.src = e.target.result;

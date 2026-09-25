@@ -188,6 +188,12 @@ export default function AdminCatalog() {
     if (!item.price || Number(item.price) <= 0) return setError("Enter a valid price.");
     if (!item.categoryPath?.length) return setError("Choose a catalog category.");
     try {
+      const primaryImg = item.image || (Array.isArray(item.images) && item.images[0]) || (Array.isArray(item.gallery) && item.gallery[0]) || DEFAULT_IMAGE;
+      const gallery = Array.from(new Set([
+        primaryImg,
+        ...(Array.isArray(item.images) ? item.images : []),
+        ...(Array.isArray(item.gallery) ? item.gallery : []),
+      ].filter(Boolean)));
       const saved = await saveProductToCloud({
         ...item,
         slug: sanitizeSlug(item.slug || item.name),
@@ -196,7 +202,9 @@ export default function AdminCatalog() {
         occasionSlug: modal.kind === "service" ? "event-services" : item.categoryPath[0],
         categoryPath: modal.kind === "service" ? item.categoryPath : item.categoryPath,
         categorySlug: item.categoryPath[item.categoryPath.length - 1],
-        image: item.image || DEFAULT_IMAGE,
+        image: primaryImg,
+        images: gallery,
+        gallery: gallery,
         originalPrice: item.originalPrice || null,
         packageItems: modal.kind === "package" ? item.packageItems : [],
         includes: modal.kind === "package" ? item.packageItems.map((x) => x.name) : String(item.inclusionsText || "").split("\n").map((x) => x.trim()).filter(Boolean),

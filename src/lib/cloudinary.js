@@ -1,0 +1,54 @@
+// ============================================================================
+// CLOUDINARY MEDIA UPLOADS
+// Images/videos belong in Cloudinary; Supabase stores only their URLs/metadata.
+// The upload preset must be configured as an unsigned preset with a safe
+// folder and resource limits in the Cloudinary console.
+// ============================================================================
+
+const CLOUD_NAME = String(import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "").trim();
+const UPLOAD_PRESET = String(import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "").trim();
+
+function configError() {
+  return new Error(
+    "Cloudinary is not configured. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET, then rebuild the website."
+  );
+}
+
+async function uploadToCloudinary(file, resourceType = "image") {
+  if (!CLOUD_NAME || !UPLOAD_PRESET) throw configError();
+  const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUD_NAME)}/${resourceType}/upload`;
+  const form = new FormData();
+  form.append("file", file);
+  form.append("upload_preset", UPLOAD_PRESET);
+  form.append("folder", "next-level-events");
+
+  const response = await fetch(endpoint, { method: "POST", body: form });
+  let data = null;
+  try { data = await response.json(); } catch { /* ignore */ }
+  if (!response.ok || !data?.secure_url) {
+    throw new Error(data?.error?.message || `Cloudinary upload failed (${response.status}).`);
+  }
+  return data;
+}
+
+export async function uploadImageBlob(blob, filename = "image.webp") {
+  const file = blob instanceof File ? blob : new File([blob], filename, { type: blob.type || "image/webp" });
+  return uploadToCloudinary(file, "image");
+}
+
+export async function uploadImageUrl(url) {
+  if (!CLOUD_NAME || !UPLOAD_PRESET) throw configError();
+  const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUD_NAME)}/image/upload`;
+  const form = new FormData();
+  form.append("file", url);
+  form.append("upload_preset", UPLOAD_PRESET);
+  form.append("folder", "next-level-events");
+
+  const response = await fetch(endpoint, { method: "POST", body: form });
+  let data = null;
+  try { data = await response.json(); } catch { /* ignore */ }
+  if (!response.ok || !data?.secure_url) {
+    throw new Error(data?.error?.message || `Cloudinary URL import failed (${response.status}).`);
+  }
+  return data;
+}

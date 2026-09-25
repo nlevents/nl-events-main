@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate:cloudinary": "node scripts/migrate-base64-to-cloudinary.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

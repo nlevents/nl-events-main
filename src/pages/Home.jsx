@@ -4,6 +4,7 @@ import { IMAGES, waLink } from "../data/images";
 import { GLOBAL_ADDONS } from "../data/addons";
 import { onImgError } from "../lib/imageFallback";
 import usePageMeta from "../hooks/usePageMeta";
+import { listOccasions, weddingFunctionLinks, birthdayThemeLinks } from "../data/occasions";
 const ShortsRail = lazy(() => import("../components/ShortsRail"));
 const VideoReviewGrid = lazy(() => import("../components/VideoReviewGrid"));
 import Faq from "../components/Faq";
@@ -151,6 +152,39 @@ function HorizontalCards({ items, cardClass = "ref-home-card", dark = false }) {
 }
 
 function CelebrationSection() {
+  const [celebrations, setCelebrations] = useState(() => {
+    const live = listOccasions();
+    if (!live || !live.length) return CELEBRATIONS;
+    return live.map((occ) => {
+      const matching = CELEBRATIONS.find((c) => c.href.includes(occ.slug));
+      return {
+        label: occ.label,
+        href: matching?.href || `/occasion/${occ.slug}`,
+        img: occ.image || occ.heroImg || matching?.img || IMAGES.typeWedding,
+      };
+    });
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const live = listOccasions();
+      if (live && live.length) {
+        setCelebrations(
+          live.map((occ) => {
+            const matching = CELEBRATIONS.find((c) => c.href.includes(occ.slug));
+            return {
+              label: occ.label,
+              href: matching?.href || `/occasion/${occ.slug}`,
+              img: occ.image || occ.heroImg || matching?.img || IMAGES.typeWedding,
+            };
+          })
+        );
+      }
+    };
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+
   return (
     <section className="ref-home-celebrations">
       <div className="ref-home-container">
@@ -159,7 +193,7 @@ function CelebrationSection() {
           <Link to="/shop-by-occasion">SEE ALL</Link>
         </div>
         <div className="ref-home-celebration-grid">
-          {CELEBRATIONS.map((item) => (
+          {celebrations.map((item) => (
             <Link to={item.href} className="ref-home-celebration-card" key={item.label} onPointerEnter={() => prefetchOccasionRoute(item.href)} onFocus={() => prefetchOccasionRoute(item.href)}>
               <span className="ref-home-celebration-image">
                 <img src={item.img} alt={item.label} data-context={item.label} loading="lazy" decoding="async" onError={onImgError} />
@@ -174,13 +208,27 @@ function CelebrationSection() {
 }
 
 function WeddingSection() {
+  const [concepts, setConcepts] = useState(() => {
+    const live = weddingFunctionLinks();
+    return live.length ? live : WEDDING_CONCEPTS;
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const live = weddingFunctionLinks();
+      if (live.length) setConcepts(live);
+    };
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+
   return (
     <>
       <section className="ref-home-dark-section">
         <div className="ref-home-container">
           <RefSectionHead eyebrow="THE WEDDING COLLECTION" title="Weddings, Beautifully Planned" link={{ label: "Explore wedding functions", href: "/occasion/wedding" }} />
           <p className="ref-home-dark-copy">From Haldi to the grand Reception, we design every function with unique themes, stunning décor and seamless execution.</p>
-          <HorizontalCards items={WEDDING_CONCEPTS} cardClass="ref-home-concept-card" dark />
+          <HorizontalCards items={concepts} cardClass="ref-home-concept-card" dark />
         </div>
       </section>
 
@@ -196,12 +244,29 @@ function WeddingSection() {
 }
 
 function BirthdaySection() {
+  const [themes, setThemes] = useState(() => {
+    const live = birthdayThemeLinks(8);
+    if (!live.length) return BIRTHDAY_THEMES;
+    return live.map((t) => ({ label: t.label, img: t.image, href: t.href }));
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const live = birthdayThemeLinks(8);
+      if (live.length) {
+        setThemes(live.map((t) => ({ label: t.label, img: t.image, href: t.href })));
+      }
+    };
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+
   return (
     <section className="ref-home-birthday">
       <div className="ref-home-container">
         <RefSectionHead title="A World of Imagination for Little Celebrations" link={{ label: "Explore kids birthday themes", href: "/occasion/birthday/kids-birthday" }} />
         <p className="ref-home-intro">Magical themes, joyful setups and unforgettable moments for your little one.</p>
-        <HorizontalCards items={BIRTHDAY_THEMES} cardClass="ref-home-theme-card" />
+        <HorizontalCards items={themes} cardClass="ref-home-theme-card" />
       </div>
     </section>
   );

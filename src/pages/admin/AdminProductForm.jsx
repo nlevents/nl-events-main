@@ -214,14 +214,15 @@ export default function AdminProductForm() {
 
     try {
       setSaving(true);
+      const primaryImage = formData.image || (Array.isArray(formData.images) && formData.images[0]) || (Array.isArray(formData.gallery) && formData.gallery[0]) || "";
       const galleryImages = Array.from(new Set([
-        ...(Array.isArray(formData.gallery) ? formData.gallery : []),
+        ...(primaryImage ? [primaryImage] : []),
         ...(Array.isArray(formData.images) ? formData.images : []),
-        ...(formData.image ? [formData.image] : []),
+        ...(Array.isArray(formData.gallery) ? formData.gallery : []),
       ].filter(Boolean)));
       const saved = await saveProductToCloud({
         ...formData,
-        image: galleryImages[0] || formData.image,
+        image: primaryImage,
         images: galleryImages,
         gallery: galleryImages,
         ...(isAddonMode ? { isAddon: true, occasionSlug: "event-services" } : {}),
@@ -731,9 +732,10 @@ export default function AdminProductForm() {
         multiple
         onClose={() => setPickerOpen(false)}
         onSelect={(selection) => {
-          const urls = Array.isArray(selection) ? selection : [selection];
-          const next = Array.from(new Set([...(formData.images || []), ...urls].filter(Boolean)));
-          setFormData({ ...formData, images: next, gallery: next, image: next[0] || formData.image });
+          const urls = (Array.isArray(selection) ? selection : [selection]).filter(Boolean);
+          if (!urls.length) return;
+          const next = Array.from(new Set([...urls, ...(formData.images || [])].filter(Boolean)));
+          setFormData({ ...formData, images: next, gallery: next, image: urls[0] || next[0] || formData.image });
         }}
       />
 

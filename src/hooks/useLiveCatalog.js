@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
-import { listProducts } from "../data/products";
+import { getProducts, getProduct } from "../lib/catalogStore";
 import { listAllProducts } from "../data/occasions";
-import { getProduct } from "../data/products";
 
 export function useLiveProducts() {
-  const [products, setProducts] = useState(listProducts);
+  const [products, setProducts] = useState(getProducts);
 
   useEffect(() => {
-    const onUpdate = () => setProducts(listProducts());
+    const onUpdate = () => setProducts(getProducts());
     window.addEventListener("nle-catalog-updated", onUpdate);
     return () => window.removeEventListener("nle-catalog-updated", onUpdate);
   }, []);

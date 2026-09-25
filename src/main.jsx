@@ -64,13 +64,13 @@ if (typeof window !== "undefined") {
       return;
     }
     if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(hydrate, { timeout: 10000 });
+      window.requestIdleCallback(hydrate, { timeout: 1500 });
     } else {
-      window.setTimeout(hydrate, 8000);
+      window.setTimeout(hydrate, 300);
     }
   };
 
-  window.setTimeout(scheduleHydration, 8000);
+  scheduleHydration();
 }
 
 createRoot(document.getElementById('root')).render(

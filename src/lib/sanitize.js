@@ -52,7 +52,8 @@ export function sanitizeUrl(url) {
 
   // Check protocol
   try {
-    const parsed = new URL(trimmed, window.location.origin);
+    const origin = typeof window !== "undefined" && window.location ? window.location.origin : "http://localhost";
+    const parsed = new URL(trimmed, origin);
     if (parsed.protocol === "http:" || parsed.protocol === "https:") {
       return trimmed;
     }

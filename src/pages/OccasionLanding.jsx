@@ -4,7 +4,7 @@ import { IMAGES } from "../data/images";
 import usePageMeta from "../hooks/usePageMeta";
 import ProductCard from "../components/occasion/ProductCard";
 import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
-import { pathFor, sortProducts } from "../data/occasions";
+import { pathFor, sortProducts, listOccasions } from "../data/occasions";
 
 const ICONS = ["✧", "♢", "♫", "◉", "⌂", "✦", "⌖", "◷", "◇", "◎"];
 
@@ -18,12 +18,6 @@ const CONFIGS = {
     servicesTitle: "Complete Anniversary Solutions",
     servicesIntro: "From intimate dinners to grand celebrations, we handle every detail so you can focus on what truly matters — each other.",
     services: [["Decor & Setups", "Romantic styling", IMAGES.typeDecor], ["Candlelight & Ambience", "Warm, intimate setups", IMAGES.showcase8], ["Photography & Videography", "Capture every emotion", IMAGES.typePhotography], ["Catering", "Dinner & celebration", IMAGES.typeCatering], ["Entertainment", "Music & live experiences", IMAGES.galConcert2], ["Venue Selection", "Indoor & outdoor", IMAGES.showcase2], ["Personalized Elements", "Custom details", IMAGES.themeBalloonCelebration], ["Special Experiences", "Make it unforgettable", IMAGES.showcase1]],
-    packagesTitle: "Featured Anniversary Packages", packagesIntro: "Carefully curated packages for every kind of love story.",
-    packages: [
-      ["Essential Package", "Beautiful celebrations with all the essentials.", IMAGES.showcase8, "Starting from ₹25,000"],
-      ["Premium Package", "Enhanced décor and experiences for a memorable celebration.", IMAGES.pkgPremiumBirthday, "Starting from ₹55,000"],
-      ["Luxury Package", "For larger celebrations with premium experiences.", IMAGES.showcase1, "Starting from ₹1,00,000"],
-    ],
     momentsTitle: "Real Celebrations. Real Emotions.", moments: [["Love Celebration", IMAGES.showcase8], ["Romantic Entry", IMAGES.showcase2], ["Dinner Under Lights", IMAGES.showcase1], ["Milestone Night", IMAGES.pkgPremiumBirthday], ["25th Anniversary", IMAGES.showcase4], ["Couple Moments", IMAGES.galWedding2]],
     review: { quote: "Thank you Next Level Events for making our anniversary so special. It was beyond our expectations.", name: "A Happy Couple" },
     cta: ["LET'S CELEBRATE YOUR STORY", "Let’s Plan Your Next Anniversary", "Tell us your story and we’ll turn it into a beautiful celebration."]
@@ -43,11 +37,9 @@ const CONFIGS = {
     meta: ["Kids & Family Events — Next Level Events", "Baby showers, Annaprashan, Mundan, naming ceremonies and family celebrations."],
     hero: { eyebrow: "LITTLE MOMENTS. BIG MEMORIES.", title: <>Kids & Family <em>Events</em></>, text: "Celebrations designed for your family's most special milestones.", image: IMAGES.heroBirthday, primary: "Plan Your Celebration", secondary: "Watch Our Story", stats: [["500+", "Family Celebrations"], ["100%", "Happy Families"], ["Memories", "That Last a Lifetime"], ["Ranchi, Jharkhand", "& Beyond"]] },
     intro: ["CHOOSE YOUR CELEBRATION", "Family Celebration", "From the joy of a new beginning to cherished family traditions, we make every moment special with thoughtful planning and beautiful execution."],
-    family: [["Baby Shower", "Celebrate the journey to parenthood with love and joy.", IMAGES.typeBabyShower], ["Annaprashan", "Mark the first step towards a healthy and happy future.", IMAGES.typeAnnaprashan], ["Mundan Ceremony", "A sacred tradition, beautifully celebrated.", IMAGES.showcase5], ["Naming Ceremony", "A special occasion to announce a lifetime of happiness.", IMAGES.typeNewbornWelcome]],
+    family: [["Baby Shower", "Celebrate the journey to parenthood with love and joy.", IMAGES.typeBabyShower], ["Annaprashan", "Mark the first step towards a healthy and happy future.", IMAGES.typeAnnaprashan], ["Mundan Ceremony", "A sacred tradition, beautifully celebrated.", IMAGES.showcase5], ["Naming Ceremony", "A special occasion to announce a lifetime of happiness.", IMAGES.typeNewbornWelcome], ["Modern Ceremony", "Contemporary styling for meaningful family ceremonies.", IMAGES.showcase2], ["Procession", "Beautifully coordinated procession and celebration setups.", IMAGES.themeStageLights]],
     servicesTitle: "Complete Family Event Solutions", servicesIntro: "We take care of everything, so you can focus on what truly matters — being with your loved ones.",
     services: [["Decor & Setups", "Beautiful themes", IMAGES.typeDecor], ["Grand Entry", "Warm welcomes", IMAGES.showcase4], ["Photography & Videography", "Capture every milestone", IMAGES.typePhotography], ["Catering", "Delicious food", IMAGES.typeCatering], ["Entertainment", "Music and activities", IMAGES.galConcert2], ["Kids Activities", "Fun for little guests", IMAGES.themeBalloonCelebration], ["Special Experiences", "Personal touches", IMAGES.showcase1]],
-    packagesTitle: "Featured Family Celebration Packages", packagesIntro: "Curated packages for stress-free and memorable celebrations.",
-    packages: [["Essential Package", "Beautiful celebrations with essentials covered.", IMAGES.typeBabyShower, "Starting from ₹25,000"], ["Premium Package", "Enhanced décor and experiences for a memorable event.", IMAGES.showcase1, "Starting from ₹55,000"], ["Luxury Package", "Bigger, grander and truly unforgettable celebrations.", IMAGES.showcase4, "Starting from ₹1,00,000"]],
     momentsTitle: "Real Celebrations. Real Happiness.", moments: [["Baby Shower", IMAGES.typeBabyShower], ["Family Celebration", IMAGES.showcase1], ["Naming Ceremony", IMAGES.typeNewbornWelcome], ["Little Moments", IMAGES.themeBalloonCelebration], ["Beautiful Setup", IMAGES.showcase2]],
     review: { quote: "Thank you Next Level Events for making our special day so beautiful and stress-free!", name: "A Happy Family" },
     cta: ["LET'S CREATE FAMILY MEMORIES", "Let’s Plan Your Next Family Celebration", "Tell us what you’re celebrating and we’ll take care of the details."]
@@ -89,12 +81,35 @@ function Hero({ config, type }) {
   </section>;
 }
 
-function ImageCards({ items, className = "", large = false }) {
+function findCatalogPathByLabel(label, rootSlugs = []) {
+  const wanted = String(label || "").trim().toLowerCase();
+  const roots = listOccasions();
+  const preferred = rootSlugs.length ? roots.filter((o) => rootSlugs.includes(o.slug)) : roots;
+  function walk(node, trail) {
+    if (!node) return null;
+    if (String(node.label || "").trim().toLowerCase() === wanted) return pathFor([...trail, node]);
+    for (const child of node.children || []) {
+      const found = walk(child, [...trail, node]);
+      if (found) return found;
+    }
+    return null;
+  }
+  for (const root of preferred) {
+    const found = walk(root, []);
+    if (found) return found;
+  }
+  return null;
+}
+
+function ImageCards({ items, className = "", large = false, rootSlugs = [] }) {
   return <div className={`occasion-pro-cards ${large ? "is-large" : ""} ${className}`}>
-    {items.map(([title, text, image], i) => <Link className="occasion-pro-card" to="/book-event" key={title}>
-      <div className="occasion-pro-card-img"><img src={image} alt="" loading="lazy" decoding="async" /><span>{ICONS[i % ICONS.length]}</span></div>
-      <div className="occasion-pro-card-copy"><h3>{title}</h3>{text && <p>{text}</p>}<strong>Explore <b>→</b></strong></div>
-    </Link>)}
+    {items.map(([title, text, image], i) => {
+      const href = findCatalogPathByLabel(title, rootSlugs);
+      return <Link className="occasion-pro-card" to={href || "/book-event"} key={title}>
+        <div className="occasion-pro-card-img"><img src={image} alt="" loading="lazy" decoding="async" /><span>{ICONS[i % ICONS.length]}</span></div>
+        <div className="occasion-pro-card-copy"><h3>{title}</h3>{text && <p>{text}</p>}<strong>Explore <b>→</b></strong></div>
+      </Link>;
+    })}
   </div>;
 }
 
@@ -102,17 +117,6 @@ function Services({ config }) {
   return <section className="occasion-pro-section occasion-pro-services"><div className="occasion-pro-container">
     <SectionHead eyebrow="OUR SERVICES" title={config.servicesTitle} text={config.servicesIntro} />
     <div className="occasion-pro-service-grid">{config.services.map(([name, sub, image], i) => <Link to="/services" className="occasion-pro-service" key={name}><span>{ICONS[i % ICONS.length]}</span><strong>{name}</strong><small>{sub}</small></Link>)}</div>
-  </div></section>;
-}
-
-function Packages({ config }) {
-  const [index, setIndex] = useState(0);
-  if (!config.packages) return null;
-  const active = config.packages[index];
-  return <section className="occasion-pro-section occasion-pro-packages"><div className="occasion-pro-container occasion-pro-package-layout">
-    <div className="occasion-pro-package-intro"><span>FEATURED</span><h2>{config.packagesTitle}</h2><p>{config.packagesIntro}</p><Link to="/packages" className="occasion-pro-gold">View All Packages <b>→</b></Link></div>
-    <div className="occasion-pro-package-stage"><button onClick={() => setIndex((index - 1 + config.packages.length) % config.packages.length)} aria-label="Previous package">←</button><article><img src={active[2]} alt={active[0]} loading="lazy" /><div><h3>{active[0]}</h3><p>{active[1]}</p><strong>{active[3]}</strong><Link to="/packages">View Details →</Link></div></article><button onClick={() => setIndex((index + 1) % config.packages.length)} aria-label="Next package">→</button></div>
-    <div className="occasion-pro-package-stats"><span>♧ <b>500+</b> Celebrations</span><span>◉ <b>100%</b> Happy Clients</span><span>◇ <b>Memories</b> That Last</span><span>⌖ <b>Ranchi, Jharkhand</b> & Beyond</span></div>
   </div></section>;
 }
 
@@ -251,13 +255,15 @@ export default function OccasionLanding({ type }) {
 
   return <main className={`occasion-pro-page occasion-pro-page-${type}`}>
     <Hero config={config.hero} type={type} />
-    {config.tabs && <section className="occasion-pro-section occasion-pro-tabs"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><div className="occasion-pro-tab-rail">{config.tabs.map((label, i) => <Link to="/book-event" key={label}><span>{ICONS[i % ICONS.length]}</span>{label}</Link>)}</div></div></section>}
-    {config.festivals && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><ImageCards items={config.festivals} /></div></section>}
-    {config.other && <section className="occasion-pro-section occasion-pro-soft"><div className="occasion-pro-container"><SectionHead eyebrow="BEYOND FESTIVALS" title="Other Special Occasions" text="Because every occasion, big or small, deserves a beautiful celebration." /><ImageCards items={config.other} /></div></section>}
-    {config.family && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><ImageCards items={config.family} large /></div></section>}
-    {config.corporate && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} link={{ label: "View All Corporate Events", href: "/occasion/corporate" }} /><ImageCards items={config.corporate} large /></div></section>}
+    {config.tabs && <section className="occasion-pro-section occasion-pro-tabs"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><div className="occasion-pro-tab-rail">{config.tabs.map((label, i) => {
+        const href = findCatalogPathByLabel(label, ["anniversary"]);
+        return <Link to={href || "/occasion/anniversary"} key={label}><span>{ICONS[i % ICONS.length]}</span>{label}</Link>;
+      })}</div></div></section>}
+    {config.festivals && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><ImageCards items={config.festivals} rootSlugs={["festivals-culture"]} /></div></section>}
+    {config.other && <section className="occasion-pro-section occasion-pro-soft"><div className="occasion-pro-container"><SectionHead eyebrow="BEYOND FESTIVALS" title="Other Special Occasions" text="Because every occasion, big or small, deserves a beautiful celebration." /><ImageCards items={config.other} rootSlugs={["festivals-culture"]} /></div></section>}
+    {config.family && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><ImageCards items={config.family} large rootSlugs={["kids-family"]} /></div></section>}
+    {config.corporate && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} link={{ label: "View All Corporate Events", href: "/occasion/corporate" }} /><ImageCards items={config.corporate} large rootSlugs={["corporate"]} /></div></section>}
     <Services config={config} />
-    <Packages config={config} />
     <FeaturedProducts type={type} />
     <Gallery config={config} />
     <Moments config={config} />

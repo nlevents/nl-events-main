@@ -2,18 +2,19 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
 import ProductCard from "../components/occasion/ProductCard";
-import { pathFor, sortProducts } from "../data/occasions";
+import { pathFor, sortProducts, weddingFunctionLinks, findOccasion } from "../data/occasions";
 import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
 import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
 import usePageMeta from "../hooks/usePageMeta";
 import { getAddonsForOccasion } from "../lib/catalogStore";
+import { onImgError } from "../lib/imageFallback";
 
 const FUNCTIONS = [
   { label: "Haldi", img: IMAGES.themeJungleLeaves, href: "/occasion/wedding/haldi" },
   { label: "Mehendi", img: IMAGES.themeMehndiHenna, href: "/occasion/wedding/mehndi" },
-  { label: "Sangeet", img: IMAGES.themeStageLights, href: "/occasion/wedding/sangeet" },
-  { label: "Wedding", img: IMAGES.heroWedding, href: "/occasion/wedding/wedding-ceremony" },
-  { label: "Reception", img: IMAGES.showcase1, href: "/occasion/wedding/reception" },
+  { label: "Sangeet", img: IMAGES.themeStageLights, href: "/occasion/wedding/sangeet-night" },
+  { label: "Wedding", img: IMAGES.heroWedding, href: "/occasion/wedding/mandap-ceremony-decor" },
+  { label: "Reception", img: IMAGES.showcase1, href: "/occasion/wedding/reception-styling" },
   { label: "Engagement", img: IMAGES.showcase2, href: "/occasion/wedding/ring-ceremony" },
   { label: "Mayra / Rituals", img: IMAGES.showcase5, href: "/occasion/wedding" },
 ];
@@ -94,9 +95,25 @@ function HorizontalRail({ children, className = "" }) {
 }
 
 function WeddingHero() {
+  const [heroImg, setHeroImg] = useState(() => {
+    const wedding = findOccasion("wedding");
+    return wedding?.heroImg || wedding?.image || IMAGES.heroWedding;
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const wedding = findOccasion("wedding");
+      if (wedding?.heroImg || wedding?.image) {
+        setHeroImg(wedding.heroImg || wedding.image);
+      }
+    };
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+
   return (
     <section className="wedding-hero">
-      <img src={IMAGES.heroWedding} alt="Wedding celebration by Next Level Events" fetchPriority="high" decoding="async" />
+      <img src={heroImg} alt="Wedding celebration by Next Level Events" fetchPriority="high" decoding="async" onError={onImgError} />
       <div className="wedding-hero-overlay" />
       <div className="wedding-hero-content">
         <span>OUR WEDDING COLLECTION</span>
@@ -118,14 +135,29 @@ function WeddingHero() {
 }
 
 function WeddingFunctions() {
+  const [functions, setFunctions] = useState(() => {
+    const live = weddingFunctionLinks();
+    return live.length ? live : FUNCTIONS;
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const live = weddingFunctionLinks();
+      if (live.length) setFunctions(live);
+    };
+    refresh();
+    window.addEventListener("nle-catalog-updated", refresh);
+    return () => window.removeEventListener("nle-catalog-updated", refresh);
+  }, []);
+
   return (
     <section className="wedding-white-section">
       <div className="wedding-container">
         <SectionHead eyebrow="OUR WEDDING FUNCTIONS" title="Every Function, Beautifully Curated" link={{ label: "View All Weddings", href: "/occasion/wedding" }} />
         <HorizontalRail>
-          {FUNCTIONS.map((item) => (
-            <Link to={item.href} className="wedding-function-card" key={item.label}>
-              <img src={item.img} alt={item.label} loading="lazy" decoding="async" />
+          {functions.map((item) => (
+            <Link to={item.href} className="wedding-function-card" key={item.label + (item.slug || "")}>
+              <img src={item.img || item.image} alt={item.label} loading="lazy" decoding="async" onError={onImgError} />
               <span>{item.label}</span>
               <b>→</b>
             </Link>

@@ -526,6 +526,14 @@ function replaceChildren(occasionSlug, children) {
 // Birthday Decor → Balloon Decor / Canopy Decor / Car Boot Decor /
 // Kids Special / Premium / Room Decor.
 replaceChildren("birthday", [
+  // Age/celebration landing nodes. Products are intentionally empty here and
+  // are supplied only by Admin so every age gets its own URL and product list.
+  makeRefNode("category", "kids-birthday", "Kids Birthday", IMAGES.typeKidsBirthday, "Birthday setups for children and kids themes."),
+  makeRefNode("category", "fifth-birthday", "Fifth Birthday", IMAGES.pkgBirthdayBash, "A dedicated page for fifth birthday products."),
+  makeRefNode("category", "teen-birthday", "Teen Birthday", IMAGES.themeStageLights, "Birthday setups for teenagers."),
+  makeRefNode("category", "adult-birthday", "Adult Birthday", IMAGES.pkgPremiumBirthday, "Birthday setups for adults."),
+  makeRefNode("category", "milestone-birthday", "Milestone Birthday", IMAGES.pkgPremiumBirthday, "Milestone birthday setups for 18th, 30th, 40th, 50th and beyond."),
+  makeRefNode("category", "surprise-birthday", "Surprise Birthday", IMAGES.galBirthday2, "Surprise birthday decoration and celebration setups."),
   makeRefNode("category", "balloon-decor", "Balloon Decor", IMAGES.themeBalloonArch, "Birthday balloon arches, garlands and ceiling styling."),
   makeRefNode("category", "canopy-decor", "Canopy Decor", IMAGES.themePony, "Canopy and tent-style birthday setups."),
   makeRefNode("category", "car-boot-decor", "Car Boot Decor", IMAGES.pkgBirthdayBash, "Birthday decorations arranged around the car boot."),
@@ -547,6 +555,18 @@ replaceChildren("birthday", [
 ]);
 
 // Wedding ceremony hierarchy used by the reference flow.
+// Anniversary celebration types are real catalog nodes. Static landing cards
+// point to these pages instead of sending users to Book Event.
+replaceChildren("anniversary", [
+  makeRefNode("category", "first-anniversary", "1st Anniversary", IMAGES.typeAnniversary, "First anniversary celebration setups."),
+  makeRefNode("category", "fifth-anniversary", "5th Anniversary", IMAGES.showcase8, "Fifth anniversary celebration setups."),
+  makeRefNode("category", "tenth-anniversary", "10th Anniversary", IMAGES.showcase1, "Tenth anniversary celebration setups."),
+  makeRefNode("category", "twenty-fifth-anniversary", "25th Anniversary", IMAGES.showcase2, "25th anniversary celebration setups."),
+  makeRefNode("category", "fiftieth-anniversary", "50th Anniversary", IMAGES.pkgPremiumBirthday, "Golden jubilee anniversary celebration setups."),
+  makeRefNode("category", "romantic-anniversary", "Romantic Anniversary", IMAGES.galWedding2, "Romantic anniversary setups."),
+  makeRefNode("category", "anniversary-surprise", "Anniversary Surprise", IMAGES.showcase8, "Surprise anniversary setups."),
+]);
+
 replaceChildren("wedding", [
   makeRefNode("category", "haldi", "Haldi", IMAGES.themeJungleLeaves, "Haldi ceremony decoration packages."),
   makeRefNode("category", "mehndi", "Mehndi", IMAGES.themeMehndiHenna, "Mehndi ceremony decoration packages."),
@@ -558,6 +578,40 @@ replaceChildren("wedding", [
 ]);
 
 // Event Services hierarchy: the visible cards are categories, never products.
+// Kids & Family landing cards map to real category pages. Products remain
+// admin-owned; these nodes are navigation containers only.
+replaceChildren("kids-family", [
+  makeRefNode("category", "baby-shower", "Baby Shower", IMAGES.typeBabyShower, "Baby shower celebration setups."),
+  makeRefNode("category", "annaprashan", "Annaprashan", IMAGES.typeAnnaprashan, "Annaprashan ceremony setups."),
+  makeRefNode("category", "mundan-ceremony", "Mundan Ceremony", IMAGES.showcase5, "Mundan ceremony setups."),
+  makeRefNode("category", "naming-ceremony", "Naming Ceremony", IMAGES.typeNewbornWelcome, "Naming ceremony setups."),
+  makeRefNode("category", "modern-ceremony", "Modern Ceremony", IMAGES.showcase2, "Modern family ceremony setups."),
+  makeRefNode("category", "procession", "Procession", IMAGES.themeStageLights, "Family and celebration procession setups."),
+]);
+
+replaceChildren("corporate", [
+  makeRefNode("category", "annual-day", "Annual Day", IMAGES.galCorporate1, "Annual day event setups."),
+  makeRefNode("category", "product-launch", "Product Launch", IMAGES.heroCorporate, "Branded product launch setups."),
+  makeRefNode("category", "conference", "Conference", IMAGES.galCorporate2, "Conference event setups."),
+  makeRefNode("category", "exhibition", "Exhibition", IMAGES.showcase6, "Exhibition and booth styling."),
+  makeRefNode("category", "awards-ceremony", "Awards Ceremony", IMAGES.showcase1, "Awards ceremony setups."),
+  makeRefNode("category", "employee-engagement", "Employee Engagement", IMAGES.galCorporate3, "Employee engagement event setups."),
+  makeRefNode("category", "dealer-partner-meet", "Dealer / Partner Meet", IMAGES.showcase4, "Dealer and partner meet setups."),
+  makeRefNode("category", "corporate-party", "Corporate Party", IMAGES.themeStageLights, "Corporate party setups."),
+  makeRefNode("category", "seminar-workshop", "Seminar & Workshop", IMAGES.galCorporate2, "Seminar and workshop setups."),
+  makeRefNode("category", "brand-activation", "Brand Activation", IMAGES.heroCorporate, "Brand activation experiences."),
+  makeRefNode("category", "corporate-celebration", "Corporate Celebration", IMAGES.showcase1, "Corporate celebration setups."),
+]);
+
+replaceChildren("festivals-culture", [
+  makeRefNode("category", "diwali", "Diwali", IMAGES.typeFestival, "Diwali celebration setups."),
+  makeRefNode("category", "holi", "Holi", IMAGES.themeHoliColors, "Holi celebration setups."),
+  makeRefNode("category", "christmas", "Christmas", IMAGES.showcase7, "Christmas celebration setups."),
+  makeRefNode("category", "new-year", "New Year", IMAGES.galConcert1, "New Year celebration setups."),
+  makeRefNode("category", "navratri", "Navratri", IMAGES.showcase8, "Navratri celebration setups."),
+  makeRefNode("category", "eid", "Eid", IMAGES.showcase5, "Eid celebration setups."),
+]);
+
 replaceChildren("event-services", [
   makeRefNode("category", "sfx", "SFX", IMAGES.showcase7, "Special effects: cold pyro, fog and fireworks.", [
     makeRefNode("category", "cold-pyro", "Cold Pyro", IMAGES.showcase7, "Cold spark effects for entries and stages."),
@@ -667,6 +721,13 @@ function applyCatalogImages(nodes) {
 let liveOccasionsCache = null;
 let liveOccasionsCacheKey = "";
 
+if (typeof window !== "undefined") {
+  window.addEventListener("nle-catalog-updated", () => {
+    liveOccasionsCache = null;
+    liveOccasionsCacheKey = "";
+  });
+}
+
 function getLiveOccasions() {
   if (typeof window === "undefined") return OCCASIONS;
   try {
@@ -770,6 +831,19 @@ export function findOccasion(slug) {
   return getLiveOccasions().find((o) => o.slug === slug) || null;
 }
 
+export function weddingFunctionLinks() {
+  const wedding = findOccasion("wedding");
+  if (!wedding || !Array.isArray(wedding.children) || wedding.children.length === 0) {
+    return [];
+  }
+  return wedding.children.map((child) => ({
+    label: child.label,
+    img: child.image || child.heroImg || IMAGES.heroWedding,
+    image: child.image || child.heroImg || IMAGES.heroWedding,
+    href: pathFor([wedding, child]),
+    slug: child.slug,
+  }));
+}
 
 function childOf(node, slug) {
   const kids = node.children || [];
@@ -791,6 +865,11 @@ const PATH_ALIASES = {
   "princess-themes": "princess-theme",
   "barbie-themes": "barbie-theme",
   "wedding-car-decoration": "wedding-car",
+  "sangeet": "sangeet-night",
+  "reception": "reception-styling",
+  "wedding-ceremony": "mandap-ceremony-decor",
+  "mandap": "mandap-ceremony-decor",
+  "engagement": "ring-ceremony",
 };
 
 export function resolvePath(slugs) {

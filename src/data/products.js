@@ -44,25 +44,17 @@ export const CATEGORY_DATA = {
   }
 };
 
-/* Products are managed by the production admin catalog.
-   This file intentionally contains no hard-coded product data. */
+import { getProducts as getLiveProducts, getProduct as getLiveProduct } from "../lib/catalogStore";
+
 export const PRODUCTS = {};
 
 export function getProduct(id) {
-  if (typeof id !== "string") return null;
-  return Object.prototype.hasOwnProperty.call(PRODUCTS, id) ? PRODUCTS[id] : null;
+  if (typeof id !== "string" || !id) return null;
+  return getLiveProduct(id);
 }
 
 export function listProducts() {
-  const seen = new Set();
-  return Object.keys(PRODUCTS)
-    .map((key) => PRODUCTS[key])
-    .filter((item) => {
-      const id = item?.slug || item?.id;
-      if (!id || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
+  return getLiveProducts();
 }
 
 export function listSimilar(id, limit) {

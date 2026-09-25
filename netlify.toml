@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA fallback. API calls should use VITE_API_URL when the API is hosted
+# separately (for example the existing Vercel serverless API).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
