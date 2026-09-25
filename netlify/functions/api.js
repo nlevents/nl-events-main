@@ -31,12 +31,32 @@ function routeFromEvent(event) {
     event?.url,
   ].filter(Boolean).map(String);
 
-  for (const candidate of candidates) {
-    const match = candidate.match(/\/api\/(.+?)(?:\?.*)?$/);
-    if (match) return decodeURIComponent(match[1]).replace(/^\/+|\/+$/g, "");
+  // Debug: log in production so Netlify Function logs reveal the actual path shapes
+  console.log("[api] routeFromEvent candidates:", JSON.stringify(candidates));
 
-    const functionMatch = candidate.match(/\/\.netlify\/functions\/api\/(.+?)(?:\?.*)?$/);
-    if (functionMatch) return decodeURIComponent(functionMatch[1]).replace(/^\/+|\/+$/g, "");
+  for (const candidate of candidates) {
+    // Strip query string first for cleaner matching
+    const pathOnly = candidate.split("?")[0];
+
+    // Full URL or path containing /.netlify/functions/api/<route>
+    const fnMatch = pathOnly.match(/\/\.netlify\/functions\/api(?:\/(.+))?$/);
+    if (fnMatch) {
+      const slug = (fnMatch[1] || "").replace(/^\/+|\/+$/g, "");
+      if (slug) return decodeURIComponent(slug);
+    }
+
+    // Path containing /api/<route> (original frontend URL, or after Netlify rewrite)
+    const apiMatch = pathOnly.match(/\/api\/(.+)$/);
+    if (apiMatch) {
+      const slug = apiMatch[1].replace(/^\/+|\/+$/g, "");
+      if (slug) return decodeURIComponent(slug);
+    }
+
+    // Netlify sometimes passes only the splat portion (e.g. "admin/state")
+    // when the function is invoked via a rewrite rule.
+    // Check if the bare path (no leading slash) matches a known route.
+    const bare = pathOnly.replace(/^\/+|\/+$/g, "");
+    if (bare && ROUTES.has(bare)) return bare;
   }
 
   return "";
