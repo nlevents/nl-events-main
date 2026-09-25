@@ -40,7 +40,7 @@ const KEYS = {
   serviceOccasionSplitV2: STORE_KEY_PREFIX + "service_occasion_split_v2",
 };
 
-const STORE_VERSION = "4.7-service-occasion-split";
+const STORE_VERSION = "4.8-category-deletion-persistence";
 const REFERENCE_HIERARCHY_MIGRATION = "2";
 let seedsInitialized = false;
 
@@ -361,27 +361,6 @@ function normalizeReferenceStoredTree(existing) {
   return clone;
 }
 
-function mergeSeedOccasions(existing, seed) {
-  if (!Array.isArray(existing)) return seed;
-  const clone = JSON.parse(JSON.stringify(existing));
-  function mergeNode(target, source) {
-    if (!target || !source) return;
-    target.children = Array.isArray(target.children) ? target.children : [];
-    (source.children || []).forEach((seedChild) => {
-      const found = target.children.find((c) => c.slug === seedChild.slug);
-      if (found) mergeNode(found, seedChild);
-      else target.children.push(JSON.parse(JSON.stringify(seedChild)));
-    });
-  }
-  (seed || []).forEach((seedOccasion) => {
-    const found = clone.find((o) => o.slug === seedOccasion.slug);
-    if (found) mergeNode(found, seedOccasion);
-    else clone.push(JSON.parse(JSON.stringify(seedOccasion)));
-  });
-  return clone;
-}
-
-
 function referenceDemoProducts() {
   const common = (p) => ({
     id: uid("demo-prod"),
@@ -657,21 +636,20 @@ function initializeSeedsIfNeeded() {
   // V2 flag prevents the old purge logic from wiping these links on upgrade.
   seedRealShortsIfNeeded();
 
-  // Apply the supplied reference hierarchy once. The previous builds used a
-  // partially different tree, so merging here would leave old category nodes
-  // in place. After this one-time migration, all future admin edits are
-  // preserved normally. Products are stored separately and remain empty until
-  // an admin creates them.
+  // Initialize the reference hierarchy only when this browser has no catalog yet.
+  // IMPORTANT: never merge SEED_OCCASIONS into an existing admin catalog. A
+  // previous version did that during version migrations, which could resurrect
+  // categories that an admin had intentionally deleted (for example
+  // Annaprashan or Newborn Welcome). The database/local catalog is the source
+  // of truth after the first initialization, so existing trees must be preserved
+  // exactly apart from the safe legacy slug normalization above.
   {
-    // Always merge the improved seed hierarchy into the existing tree instead
-    // of replacing it. This preserves categories and edits created by Admin.
     const storedOccasions = normalizeReferenceStoredTree(readStorage(KEYS.occasions, null));
-    writeStorage(
-      KEYS.occasions,
-      Array.isArray(storedOccasions) && storedOccasions.length > 0
-        ? mergeSeedOccasions(storedOccasions, SEED_OCCASIONS)
-        : JSON.parse(JSON.stringify(SEED_OCCASIONS))
-    );
+    if (Array.isArray(storedOccasions) && storedOccasions.length > 0) {
+      writeStorage(KEYS.occasions, storedOccasions);
+    } else {
+      writeStorage(KEYS.occasions, JSON.parse(JSON.stringify(SEED_OCCASIONS)));
+    }
     localStorage.setItem(KEYS.referenceHierarchyMigration, REFERENCE_HIERARCHY_MIGRATION);
   }
 
