@@ -1,2 +1,7 @@
-# Cloudflare Pages SPA Routing Fallback
+# Route /api/* to the Netlify Function BEFORE the SPA fallback catches it.
+# Without this, the catch-all below would serve index.html for every API call,
+# causing 404/405 errors in the admin panel.
+/api/*  /.netlify/functions/api/:splat  200
+
+# SPA fallback for React Router (all non-API, non-asset routes).
 /*    /index.html   200
