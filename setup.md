@@ -171,16 +171,28 @@ VITE_STRIPE_PUBLISHABLE_KEY   (only if Stripe is enabled)
 VITE_API_URL
 ```
 
-### Important Netlify/API note
+### Netlify API setup
 
-The existing `api/` directory contains Vercel-style serverless handlers. Netlify can host the frontend immediately, but those handlers should either:
+This project now includes a Netlify Function adapter at `netlify/functions/api.js`.
+The existing `/api/*` frontend URLs are routed to that function before the SPA fallback, so the admin catalog, authentication, inquiries, bookings, and account API calls can run on the same Netlify project.
 
-1. remain hosted at the existing compatible API host and be referenced through `VITE_API_URL`, or
-2. be explicitly migrated to Netlify Functions.
+Keep:
 
-Do not assume that a Netlify static deployment automatically executes the Vercel-style `api/*.js` handlers.
+```env
+VITE_API_URL=/api
+```
 
-For a clean temporary setup, keep the frontend on Netlify and point `VITE_API_URL` at the working API deployment.
+Also add the server-side variables in Netlify Environment Variables (Builds + Functions/Runtime):
+
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_ADMIN_EMAILS
+```
+
+If bookings/notifications are enabled, also add the corresponding `RESEND_*` and/or `WHATSAPP_*` variables from `.env.example`.
+
+Do not put `SUPABASE_SERVICE_ROLE_KEY`, `CLOUDINARY_API_SECRET`, or other server secrets in `VITE_*` variables.
 
 ## 8. Vercel — later deployment
 
