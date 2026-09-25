@@ -84,14 +84,33 @@ function createResponse() {
   };
 }
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 export async function handler(event) {
+  // Resolve HTTP method across all Netlify event shapes (v1, v2, Lambda compat)
+  const method = (
+    event?.httpMethod ||
+    event?.method ||
+    event?.requestContext?.http?.method ||
+    "GET"
+  ).toUpperCase();
+
+  // Handle CORS preflight
+  if (method === "OPTIONS") {
+    return { statusCode: 204, headers: CORS_HEADERS, body: "" };
+  }
+
   const route = routeFromEvent(event);
   const target = ROUTES.get(route);
 
   if (!target) {
     return {
       statusCode: 404,
-      headers: { "Content-Type": "application/json; charset=utf-8" },
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({ ok: false, error: "API route not found." }),
     };
   }
@@ -101,7 +120,7 @@ export async function handler(event) {
   );
   const query = event?.queryStringParameters || {};
   const req = {
-    method: event?.httpMethod || event?.requestContext?.http?.method || "GET",
+    method,
     headers,
     body: parseBody(event),
     query,
@@ -113,14 +132,14 @@ export async function handler(event) {
     await target(req, res);
     return {
       statusCode: res.statusCode || 200,
-      headers: res.headers,
+      headers: { ...CORS_HEADERS, ...res.headers },
       body: res.body || "",
     };
   } catch (error) {
     console.error(`Netlify API error for /api/${route}:`, error);
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json; charset=utf-8" },
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({ ok: false, error: error?.message || "Internal server error." }),
     };
   }
