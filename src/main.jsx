@@ -50,27 +50,20 @@ if (typeof window !== "undefined") {
     }
   });
 
-  const hydrate = () =>
-    import('./lib/catalogStore')
-      .then(({ hydrateCatalogFromCloud }) => hydrateCatalogFromCloud())
-      .catch(() => { /* best-effort background hydration */ })
+  // Keep the storefront connected to the admin catalog even when the admin
+  // panel and public website are open in different tabs, browsers, or devices.
+  // The sync endpoint is intentionally tiny; the ~2.7 MB product catalog is
+  // fetched only when its cloud updated_at version changes.
+  const startCatalogSync = () =>
+    import('./lib/cloudStore')
+      .then(({ startPublicCatalogSync }) => startPublicCatalogSync({ intervalMs: 30000 }))
+      .catch(() => { /* best-effort background synchronization */ });
 
-  // Do not compete with the first interaction/navigation for CPU, JSON parsing,
-  // localStorage writes, or network bandwidth. Public catalog hydration is only
-  // a cache refresh; the storefront already has its local/seed fallback.
-  const scheduleHydration = () => {
-    if (document.visibilityState === "hidden") {
-      document.addEventListener("visibilitychange", scheduleHydration, { once: true });
-      return;
-    }
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(hydrate, { timeout: 1500 });
-    } else {
-      window.setTimeout(hydrate, 300);
-    }
-  };
-
-  scheduleHydration();
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(startCatalogSync, { timeout: 1500 });
+  } else {
+    window.setTimeout(startCatalogSync, 300);
+  }
 }
 
 createRoot(document.getElementById('root')).render(

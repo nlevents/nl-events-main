@@ -13,7 +13,8 @@
 // resolves any depth of the tree generically from the URL path.
 // ===========================================================
 
-import { IMAGES } from "./images";
+import { IMAGES, CATALOG_IMAGES } from "./images";
+import { clientImageFor, clientImagesFor } from "./clientImages";
 
 let uid = 0;
 function nextId(prefix) {
@@ -535,15 +536,14 @@ replaceChildren("birthday", [
       makeRefNode("category", "50th-birthday", "50th Birthday", IMAGES.pkgPremiumBirthday),
     ]),
     makeRefNode("category", "surprise-birthday", "Surprise Birthday", IMAGES.galBirthday2),
-    makeRefNode("category", "theme-party", "Theme Party", IMAGES.themeBalloonArch),
-  ]),
-  makeRefNode("category", "popular-birthday-themes", "Popular Birthday Themes", IMAGES.themeBalloonCelebration, "Popular birthday themes.", [
-    makeRefNode("theme", "cocomelon-theme", "Cocomelon Theme", IMAGES.heroBirthday),
-    makeRefNode("theme", "jungle-theme", "Jungle Theme", IMAGES.themeJungleLeaves),
-    makeRefNode("theme", "princess-theme", "Princess Theme", IMAGES.themeTiaraCrown),
-    makeRefNode("theme", "superhero-theme", "Superhero Theme", IMAGES.pkgBirthdayBash),
-    makeRefNode("theme", "unicorn-theme", "Unicorn Theme", IMAGES.themePony),
-    makeRefNode("theme", "car-theme", "Car Theme", IMAGES.pkgBirthdayBash),
+    makeRefNode("category", "theme-party", "Theme Party", IMAGES.themeBalloonArch, "Choose from our popular birthday themes.", [
+      makeRefNode("theme", "cocomelon-theme", "Cocomelon Theme", IMAGES.heroBirthday),
+      makeRefNode("theme", "jungle-theme", "Jungle Theme", IMAGES.themeJungleLeaves),
+      makeRefNode("theme", "princess-theme", "Princess Theme", IMAGES.themeTiaraCrown),
+      makeRefNode("theme", "superhero-theme", "Superhero Theme", IMAGES.pkgBirthdayBash),
+      makeRefNode("theme", "unicorn-theme", "Unicorn Theme", IMAGES.themePony),
+      makeRefNode("theme", "car-theme", "Car Theme", IMAGES.pkgBirthdayBash),
+    ]),
   ]),
 ]);
 
@@ -682,6 +682,64 @@ replaceChildren("event-services", [
   makeRefNode("category", "baraat-procession", "Baraat Procession", IMAGES.themeStageLights, "Dhol, band and baraat entry services."),
 ]);
 
+// Apply the uploaded local image library to the reference tree without
+// changing the tree itself. A child inherits its parent's image set only when
+// it does not have a dedicated set. This gives every visible node a real
+// client image while keeping deeper levels visually distinct.
+const CLIENT_NODE_IMAGE_SET = {
+  wedding: "wedding",
+  "wedding-events": "wedding-events",
+  haldi: "haldi",
+  mehndi: "mehndi",
+  sangeet: "sangeet",
+  wedding: "wedding",
+  reception: "reception",
+  engagement: "engagement",
+  maira: "maira",
+  rituals: "maira",
+  services: "decor",
+  decor: "decor",
+  "sound-technical": "sound-technical",
+  "tent-furniture": "tent-furniture",
+  catering: "catering",
+  "baraat-procession": "baraat-procession",
+  "kids-family": "kids-family",
+  "family-celebrations": "family-celebrations",
+  "baby-shower": "baby-shower",
+  annaprashan: "annaprashan",
+  "mundan-ceremony": "mundan-ceremony",
+  "naming-ceremony": "naming-ceremony",
+  "festivals-culture": "festivals",
+  festivals: "festivals",
+  diwali: "diwali",
+  holi: "holi",
+  christmas: "christmas",
+  "new-year": "new-year",
+  navratri: "navratri",
+  housewarming: "housewarming",
+  farewell: "farewell",
+  "car-theme": "car-theme",
+};
+
+function applyClientImageSets(nodes, inheritedSetKey = null) {
+  (nodes || []).forEach((node, index) => {
+    const ownSetKey = CLIENT_NODE_IMAGE_SET[node.slug];
+    const setKey = ownSetKey || inheritedSetKey;
+    const images = setKey ? clientImagesFor(setKey) : [];
+    if (images.length) {
+      // Use a different source image for sibling cards when possible.
+      node.image = clientImageFor(setKey, index);
+      // The same source folder becomes the hero carousel for that level.
+      node.heroGallery = images.slice(0, 5);
+    }
+    if (Array.isArray(node.children) && node.children.length) {
+      applyClientImageSets(node.children, setKey);
+    }
+  });
+}
+
+applyClientImageSets(OCCASIONS);
+
 // Keep exactly the six public top-level website categories requested.
 const PUBLIC_TOP_LEVEL_SLUGS = new Set([
   "wedding", "birthday", "corporate", "kids-family", "anniversary", "festivals-culture",
@@ -777,7 +835,7 @@ function applyCatalogImages(nodes) {
   let index = 0;
   function walk(list) {
     (list || []).forEach((node) => {
-      node.image = realOccasionImage(node.slug, index++);
+      node.image = CATALOG_IMAGES[node.slug] || realOccasionImage(node.slug, index++);
       if (node.heroImg && node.type !== "occasion") node.heroImg = node.image;
       if (Array.isArray(node.children)) walk(node.children);
     });
@@ -788,6 +846,70 @@ function applyCatalogImages(nodes) {
 
 let liveOccasionsCache = null;
 let liveOccasionsCacheKey = "";
+
+// The six-category reference tree is the public navigation contract. Older
+// localStorage/cloud trees may contain legacy flattened categories, so we
+// rebuild the public navigation shape from the reference tree while
+// preserving admin-managed metadata and products attached to matching nodes.
+function reconcilePublicHierarchy(stored) {
+  const bySlug = new Map((Array.isArray(stored) ? stored : []).map((n) => [n?.slug, n]));
+
+  function mergeNode(reference, previous) {
+    const merged = { ...reference };
+    if (previous && typeof previous === "object") {
+      // Preserve admin-controlled presentation/metadata, but keep the
+      // reference tree's labels, slugs and children as the canonical shape.
+      ["heroImg", "description", "tagline", "active", "sortOrder", "addonOnly"].forEach((key) => {
+        if (previous[key] !== undefined) merged[key] = previous[key];
+      });
+      // Category artwork is intentionally hard-coded to the supplied local
+      // assets for now. This keeps the public website independent of stale
+      // admin/cloud image records while the hierarchy is being finalized.
+      if (!CATALOG_IMAGES[reference.slug] && previous.image !== undefined) {
+        merged.image = previous.image;
+      }
+      if (Array.isArray(previous.products)) merged.products = previous.products;
+    }
+    const previousChildren = new Map((previous?.children || []).map((n) => [n?.slug, n]));
+    merged.children = (reference.children || []).map((child) =>
+      mergeNode(child, previousChildren.get(child.slug))
+    );
+    return merged;
+  }
+
+  return OCCASIONS
+    .filter((o) => PUBLIC_TOP_LEVEL_SLUGS.has(o.slug))
+    .map((reference) => mergeNode(reference, bySlug.get(reference.slug)));
+}
+
+function normalizeLegacyProductPath(prod) {
+  const p = Array.isArray(prod?.categoryPath) ? [...prod.categoryPath] : null;
+  if (!p || p.length < 2) return p;
+
+  // Legacy birthday URLs/categories omitted the Birthday Types wrapper.
+  if (p[0] === "birthday" && p[1] !== "birthday-types") {
+    const birthdayTypeChildren = new Set([
+      "kids-birthday", "teen-birthday", "adult-birthday", "milestone-birthday",
+      "surprise-birthday", "theme-party", "popular-birthday-themes",
+    ]);
+    const birthdayThemes = new Set([
+      "cocomelon-theme", "jungle-theme", "princess-theme", "superhero-theme",
+      "unicorn-theme", "car-theme",
+    ]);
+    if (birthdayThemes.has(p[1])) return ["birthday", "birthday-types", "theme-party", ...p.slice(1)];
+    if (birthdayTypeChildren.has(p[1])) return ["birthday", "birthday-types", ...p.slice(1)];
+  }
+
+  // Legacy wedding URLs omitted the Wedding Events wrapper for functions.
+  if (p[0] === "wedding" && p[1] !== "wedding-events" && p[1] !== "services") {
+    const weddingFunctions = new Set([
+      "haldi", "mehndi", "sangeet", "wedding", "reception", "engagement", "maira", "rituals",
+    ]);
+    if (weddingFunctions.has(p[1])) return ["wedding", "wedding-events", ...p.slice(1)];
+  }
+
+  return p;
+}
 
 if (typeof window !== "undefined") {
   window.addEventListener("nle-catalog-updated", () => {
@@ -810,7 +932,7 @@ function getLiveOccasions() {
     // occasions/categories that an admin deliberately deleted. Only use the
     // seed tree when this browser has never received a catalog tree.
     const hasStoredTree = Array.isArray(parsedOcc);
-    const baseOccasions = hasStoredTree ? parsedOcc : OCCASIONS;
+    const baseOccasions = hasStoredTree ? reconcilePublicHierarchy(parsedOcc) : OCCASIONS;
     const clone = JSON.parse(JSON.stringify(baseOccasions));
 
     // The built-in occasion tree contains reference catalog products,
@@ -847,7 +969,9 @@ function getLiveOccasions() {
       // still finds the node but OccasionBrowser can't tell it's a leaf
       // product and renders CategoryTemplate on it instead — a blank
       // product page.
-      const prod = rawProd.type === "product" ? rawProd : { ...rawProd, type: "product" };
+      const prodBase = rawProd.type === "product" ? rawProd : { ...rawProd, type: "product" };
+      const legacyPath = normalizeLegacyProductPath(prodBase);
+      const prod = legacyPath ? { ...prodBase, categoryPath: legacyPath } : prodBase;
       // A legacy catalog may have a navigation label such as "Haldi" saved
       // as a product. If the same slug/name is now a category/theme node,
       // never render that marker as a sellable package.
@@ -940,8 +1064,7 @@ const PATH_ALIASES = {
   "engagement": "ring-ceremony",
 };
 
-export function resolvePath(slugs) {
-  if (!Array.isArray(slugs) || slugs.length === 0) return null;
+function tryResolveSegments(slugs) {
   const normalizedSlugs = slugs.map((slug) => PATH_ALIASES[slug] || slug);
   const occasion = findOccasion(normalizedSlugs[0]);
   if (!occasion) return null;
@@ -950,12 +1073,54 @@ export function resolvePath(slugs) {
   for (let i = 1; i < normalizedSlugs.length; i++) {
     const next = childOf(node, normalizedSlugs[i]);
     if (!next) return null;
-    // A product must be the final segment — it never has children.
-    if (next.type === "product" && i !== slugs.length - 1) return null;
+    if (next.type === "product" && i !== normalizedSlugs.length - 1) return null;
     node = next;
     trail.push(next);
   }
   return { node, trail };
+}
+
+export function resolvePath(slugs) {
+  if (!Array.isArray(slugs) || slugs.length === 0) return null;
+
+  const direct = tryResolveSegments(slugs);
+  if (direct) return direct;
+
+  // Backward-compatible URL support for the old flattened birthday tree.
+  if (slugs[0] === "birthday" && slugs.length >= 2) {
+    const birthdayTypes = new Set([
+      "kids-birthday", "teen-birthday", "adult-birthday", "milestone-birthday",
+      "surprise-birthday", "theme-party",
+    ]);
+    const birthdayThemes = new Set([
+      "cocomelon-theme", "jungle-theme", "princess-theme", "superhero-theme",
+      "unicorn-theme", "car-theme",
+    ]);
+    const second = slugs[1];
+    if (birthdayThemes.has(second)) {
+      const expanded = ["birthday", "birthday-types", "theme-party", ...slugs.slice(1)];
+      const result = tryResolveSegments(expanded);
+      if (result) return result;
+    }
+    if (birthdayTypes.has(second)) {
+      const expanded = ["birthday", "birthday-types", ...slugs.slice(1)];
+      const result = tryResolveSegments(expanded);
+      if (result) return result;
+    }
+  }
+
+  // Backward-compatible URL support for old wedding function links.
+  if (slugs[0] === "wedding" && slugs.length >= 2) {
+    const weddingFunctions = new Set([
+      "haldi", "mehndi", "sangeet", "wedding", "reception", "engagement", "maira", "rituals",
+    ]);
+    if (weddingFunctions.has(slugs[1])) {
+      const result = tryResolveSegments(["wedding", "wedding-events", ...slugs.slice(1)]);
+      if (result) return result;
+    }
+  }
+
+  return null;
 }
 
 // Builds the href for a node given its trail (ancestor chain to it).
@@ -1252,6 +1417,12 @@ export function collectProductEntries(node, baseTrail) {
 function flattenQuickLinkNodes(node, trail, out = []) {
   if (!node) return out;
   const base = trail || [node];
+
+  // IMPORTANT: navigation must follow the tree one level at a time.
+  // Never flatten grandchildren into the current page. For example:
+  // Wedding Events → Haldi → Traditional Haldi
+  // means Wedding Events shows only Haldi/Mehndi/Sangeet/etc.;
+  // Traditional Haldi appears only after opening Haldi.
   (node.children || []).forEach((child) => {
     const childTrail = [...base, child];
     out.push({
@@ -1261,17 +1432,15 @@ function flattenQuickLinkNodes(node, trail, out = []) {
       type: child.type,
       slug: child.slug,
     });
-    if (Array.isArray(child.children) && child.children.length > 0) {
-      flattenQuickLinkNodes(child, childTrail, out);
-    }
   });
+
   return out;
 }
 
-// Returns the complete navigation set for the theme picker. The compact row
-// intentionally shows only the first few cards, while the View all menu uses
-// this function so deeper/nested theme data is never hidden by a six-card UI
-// limit.
+// Returns the complete navigation set for the current tree level.
+// The compact row intentionally shows only the first few cards, while View all
+// reveals the remaining DIRECT children. Deeper levels are reached by opening
+// the parent node, preserving the exact folder/tree hierarchy.
 export function allQuickLinksFor(node, trail) {
   if (!node) return [];
   if (Array.isArray(node.quickLinks) && node.quickLinks.length > 0) {

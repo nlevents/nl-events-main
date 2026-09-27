@@ -71,83 +71,11 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/images/brand/favicon-192.png">
 <link rel="apple-touch-icon" href="/assets/images/brand/favicon-180.png">
 
-<!-- Preload the homepage's first hero image so it starts downloading in
-     parallel with the JS bundle, instead of only being requested after React
-     mounts and renders it. Keep this in sync with IMAGES.heroHome in
-     src/data/images.js if that image ever changes. -->
+<!-- The homepage is loaded eagerly; keep the first hero image warm while React boots. -->
 <link rel="preload" as="image" fetchpriority="high" href="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1600&q=75">
 
-<style>
-  #nle-loader{
-    position:fixed; inset:0; z-index:9999;
-    display:flex; align-items:center; justify-content:center;
-    background:#faf7f0;
-    transition:opacity .45s ease;
-  }
-  [data-theme="dark"] #nle-loader{ background:#03152d; }
-  #nle-loader.nle-loader-hide{ opacity:0; pointer-events:none; }
-  #nle-loader .nle-loader-mark{
-    position:relative; width:76px; height:76px;
-    display:flex; align-items:center; justify-content:center;
-  }
-  #nle-loader .nle-loader-mark img{
-    width:42px; height:42px; border-radius:50%;
-    animation:nle-pulse 1.4s ease-in-out infinite;
-  }
-  #nle-loader .nle-loader-ring{
-    position:absolute; inset:0; border-radius:50%;
-    border:2.5px solid rgba(193,151,67,.18); border-top-color:#c19743;
-    animation:nle-spin .9s linear infinite;
-  }
-  @keyframes nle-spin{ to{ transform:rotate(360deg); } }
-  @keyframes nle-pulse{ 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.08); opacity:.85; } }
-</style>
-</head>
-<body>
-<div id="nle-loader" aria-hidden="true">
-  <div class="nle-loader-mark">
-    <div class="nle-loader-ring"></div>
-    <img src="/assets/images/brand/logo.png" alt="" width="42" height="42">
-  </div>
-</div>
 <div id="root"></div>
 <script type="module" src="/src/main.jsx"></script>
-<script>
-(function(){
-  var loader = document.getElementById('nle-loader');
-  if (!loader) return;
-  var isHome = location.pathname === '/';
-  var MIN_MS = 350;   // avoid a flash-of-loader on fast connections
-  var MAX_MS = 4000;  // never block the site longer than this, whatever fails
-  var start = Date.now();
-  var hidden = false;
-  var appReady = false;
-  var imageReady = !isHome; // only the homepage needs the hero image ready
 
-  function tryHide(){
-    if (hidden || !appReady || !imageReady) return;
-    hidden = true;
-    var wait = Math.max(0, MIN_MS - (Date.now() - start));
-    setTimeout(function(){
-      loader.classList.add('nle-loader-hide');
-      setTimeout(function(){ if (loader.parentNode) loader.parentNode.removeChild(loader); }, 500);
-    }, wait);
-  }
-
-  // Dispatched by usePageMeta once the actual page component has mounted —
-  // see src/hooks/usePageMeta.js.
-  window.addEventListener('nle:app-ready', function(){ appReady = true; tryHide(); }, { once: true });
-
-  if (isHome) {
-    var heroImg = new Image();
-    heroImg.onload = heroImg.onerror = function(){ imageReady = true; tryHide(); };
-    heroImg.src = "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1600&q=75";
-  }
-
-  // Safety net: something failed to fire (slow network, blocked request,
-  // JS error) — reveal the site anyway rather than leaving it hidden.
-  setTimeout(function(){ appReady = true; imageReady = true; tryHide(); }, MAX_MS);
-})();
-</script>
 </body>
 </html>

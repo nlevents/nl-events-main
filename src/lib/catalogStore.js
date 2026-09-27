@@ -1045,13 +1045,13 @@ export function getBirthdayAgeCategories() {
   const stored = raw ? readStorage(KEYS.birthdayAgeCategories, null) : null;
   const list = Array.isArray(stored) ? stored : DEFAULT_BIRTHDAY_AGE_CATEGORIES;
   const canonicalBirthdayHrefs = {
-    "birthday-kids": "/occasion/birthday/kids-birthday",
-    "birthday-fifth": "/occasion/birthday/fifth-birthday",
-    "birthday-teen": "/occasion/birthday/teen-birthday",
-    "birthday-adult": "/occasion/birthday/adult-birthday",
-    "birthday-milestone": "/occasion/birthday/milestone-birthday",
-    "birthday-surprise": "/occasion/birthday/surprise-birthday",
-    "birthday-themes": "/occasion/birthday/kids-birthday",
+    "birthday-kids": "/occasion/birthday/birthday-types/kids-birthday",
+    "birthday-fifth": "/occasion/birthday/birthday-types/milestone-birthday",
+    "birthday-teen": "/occasion/birthday/birthday-types/teen-birthday",
+    "birthday-adult": "/occasion/birthday/birthday-types/adult-birthday",
+    "birthday-milestone": "/occasion/birthday/birthday-types/milestone-birthday",
+    "birthday-surprise": "/occasion/birthday/birthday-types/surprise-birthday",
+    "birthday-themes": "/occasion/birthday/birthday-types/theme-party",
   };
   birthdayAgeCacheValue = list
     .map((item, index) => ({
@@ -1069,13 +1069,13 @@ export function getBirthdayAgeCategories() {
 
 export function saveBirthdayAgeCategories(items) {
   const canonicalBirthdayHrefs = {
-    "birthday-kids": "/occasion/birthday/kids-birthday",
-    "birthday-fifth": "/occasion/birthday/fifth-birthday",
-    "birthday-teen": "/occasion/birthday/teen-birthday",
-    "birthday-adult": "/occasion/birthday/adult-birthday",
-    "birthday-milestone": "/occasion/birthday/milestone-birthday",
-    "birthday-surprise": "/occasion/birthday/surprise-birthday",
-    "birthday-themes": "/occasion/birthday/kids-birthday",
+    "birthday-kids": "/occasion/birthday/birthday-types/kids-birthday",
+    "birthday-fifth": "/occasion/birthday/birthday-types/milestone-birthday",
+    "birthday-teen": "/occasion/birthday/birthday-types/teen-birthday",
+    "birthday-adult": "/occasion/birthday/birthday-types/adult-birthday",
+    "birthday-milestone": "/occasion/birthday/birthday-types/milestone-birthday",
+    "birthday-surprise": "/occasion/birthday/birthday-types/surprise-birthday",
+    "birthday-themes": "/occasion/birthday/birthday-types/theme-party",
   };
   const safe = (Array.isArray(items) ? items : [])
     .map((item, index) => ({

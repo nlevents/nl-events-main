@@ -44,14 +44,14 @@ export const SEARCH_INDEX = [
   { label: "Ring Ceremony Decor Setup", cat: "Product", href: "/occasion/wedding/ring-ceremony/ring-ceremony-decor-setup", keywords: "ring ceremony decor setup" },
 
   // Birthday subcategories
-  { label: "Kids Birthday Themes", cat: "Kids Theme Decor", href: "/occasion/birthday/kids-birthday", keywords: "kids birthday themes cartoon princess superhero animal" },
-  { label: "Milestone Birthday", cat: "Kids Theme Decor", href: "/occasion/birthday/milestone-birthday", keywords: "milestone birthday 18th 30th 50th gold silver" },
-  { label: "Balloon Decor Setups", cat: "Kids Theme Decor", href: "/occasion/birthday/balloon-decor-setups", keywords: "balloon arch backdrop birthday" },
-  { label: "Princess Theme Birthday", cat: "Product", href: "/occasion/birthday/kids-birthday/princess-themes/royal-princess-party", keywords: "princess castle throne birthday party" },
-  { label: "Superhero Theme Birthday", cat: "Product", href: "/occasion/birthday/kids-birthday/superhero-themes/superhero-squad-party", keywords: "superhero spiderman avengers batman birthday" },
-  { label: "Animal Theme Birthday", cat: "Kids Theme Decor", href: "/occasion/birthday/kids-birthday/animal-themes/jungle-safari-birthday", keywords: "jungle safari animal horse birthday" },
-  { label: "Frozen Ice-Princess Party", cat: "Product", href: "/occasion/birthday/kids-birthday/princess-themes/frozen-ice-princess-party", keywords: "frozen ice princess elsa birthday" },
-  { label: "Balloon Arch Backdrop", cat: "Product", href: "/occasion/birthday/balloon-decor-setups/balloon-arch-backdrop", keywords: "balloon arch backdrop birthday" },
+  { label: "Kids Birthday Themes", cat: "Kids Theme Decor", href: "/occasion/birthday/birthday-types/kids-birthday", keywords: "kids birthday themes cartoon princess superhero animal" },
+  { label: "Milestone Birthday", cat: "Kids Theme Decor", href: "/occasion/birthday/birthday-types/milestone-birthday", keywords: "milestone birthday 18th 30th 50th gold silver" },
+  { label: "Balloon Decor Setups", cat: "Kids Theme Decor", href: "/occasion/birthday/birthday-types/theme-party", keywords: "balloon arch backdrop birthday" },
+  { label: "Princess Theme Birthday", cat: "Product", href: "/occasion/birthday/birthday-types/theme-party/princess-theme/royal-princess-party", keywords: "princess castle throne birthday party" },
+  { label: "Superhero Theme Birthday", cat: "Product", href: "/occasion/birthday/birthday-types/theme-party/superhero-theme/superhero-squad-party", keywords: "superhero spiderman avengers batman birthday" },
+  { label: "Animal Theme Birthday", cat: "Kids Theme Decor", href: "/occasion/birthday/birthday-types/theme-party/jungle-theme/jungle-safari-birthday", keywords: "jungle safari animal horse birthday" },
+  { label: "Frozen Ice-Princess Party", cat: "Product", href: "/occasion/birthday/birthday-types/theme-party/princess-theme/frozen-ice-princess-party", keywords: "frozen ice princess elsa birthday" },
+  { label: "Balloon Arch Backdrop", cat: "Product", href: "/occasion/birthday/birthday-types/theme-party/balloon-arch-backdrop", keywords: "balloon arch backdrop birthday" },
 
   // Anniversary subcategories
   { label: "Candlelight Dinner Setup", cat: "Product", href: "/occasion/anniversary/candlelight-celebrations/candlelight-dinner-setup", keywords: "candlelight dinner anniversary romance" },

@@ -15,33 +15,33 @@ export const CATEGORY_NAV = [
     label: "Kids Theme Decor",
     href: "/occasion/birthday",
     type: "mega",
-    featured: { img: IMAGES.pkgPremiumBirthday, title: "Premium Birthday", subtitle: "Custom theme, premium florals & host coordination", href: "/occasion/birthday/milestone-birthday/elegant-30th-milestone" },
+    featured: { img: IMAGES.pkgPremiumBirthday, title: "Premium Birthday", subtitle: "Custom theme, premium florals & host coordination", href: "/occasion/birthday/birthday-types/milestone-birthday/elegant-30th-milestone" },
     columns: [
       {
         heading: "Birthday Decoration",
         links: [
           { label: "All Birthday Decorations", href: "/occasion/birthday" },
-          { label: "Kids Birthday", href: "/occasion/birthday/kids-birthday" },
-          { label: "Milestone Birthdays", href: "/occasion/birthday/milestone-birthday" },
-          { label: "Balloon Decor Setups", href: "/occasion/birthday/balloon-decor-setups" },
+          { label: "Kids Birthday", href: "/occasion/birthday/birthday-types/kids-birthday" },
+          { label: "Milestone Birthdays", href: "/occasion/birthday/birthday-types/milestone-birthday" },
+          { label: "Balloon Decor Setups", href: "/occasion/birthday/birthday-types/theme-party" },
         ],
       },
       {
         heading: "Kids Theme Birthday",
         links: [
-          { label: "All Themes", href: "/occasion/birthday/kids-birthday" },
-          { label: "Animal Themes", href: "/occasion/birthday/kids-birthday/animal-themes" },
-          { label: "Princess Themes", href: "/occasion/birthday/kids-birthday/princess-themes" },
-          { label: "Superhero Themes", href: "/occasion/birthday/kids-birthday/superhero-themes" },
+          { label: "All Themes", href: "/occasion/birthday/birthday-types/kids-birthday" },
+          { label: "Animal Themes", href: "/occasion/birthday/birthday-types/theme-party/jungle-theme" },
+          { label: "Princess Themes", href: "/occasion/birthday/birthday-types/theme-party/princess-theme" },
+          { label: "Superhero Themes", href: "/occasion/birthday/birthday-types/theme-party/superhero-theme" },
         ],
       },
       {
         heading: "Party Setups",
         links: [
-          { label: "Balloon Arch Backdrop", href: "/occasion/birthday/balloon-decor-setups/balloon-arch-backdrop" },
-          { label: "Balloon Ceiling Cloud", href: "/occasion/birthday/balloon-decor-setups/balloon-ceiling-cloud" },
-          { label: "Elegant 30th Milestone", href: "/occasion/birthday/milestone-birthday/elegant-30th-milestone" },
-          { label: "Golden Glam Birthday", href: "/occasion/birthday/milestone-birthday/golden-glam-birthday" },
+          { label: "Balloon Arch Backdrop", href: "/occasion/birthday/birthday-types/theme-party/balloon-arch-backdrop" },
+          { label: "Balloon Ceiling Cloud", href: "/occasion/birthday/birthday-types/theme-party/balloon-ceiling-cloud" },
+          { label: "Elegant 30th Milestone", href: "/occasion/birthday/birthday-types/milestone-birthday/elegant-30th-milestone" },
+          { label: "Golden Glam Birthday", href: "/occasion/birthday/birthday-types/milestone-birthday/golden-glam-birthday" },
         ],
       },
       {
@@ -57,22 +57,22 @@ export const CATEGORY_NAV = [
   {
     key: "balloon-decor",
     label: "Balloon Decor",
-    href: "/occasion/birthday/balloon-decor-setups",
+    href: "/occasion/birthday/birthday-types/theme-party",
     type: "mega",
-    featured: { img: IMAGES.pkgBirthdayBash, title: "Themed Balloon Setups", subtitle: "Arches, bouquets & full-room balloon styling", href: "/occasion/birthday/balloon-decor-setups/balloon-arch-backdrop" },
+    featured: { img: IMAGES.pkgBirthdayBash, title: "Themed Balloon Setups", subtitle: "Arches, bouquets & full-room balloon styling", href: "/occasion/birthday/birthday-types/theme-party/balloon-arch-backdrop" },
     columns: [
       {
         heading: "Balloon Styles",
         links: [
-          { label: "Balloon Arch Backdrop", href: "/occasion/birthday/balloon-decor-setups/balloon-arch-backdrop" },
-          { label: "Balloon Ceiling Cloud", href: "/occasion/birthday/balloon-decor-setups/balloon-ceiling-cloud" },
-          { label: "All Balloon Setups", href: "/occasion/birthday/balloon-decor-setups" },
+          { label: "Balloon Arch Backdrop", href: "/occasion/birthday/birthday-types/theme-party/balloon-arch-backdrop" },
+          { label: "Balloon Ceiling Cloud", href: "/occasion/birthday/birthday-types/theme-party/balloon-ceiling-cloud" },
+          { label: "All Balloon Setups", href: "/occasion/birthday/birthday-types/theme-party" },
         ],
       },
       {
         heading: "By Occasion",
         links: [
-          { label: "Birthday Balloon Decor", href: "/occasion/birthday/balloon-decor-setups" },
+          { label: "Birthday Balloon Decor", href: "/occasion/birthday/birthday-types/theme-party" },
           { label: "Anniversary Balloon Decor", href: "/occasion/anniversary/surprise-setups" },
           { label: "Baby Shower Balloon Decor", href: "/occasion/baby-shower/photo-corner-setups/balloon-photo-corner" },
           { label: "Newborn Welcome Decor", href: "/occasion/newborn-welcome" },
@@ -192,10 +192,10 @@ export const CATEGORY_NAV = [
       {
         heading: "Kids Birthday",
         links: [
-          { label: "All Kids Themes", href: "/occasion/birthday/kids-birthday" },
-          { label: "Princess Themes", href: "/occasion/birthday/kids-birthday/princess-themes" },
-          { label: "Superhero Themes", href: "/occasion/birthday/kids-birthday/superhero-themes" },
-          { label: "Jungle Themes", href: "/occasion/birthday/kids-birthday/jungle-themes" },
+          { label: "All Kids Themes", href: "/occasion/birthday/birthday-types/kids-birthday" },
+          { label: "Princess Themes", href: "/occasion/birthday/birthday-types/theme-party/princess-theme" },
+          { label: "Superhero Themes", href: "/occasion/birthday/birthday-types/theme-party/superhero-theme" },
+          { label: "Jungle Themes", href: "/occasion/birthday/birthday-types/theme-party/jungle-theme" },
         ],
       },
     ],

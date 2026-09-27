@@ -11,7 +11,7 @@ import { AdminAuthProvider } from "./context/AdminAuthContext";
 // Route-level code splitting: each page is fetched only when visited,
 // keeping the initial JS payload small.
 const Landing = lazy(() => import("./pages/Landing"));
-const Home = lazy(() => import("./pages/Home"));
+import Home from "./pages/Home.jsx";
 const Services = lazy(() => import("./pages/Services"));
 const Products = lazy(() => import("./pages/Products"));
 const Packages = lazy(() => import("./pages/Packages"));

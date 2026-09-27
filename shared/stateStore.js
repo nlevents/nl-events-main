@@ -30,9 +30,12 @@ export async function writeState(env, key, data, userId = null) {
   // Upsert atomically on the unique `key` column. The old PATCH-then-POST
   // approach could race with another admin save and, when the row did not
   // exist yet, could also attempt a duplicate insert.
-  const rows = await db.query("app_state?on_conflict=key", {
+  await db.query("app_state?on_conflict=key", {
     method: "POST",
-    prefer: "resolution=merge-duplicates,return=representation",
+    // Admin writes never need the full JSONB row echoed back. In particular,
+    // the products bucket is ~2.7 MB, so returning the representation would
+    // create unnecessary Supabase egress on every save.
+    prefer: "resolution=merge-duplicates,return=minimal",
     body: {
       key,
       data,
@@ -40,7 +43,7 @@ export async function writeState(env, key, data, userId = null) {
       updated_by: userId,
     },
   });
-  return rows?.[0] || rows;
+  return { key };
 }
 
 export async function writeMissingStates(env, state, userId = null) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IMAGES, waLink } from "../data/images";
+import { IMAGES, CATALOG_IMAGES, waLink } from "../data/images";
 import ProductCard from "../components/occasion/ProductCard";
 import { pathFor, sortProducts, weddingFunctionLinks, findOccasion } from "../data/occasions";
 import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
@@ -10,24 +10,24 @@ import { getAddonsForOccasion } from "../lib/catalogStore";
 import { onImgError } from "../lib/imageFallback";
 
 const FUNCTIONS = [
-  { label: "Haldi", img: IMAGES.themeJungleLeaves, href: "/occasion/wedding/haldi" },
-  { label: "Mehendi", img: IMAGES.themeMehndiHenna, href: "/occasion/wedding/mehndi" },
-  { label: "Sangeet", img: IMAGES.themeStageLights, href: "/occasion/wedding/sangeet-night" },
-  { label: "Wedding", img: IMAGES.heroWedding, href: "/occasion/wedding/mandap-ceremony-decor" },
-  { label: "Reception", img: IMAGES.showcase1, href: "/occasion/wedding/reception-styling" },
-  { label: "Engagement", img: IMAGES.showcase2, href: "/occasion/wedding/ring-ceremony" },
-  { label: "Mayra / Rituals", img: IMAGES.showcase5, href: "/occasion/wedding" },
+  { label: "Haldi", img: CATALOG_IMAGES.haldi, href: "/occasion/wedding/wedding-events/haldi" },
+  { label: "Mehendi", img: CATALOG_IMAGES.mehndi, href: "/occasion/wedding/wedding-events/mehndi" },
+  { label: "Sangeet", img: CATALOG_IMAGES.sangeet, href: "/occasion/wedding/wedding-events/sangeet" },
+  { label: "Wedding", img: CATALOG_IMAGES.wedding, href: "/occasion/wedding/wedding-events/wedding" },
+  { label: "Reception", img: CATALOG_IMAGES.reception, href: "/occasion/wedding/wedding-events/reception" },
+  { label: "Engagement", img: CATALOG_IMAGES.engagement, href: "/occasion/wedding/wedding-events/engagement" },
+  { label: "Mayra / Rituals", img: CATALOG_IMAGES.maira, href: "/occasion/wedding" },
 ];
 
 const SERVICES = [
-  ["Decor", "Packages & Elements", IMAGES.typeDecor],
-  ["Entry", "Grand & Unique Entries", IMAGES.showcase4],
-  ["Entertainment", "Artists, DJ & Live Bands", IMAGES.galConcert2],
-  ["Sound & Technical", "Sound, Lighting, LED & Effects", IMAGES.themeStageLights],
-  ["Tent & Furniture", "Tents, Seating & Tables", IMAGES.showcase2],
-  ["Photography", "Capture Every Moment", IMAGES.typePhotography],
-  ["Catering", "Delicious Food Experiences", IMAGES.typeCatering],
-  ["Baraat / Procession", "Make an Unforgettable Entry", IMAGES.showcase3],
+  ["Decor", "Packages & Elements", CATALOG_IMAGES.decor],
+  ["Entry", "Grand & Unique Entries", CATALOG_IMAGES["wedding-activity"] || CATALOG_IMAGES["services"]],
+  ["Entertainment", "Artists, DJ & Live Bands", CATALOG_IMAGES.entertainment],
+  ["Sound & Technical", "Sound, Lighting, LED & Effects", CATALOG_IMAGES["sound-technical"]],
+  ["Tent & Furniture", "Tents, Seating & Tables", CATALOG_IMAGES["tent-furniture"]],
+  ["Photography", "Capture Every Moment", CATALOG_IMAGES["photography-videography"]],
+  ["Catering", "Delicious Food Experiences", CATALOG_IMAGES.catering],
+  ["Baraat / Procession", "Make an Unforgettable Entry", CATALOG_IMAGES["baraat-procession"]],
 ];
 
 const PACKAGES = [

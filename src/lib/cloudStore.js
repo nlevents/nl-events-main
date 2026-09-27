@@ -159,6 +159,56 @@ export async function hydratePublicState() {
   return { ...state, ...(localProducts ? {} : {}) };
 }
 
+// Keep an already-open storefront synchronized with admin changes made in
+// another tab, browser, or device. Same-browser changes are already covered
+// by the storage event in main.jsx; this lightweight polling only fetches the
+// small catalog bootstrap, and the large products payload is fetched only
+// when its updated_at version changes.
+let publicSyncTimer = null;
+let publicSyncInFlight = false;
+let publicSyncLastRun = 0;
+
+export function startPublicCatalogSync({ intervalMs = 30000, minRunGapMs = 5000 } = {}) {
+  if (typeof window === "undefined") return () => {};
+  if (publicSyncTimer) return () => stopPublicCatalogSync();
+
+  const run = async (force = false) => {
+    if (document.visibilityState === "hidden") return;
+    const now = Date.now();
+    if (!force && now - publicSyncLastRun < minRunGapMs) return;
+    if (publicSyncInFlight) return;
+    publicSyncLastRun = now;
+    publicSyncInFlight = true;
+    try {
+      await hydratePublicState();
+    } catch {
+      // The storefront always has a local/seed fallback.
+    } finally {
+      publicSyncInFlight = false;
+    }
+  };
+
+  const onVisibility = () => {
+    if (document.visibilityState === "visible") run(true);
+  };
+  const onFocus = () => run(true);
+
+  document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("focus", onFocus);
+  publicSyncTimer = window.setInterval(() => run(false), intervalMs);
+  run(true);
+
+  return () => stopPublicCatalogSync();
+}
+
+export function stopPublicCatalogSync() {
+  if (typeof window === "undefined") return;
+  if (publicSyncTimer) {
+    window.clearInterval(publicSyncTimer);
+    publicSyncTimer = null;
+  }
+}
+
 export async function hydrateAdminState() {
   const token = getAdminAccessToken();
   if (!token) return {};

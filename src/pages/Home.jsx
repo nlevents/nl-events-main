@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IMAGES, waLink } from "../data/images";
+import { IMAGES, CATALOG_IMAGES, waLink } from "../data/images";
 import { GLOBAL_ADDONS } from "../data/addons";
 import { onImgError } from "../lib/imageFallback";
 import usePageMeta from "../hooks/usePageMeta";
@@ -20,34 +20,34 @@ const CELEBRATIONS = [
 ];
 
 const WEDDING_CONCEPTS = [
-  { label: "Haldi", img: IMAGES.showcase1 },
-  { label: "Mehendi", img: IMAGES.themeMehndiHenna },
-  { label: "Sangeet", img: IMAGES.showcase3 },
-  { label: "Wedding", img: IMAGES.galWedding1 },
-  { label: "Reception", img: IMAGES.galWedding2 },
-  { label: "Engagement", img: IMAGES.showcase4 },
-  { label: "Mayra / Rituals", img: IMAGES.showcase5 },
+  { label: "Haldi", img: CATALOG_IMAGES.haldi },
+  { label: "Mehendi", img: CATALOG_IMAGES.mehndi },
+  { label: "Sangeet", img: CATALOG_IMAGES.sangeet },
+  { label: "Wedding", img: CATALOG_IMAGES.wedding },
+  { label: "Reception", img: CATALOG_IMAGES.reception },
+  { label: "Engagement", img: CATALOG_IMAGES.engagement },
+  { label: "Mayra / Rituals", img: CATALOG_IMAGES.maira },
 ];
 
 const WEDDING_SERVICES = [
-  { label: "Décor", sub: "Packages & elements", img: IMAGES.typeDecor },
+  { label: "Décor", sub: "Packages & elements", img: CATALOG_IMAGES.decor },
   { label: "Entry", sub: "Grand & unique entries", img: IMAGES.showcase4 },
-  { label: "Entertainment", sub: "Artists, DJ, live bands", img: IMAGES.galConcert2 },
-  { label: "Sound & Technical", sub: "Lighting, AV, effects", img: IMAGES.themeStageLights },
-  { label: "Tent & Furniture", sub: "Tents, seating, tables", img: IMAGES.showcase2 },
-  { label: "Photography & Videography", sub: "Capture every moment", img: IMAGES.typePhotography },
-  { label: "Catering", sub: "Delicious food experiences", img: IMAGES.typeCatering },
-  { label: "Baraat / Procession", sub: "Make an unforgettable entry", img: IMAGES.themeStageLights },
+  { label: "Entertainment", sub: "Artists, DJ, live bands", img: CATALOG_IMAGES.entertainment },
+  { label: "Sound & Technical", sub: "Lighting, AV, effects", img: CATALOG_IMAGES["sound-technical"] },
+  { label: "Tent & Furniture", sub: "Tents, seating, tables", img: CATALOG_IMAGES["tent-furniture"] },
+  { label: "Photography & Videography", sub: "Capture every moment", img: CATALOG_IMAGES["photography-videography"] },
+  { label: "Catering", sub: "Delicious food experiences", img: CATALOG_IMAGES.catering },
+  { label: "Baraat / Procession", sub: "Make an unforgettable entry", img: CATALOG_IMAGES["baraat-procession"] },
 ];
 
 const BIRTHDAY_THEMES = [
-  { label: "Jungle", img: IMAGES.themeJungleLeaves },
-  { label: "Cocomelon", img: IMAGES.typeKidsBirthday },
-  { label: "Fairy", img: IMAGES.themeTiaraCrown },
-  { label: "Superhero", img: IMAGES.heroBirthday },
-  { label: "Barbie", img: IMAGES.themePony },
-  { label: "Frozen", img: IMAGES.heroBirthday },
-  { label: "And Many More!", img: IMAGES.themeBalloonCelebration },
+  { label: "Jungle", img: CATALOG_IMAGES["jungle-theme"] },
+  { label: "Cocomelon", img: CATALOG_IMAGES["cocomelon-theme"] },
+  { label: "Fairy", img: CATALOG_IMAGES["princess-theme"] },
+  { label: "Superhero", img: CATALOG_IMAGES["superhero-theme"] },
+  { label: "Barbie", img: CATALOG_IMAGES["unicorn-theme"] },
+  { label: "Frozen", img: CATALOG_IMAGES["jungle-theme"] },
+  { label: "And Many More!", img: CATALOG_IMAGES["theme-party"] },
 ];
 
 const RECENT_WORK = [
@@ -196,7 +196,7 @@ function CelebrationSection() {
           {celebrations.map((item) => (
             <Link to={item.href} className="ref-home-celebration-card" key={item.label} onPointerEnter={() => prefetchOccasionRoute(item.href)} onFocus={() => prefetchOccasionRoute(item.href)}>
               <span className="ref-home-celebration-image">
-                <img src={item.img} alt={item.label} data-context={item.label} loading="lazy" decoding="async" onError={onImgError} />
+                <img src={item.img} alt={item.label} data-context={item.label} loading="eager" fetchPriority="high" decoding="async" onError={onImgError} />
               </span>
               <b>{item.label}</b>
             </Link>
