@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import "../../styles/admin.css";
 import { useState } from "react";
 import { NavLink, Outlet, useLocation, Navigate } from "react-router-dom";
@@ -111,7 +112,7 @@ export default function AdminLayout() {
     return (
     <>
       <div className="admin-sidebar-brand">
-        {isCrm ? <img src="/assets/images/landing/nle-logo.png" alt="Next Level Events" /> : <>Next Level <span>Admin</span></>}
+        {isCrm ? <img src={cloudinaryAsset("/assets/images/brand/logo.png")} alt="Next Level Events" /> : <>Next Level <span>Admin</span></>}
       </div>
       <nav className="admin-nav">
         {groups.map((group) => (

@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Icon from "./Icon";
@@ -106,7 +107,7 @@ export default function Header() {
 
             <Link to="/" className="brand-mark-link" aria-label="Next Level Events — Home">
               <span className="brand-mark">
-                <img src="/assets/images/brand/logo.png" alt="Next Level Events logo" width="34" height="34" />
+                <img src={cloudinaryAsset("/assets/images/brand/logo.png")} alt="Next Level Events logo" width="34" height="34" />
               </span>
               <span className="brand-name-full">Next Level Events<span>.</span></span>
             </Link>
@@ -228,7 +229,7 @@ export default function Header() {
       <div className={"mobile-menu" + (mobileOpen ? " is-open" : "")} aria-hidden={!mobileOpen}>
         <div className="container mobile-menu-top">
           <Link to="/" className="brand">
-            <span className="brand-mark"><img src="/assets/images/brand/logo.png" alt="Next Level Events logo" width="34" height="34" /></span>
+            <span className="brand-mark"><img src={cloudinaryAsset("/assets/images/brand/logo.png")} alt="Next Level Events logo" width="34" height="34" /></span>
             <span>Next Level Events<span>.</span></span>
           </Link>
           <button className="hamburger" type="button" aria-label="Close menu" onClick={() => setMobileOpen(false)}>

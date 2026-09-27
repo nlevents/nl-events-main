@@ -155,7 +155,11 @@ function CelebrationSection() {
   const [celebrations, setCelebrations] = useState(() => {
     const live = listOccasions();
     if (!live || !live.length) return CELEBRATIONS;
-    return live.map((occ) => {
+    const desiredOrder = ["wedding", "birthday", "anniversary", "kids-family", "corporate", "festivals-culture"];
+    const ordered = desiredOrder
+      .map((slug) => live.find((occ) => occ.slug === slug))
+      .filter(Boolean);
+    return ordered.map((occ) => {
       const matching = CELEBRATIONS.find((c) => c.href.includes(occ.slug));
       return {
         label: occ.label,
@@ -169,8 +173,12 @@ function CelebrationSection() {
     const refresh = () => {
       const live = listOccasions();
       if (live && live.length) {
+        const desiredOrder = ["wedding", "birthday", "anniversary", "kids-family", "corporate", "festivals-culture"];
+        const ordered = desiredOrder
+          .map((slug) => live.find((occ) => occ.slug === slug))
+          .filter(Boolean);
         setCelebrations(
-          live.map((occ) => {
+          ordered.map((occ) => {
             const matching = CELEBRATIONS.find((c) => c.href.includes(occ.slug));
             return {
               label: occ.label,

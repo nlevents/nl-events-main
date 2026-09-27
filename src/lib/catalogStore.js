@@ -5,7 +5,7 @@
 
 import { OCCASIONS as SEED_OCCASIONS, flattenCategoryTree, categoryByPath, pathFor, allProductsOf } from "../data/occasions";
 import { GALLERY_ITEMS as SEED_GALLERY } from "../data/categories";
-import { IMAGES } from "../data/images";
+import { IMAGES, CATALOG_IMAGES } from "../data/images";
 import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
 import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { GLOBAL_ADDONS as SEED_GLOBAL_ADDONS, EXTRA_ADDONS_BY_OCCASION as SEED_EXTRA_ADDONS, SEED_ADDON_PRODUCTS } from "../data/addons";
@@ -45,12 +45,12 @@ const REFERENCE_HIERARCHY_MIGRATION = "3";
 let seedsInitialized = false;
 
 const DEFAULT_BIRTHDAY_AGE_CATEGORIES = [
-  { id: "birthday-kids", title: "Kids Birthday", subtitle: "Age 1–12", image: IMAGES.typeKidsBirthday, href: "/occasion/birthday/birthday-types/kids-birthday", active: true, sortOrder: 1 },
-  { id: "birthday-teen", title: "Teen Birthday", subtitle: "Age 13–18", image: IMAGES.themeStageLights, href: "/occasion/birthday/birthday-types/teen-birthday", active: true, sortOrder: 2 },
-  { id: "birthday-adult", title: "Adult Birthday", subtitle: "Age 18+", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/birthday-types/adult-birthday", active: true, sortOrder: 3 },
-  { id: "birthday-milestone", title: "Milestone Birthday", subtitle: "20th, 30th, 40th, 50th", image: IMAGES.pkgPremiumBirthday, href: "/occasion/birthday/birthday-types/milestone-birthday", active: true, sortOrder: 4 },
-  { id: "birthday-surprise", title: "Surprise Birthday", subtitle: "Make it Special", image: IMAGES.galBirthday2, href: "/occasion/birthday/birthday-types/surprise-birthday", active: true, sortOrder: 5 },
-  { id: "birthday-themes", title: "Theme Party", subtitle: "Custom Themes", image: IMAGES.themeBalloonArch, href: "/occasion/birthday/birthday-types/theme-party", active: true, sortOrder: 6 },
+  { id: "birthday-kids", title: "Kids Birthday", subtitle: "Age 1–12", image: CATALOG_IMAGES["kids-birthday"], href: "/occasion/birthday/birthday-types/kids-birthday", active: true, sortOrder: 1 },
+  { id: "birthday-teen", title: "Teen Birthday", subtitle: "Age 13–18", image: CATALOG_IMAGES["teen-birthday"], href: "/occasion/birthday/birthday-types/teen-birthday", active: true, sortOrder: 2 },
+  { id: "birthday-adult", title: "Adult Birthday", subtitle: "Age 18+", image: CATALOG_IMAGES["adult-birthday"], href: "/occasion/birthday/birthday-types/adult-birthday", active: true, sortOrder: 3 },
+  { id: "birthday-milestone", title: "Milestone Birthday", subtitle: "20th, 30th, 40th, 50th", image: CATALOG_IMAGES["milestone-birthday"], href: "/occasion/birthday/birthday-types/milestone-birthday", active: true, sortOrder: 4 },
+  { id: "birthday-surprise", title: "Surprise Birthday", subtitle: "Make it Special", image: CATALOG_IMAGES["surprise-birthday"], href: "/occasion/birthday/birthday-types/surprise-birthday", active: true, sortOrder: 5 },
+  { id: "birthday-themes", title: "Theme Party", subtitle: "Custom Themes", image: CATALOG_IMAGES["theme-party"], href: "/occasion/birthday/birthday-types/theme-party", active: true, sortOrder: 6 },
 ];
 
 
@@ -1053,12 +1053,20 @@ export function getBirthdayAgeCategories() {
     "birthday-surprise": "/occasion/birthday/birthday-types/surprise-birthday",
     "birthday-themes": "/occasion/birthday/birthday-types/theme-party",
   };
+  const canonicalBirthdayImages = {
+    "birthday-kids": CATALOG_IMAGES["kids-birthday"],
+    "birthday-teen": CATALOG_IMAGES["teen-birthday"],
+    "birthday-adult": CATALOG_IMAGES["adult-birthday"],
+    "birthday-milestone": CATALOG_IMAGES["milestone-birthday"],
+    "birthday-surprise": CATALOG_IMAGES["surprise-birthday"],
+    "birthday-themes": CATALOG_IMAGES["theme-party"],
+  };
   birthdayAgeCacheValue = list
     .map((item, index) => ({
       id: item.id || uid("birthday-card"),
       title: sanitizeText(item.title || "Birthday Category"),
       subtitle: sanitizeText(item.subtitle || ""),
-      image: sanitizeUrl(item.image) || IMAGES.typeKidsBirthday,
+      image: canonicalBirthdayImages[item.id] || sanitizeUrl(item.image) || CATALOG_IMAGES["kids-birthday"],
       href: canonicalBirthdayHrefs[item.id] || sanitizeUrl(item.href) || "/occasion/birthday",
       active: item.active !== false,
       sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,

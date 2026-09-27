@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import { useEffect, useMemo, useState } from "react";
 import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
@@ -18,7 +19,7 @@ import { fmtINR } from "../../lib/pricing";
 import { sanitizeSlug } from "../../lib/sanitize";
 
 const KIND_LABELS = { product: "Product", package: "Package", service: "Service" };
-const DEFAULT_IMAGE = "/assets/images/categories/wedding.webp";
+const DEFAULT_IMAGE = cloudinaryAsset("/assets/images/categories/wedding.webp");
 
 function countAll(nodes = []) {
   return nodes.reduce((sum, node) => sum + 1 + countAll(node.children || []), 0);

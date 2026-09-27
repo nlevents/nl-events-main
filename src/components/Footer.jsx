@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 import { Link } from "react-router-dom";
 import Icon from "./Icon";
 import { waLink } from "../data/images";
@@ -10,7 +11,7 @@ export default function Footer() {
         <div className="footer-top">
           <div className="footer-brand">
             <Link to="/" className="brand">
-              <span className="brand-mark"><img src="/assets/images/brand/logo.png" alt="Next Level Events logo" width="34" height="34" /></span>
+              <span className="brand-mark"><img src={cloudinaryAsset("/assets/images/brand/logo.png")} alt="Next Level Events logo" width="34" height="34" /></span>
               <span>Next Level Events<span>.</span></span>
             </Link>
             <p>Next Level Events Ranchi — Event Planner. Weddings &middot; Anniversaries &middot; Birthdays &middot; Event Management &amp; Premium D&eacute;cor. We create experiences, not just events.</p>

@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "./cloudinaryAssets";
 import { exportFullCatalogData, importFullCatalogData } from "./catalogStore";
 import { queueCloudSync } from "./cloudStore";
 // Admin data layer.
@@ -57,7 +58,7 @@ const DEFAULT_SETTINGS = {
   nextQuotationSeq: 1,
   invoiceNotes: "Thank you for choosing Next Level Events.",
   defaultTerms: "Payment terms and event conditions will be confirmed in writing before the event.",
-  logoUrl: "/assets/images/landing/nle-logo.png",
+  logoUrl: cloudinaryAsset("/assets/images/brand/logo.png"),
 };
 
 // ---------- Settings ----------

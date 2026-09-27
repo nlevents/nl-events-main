@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { getProduct, saveProductToCloud, getOccasions, getAddonCategoryOptions } from "../../lib/catalogStore";
@@ -40,8 +41,8 @@ export default function AdminProductForm() {
     originalPrice: 59999,
     rating: 4.8,
     reviewCount: 32,
-    image: "/assets/images/categories/wedding.webp",
-    images: ["/assets/images/categories/wedding.webp"],
+    image: cloudinaryAsset("/assets/images/categories/wedding.webp"),
+    images: [cloudinaryAsset("/assets/images/categories/wedding.webp")],
     status: "active",
     includes: [
       "Full Stage & Mandap Setup",
@@ -85,7 +86,7 @@ export default function AdminProductForm() {
           ...p,
           images: galleryImages,
           gallery: galleryImages,
-          image: galleryImages[0] || p.image || "/assets/images/categories/wedding.webp",
+          image: galleryImages[0] || p.image || cloudinaryAsset("/assets/images/categories/wedding.webp"),
           isAddon: Boolean(p.isAddon || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")),
           price: p.price || 0,
           originalPrice: p.originalPrice || "",

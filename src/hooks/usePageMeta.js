@@ -1,7 +1,8 @@
+import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 import { useEffect } from "react";
 
 const SITE_URL = "https://nextlevelevents.in";
-const DEFAULT_IMAGE = SITE_URL + "/assets/images/brand/logo.png";
+const DEFAULT_IMAGE = cloudinaryAsset("/assets/images/brand/logo.png");
 
 function setMeta(selector, attr, value) {
   let tag = document.querySelector(selector);

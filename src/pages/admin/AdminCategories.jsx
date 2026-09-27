@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import { useEffect, useMemo, useState } from "react";
 import {
   getOccasions,
@@ -63,7 +64,7 @@ export default function AdminCategories() {
         label: "",
         slug: "",
         description: "",
-        image: image || "/assets/images/categories/wedding.webp",
+        image: image || cloudinaryAsset("/assets/images/categories/wedding.webp"),
         type: "category",
         children: [],
       },
@@ -177,7 +178,7 @@ export default function AdminCategories() {
           <p className="admin-hint"><strong>{cityProductCount}</strong> live products currently exist. You can create as many hierarchy levels as needed.</p>
         </div>
         <div className="admin-head-actions">
-          <button type="button" className="btn btn-primary" onClick={() => setEditingOccasion({ label: "", slug: "", tagline: "", description: "", image: "/assets/images/categories/wedding.webp", heroImg: "/assets/images/categories/wedding.webp", children: [] })}>
+          <button type="button" className="btn btn-primary" onClick={() => setEditingOccasion({ label: "", slug: "", tagline: "", description: "", image: cloudinaryAsset("/assets/images/categories/wedding.webp"), heroImg: cloudinaryAsset("/assets/images/categories/wedding.webp"), children: [] })}>
             <Icon name="plus" /> Add New Occasion
           </button>
         </div>

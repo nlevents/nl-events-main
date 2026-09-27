@@ -1,3 +1,4 @@
+import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 import { useMemo, useRef, useState } from "react";
 import "../styles/landing.css";
 
@@ -67,7 +68,7 @@ function Icon({ name, size = 30 }) {
 function LandingHeader() {
   return (
     <div className="landing-header">
-      <div className="landing-brand-mark"><img src="/assets/images/landing/nle-logo.png" alt="Next Level Events" /></div>
+      <div className="landing-brand-mark"><img src={cloudinaryAsset("/assets/images/brand/logo.png")} alt="Next Level Events" /></div>
       <div className="landing-brand-copy">
         <div className="landing-brand-name">NEXT LEVEL EVENTS</div>
         <div className="landing-brand-tagline">We Can Theme Your Dream</div>

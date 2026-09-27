@@ -1,3 +1,5 @@
+import { cloudinaryAsset } from "./cloudinaryAssets";
+
 // Shared broken-image safety net.
 //
 // Some catalogue images are remote Unsplash photos. A remote image can be
@@ -6,13 +8,13 @@
 // fall back to a real local event photo that is packaged with the site.
 
 const LOCAL_FALLBACKS = {
-  birthday: "/assets/images/categories/birthday-decor.webp",
-  kids: "/assets/images/categories/kids-birthday.webp",
-  baby: "/assets/images/categories/babyshower.webp",
-  newborn: "/assets/images/categories/newborn-welcome.webp",
-  anniversary: "/assets/images/categories/romance.webp",
-  wedding: "/assets/images/categories/wedding.webp",
-  default: "/assets/images/categories/wedding.webp",
+  birthday: cloudinaryAsset("/assets/images/categories/birthday-decor.webp"),
+  kids: cloudinaryAsset("/assets/images/categories/kids-birthday.webp"),
+  baby: cloudinaryAsset("/assets/images/categories/babyshower.webp"),
+  newborn: cloudinaryAsset("/assets/images/categories/newborn-welcome.webp"),
+  anniversary: cloudinaryAsset("/assets/images/catalog/romance.webp"),
+  wedding: cloudinaryAsset("/assets/images/categories/wedding.webp"),
+  default: cloudinaryAsset("/assets/images/categories/wedding.webp"),
 };
 
 export const PLACEHOLDER_IMAGE = LOCAL_FALLBACKS.default;

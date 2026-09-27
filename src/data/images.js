@@ -1,35 +1,36 @@
 // Centralized image bank — swap these for real client photos.
 import { clientImageFor } from "./clientImages";
+import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 
 const UNSPLASH = "https://images.unsplash.com/";
 function img(id, w) {
   return UNSPLASH + id + "?auto=format&fit=crop&w=" + (w || 1100) + "&q=75";
 }
 
-const CATALOG_ASSET = (name) => `/assets/images/catalog/${name}.webp`;
+const CATALOG_ASSET = (name) => cloudinaryAsset(`/assets/images/catalog/${name}.webp`);
 
 // Temporary hard-coded category artwork supplied by the project owner.
 // These are local assets so category pages do not depend on the admin/catalog
 // image records while the category hierarchy is being finalized.
 export const CATALOG_IMAGES = {
   wedding: clientImageFor('wedding'),
-  birthday: CATALOG_ASSET("kids-birthday-3"),
+  birthday: CATALOG_ASSET("birthday-root"),
   corporate: CATALOG_ASSET("corporate-event"),
   "kids-family": clientImageFor('kids-family'),
   anniversary: clientImageFor("engagement"),
   "festivals-culture": clientImageFor('festivals'),
 
   "birthday-types": CATALOG_ASSET("theme-party"),
-  "kids-birthday": CATALOG_ASSET("kids-birthday"),
-  "teen-birthday": CATALOG_ASSET("teen-birthday"),
-  "adult-birthday": CATALOG_ASSET("adult-birthday"),
-  "milestone-birthday": CATALOG_ASSET("milestone-birthday"),
+  "kids-birthday": CATALOG_ASSET("birthday-kids-v2"),
+  "teen-birthday": CATALOG_ASSET("birthday-teen-v2"),
+  "adult-birthday": CATALOG_ASSET("birthday-adult-v2"),
+  "milestone-birthday": CATALOG_ASSET("birthday-milestone-v2"),
   "20th-birthday": CATALOG_ASSET("milestone-birthday-2"),
   "30th-birthday": CATALOG_ASSET("milestone-birthday"),
   "40th-birthday": CATALOG_ASSET("milestone-birthday-2"),
   "50th-birthday": CATALOG_ASSET("milestone-birthday"),
-  "surprise-birthday": CATALOG_ASSET("surprise-birthday"),
-  "theme-party": CATALOG_ASSET("theme-party"),
+  "surprise-birthday": CATALOG_ASSET("birthday-surprise-v2"),
+  "theme-party": CATALOG_ASSET("birthday-theme-party-v2"),
   "cocomelon-theme": CATALOG_ASSET("theme-party-2"),
   "jungle-theme": CATALOG_ASSET("kids-birthday-2"),
   "princess-theme": CATALOG_ASSET("theme-party-2"),
@@ -73,6 +74,8 @@ export const CATALOG_IMAGES = {
   "rooftop-engagement": clientImageFor('engagement'),
   "theme-based-engagement": clientImageFor('engagement'),
   maira: clientImageFor('maira'),
+  mayra: clientImageFor('maira'),
+  "mayra-and-rituals": clientImageFor('maira'),
   rituals: clientImageFor('maira'),
   "traditional-maira": clientImageFor('maira'),
   "colorful-maira": clientImageFor('maira'),
@@ -110,7 +113,7 @@ export const CATALOG_IMAGES = {
   "corporate-party": CATALOG_ASSET("corporate-event"),
   "seminar-workshop": CATALOG_ASSET("conference"),
   "brand-activation": CATALOG_ASSET("corporate-event"),
-  "corporate-celebration": CATALOG_ASSET("corporate-event"),
+  "corporate-celebration": CATALOG_ASSET("corporate-celebration"),
 
   "anniversary-types": CATALOG_ASSET("romance"),
   "first-anniversary": CATALOG_ASSET("romance"),
@@ -169,7 +172,7 @@ export const IMAGES = {
   typeCatering: CATALOG_IMAGES.catering,
   typeDecor: CATALOG_IMAGES.decor,
   typeBabyShower: CATALOG_IMAGES["kids-family"],
-  typeNewbornWelcome: "/assets/images/categories/newborn-welcome.webp",
+  typeNewbornWelcome: cloudinaryAsset("/assets/images/categories/newborn-welcome.webp"),
   typeKidsBirthday: CATALOG_IMAGES["kids-birthday"],
   typeAnnaprashan: img("photo-1478146059778-26028b07395a"),
   typeFestival: CATALOG_IMAGES["festivals-culture"],

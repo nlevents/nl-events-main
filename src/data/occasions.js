@@ -153,7 +153,7 @@ export const OCCASIONS = [
     label: "Birthdays",
     tagline: "Themed birthday decor for kids, milestones and everything in between.",
     description: "From jungle safaris to princess castles, superhero squads to golden milestones — browse birthday themes and balloon setups, all customised for your city.",
-    image: IMAGES.heroBirthday,
+    image: CATALOG_IMAGES.birthday,
     heroImg: IMAGES.heroBirthday,
     children: [
       makeCategory({
@@ -526,17 +526,17 @@ function replaceChildren(occasionSlug, children) {
 // Exact website hierarchy requested by the business.
 replaceChildren("birthday", [
   makeRefNode("category", "birthday-types", "Birthday Types", IMAGES.heroBirthday, "Browse birthdays by age and celebration type.", [
-    makeRefNode("category", "kids-birthday", "Kids Birthday", IMAGES.typeKidsBirthday, "Age 1–12"),
-    makeRefNode("category", "teen-birthday", "Teen Birthday", IMAGES.themeStageLights, "Age 13–18"),
-    makeRefNode("category", "adult-birthday", "Adult Birthday", IMAGES.pkgPremiumBirthday, "Age 18+"),
-    makeRefNode("category", "milestone-birthday", "Milestone Birthday", IMAGES.pkgPremiumBirthday, "20th, 30th, 40th and 50th birthdays.", [
+    makeRefNode("category", "kids-birthday", "Kids Birthday", CATALOG_IMAGES["kids-birthday"], "Age 1–12"),
+    makeRefNode("category", "teen-birthday", "Teen Birthday", CATALOG_IMAGES["teen-birthday"], "Age 13–18"),
+    makeRefNode("category", "adult-birthday", "Adult Birthday", CATALOG_IMAGES["adult-birthday"], "Age 18+"),
+    makeRefNode("category", "milestone-birthday", "Milestone Birthday", CATALOG_IMAGES["milestone-birthday"], "20th, 30th, 40th and 50th birthdays.", [
       makeRefNode("category", "20th-birthday", "20th Birthday", IMAGES.pkgPremiumBirthday),
       makeRefNode("category", "30th-birthday", "30th Birthday", IMAGES.pkgPremiumBirthday),
       makeRefNode("category", "40th-birthday", "40th Birthday", IMAGES.pkgPremiumBirthday),
       makeRefNode("category", "50th-birthday", "50th Birthday", IMAGES.pkgPremiumBirthday),
     ]),
-    makeRefNode("category", "surprise-birthday", "Surprise Birthday", IMAGES.galBirthday2),
-    makeRefNode("category", "theme-party", "Theme Party", IMAGES.themeBalloonArch, "Choose from our popular birthday themes.", [
+    makeRefNode("category", "surprise-birthday", "Surprise Birthday", CATALOG_IMAGES["surprise-birthday"]),
+    makeRefNode("category", "theme-party", "Theme Party", CATALOG_IMAGES["theme-party"], "Choose from our popular birthday themes.", [
       makeRefNode("theme", "cocomelon-theme", "Cocomelon Theme", IMAGES.heroBirthday),
       makeRefNode("theme", "jungle-theme", "Jungle Theme", IMAGES.themeJungleLeaves),
       makeRefNode("theme", "princess-theme", "Princess Theme", IMAGES.themeTiaraCrown),
@@ -588,19 +588,12 @@ replaceChildren("wedding", [
       makeRefNode("theme", "rooftop-engagement", "Rooftop Engagement", IMAGES.showcase8),
       makeRefNode("theme", "theme-based-engagement", "Theme-Based Engagement", IMAGES.themeStageLights),
     ]),
-    makeRefNode("category", "maira", "Maira", IMAGES.showcase5, "Maira celebration setups.", [
-      makeRefNode("theme", "traditional-maira", "Traditional Setup", IMAGES.showcase5),
-      makeRefNode("theme", "colorful-maira", "Colorful Setup", IMAGES.themeHoliColors),
-      makeRefNode("theme", "floral-maira", "Floral Setup", IMAGES.galWedding1),
-      makeRefNode("theme", "rajasthani-maira", "Rajasthani Setup", IMAGES.showcase5),
-      makeRefNode("theme", "theme-based-maira", "Theme-Based Setup", IMAGES.themeStageLights),
-    ]),
-    makeRefNode("category", "rituals", "Rituals", IMAGES.showcase5, "Wedding ritual decoration setups.", [
-      makeRefNode("theme", "traditional-rituals", "Traditional Setup", IMAGES.showcase5),
-      makeRefNode("theme", "colorful-rituals", "Colorful Setup", IMAGES.themeHoliColors),
-      makeRefNode("theme", "floral-rituals", "Floral Setup", IMAGES.galWedding1),
-      makeRefNode("theme", "rajasthani-rituals", "Rajasthani Setup", IMAGES.showcase5),
-      makeRefNode("theme", "theme-based-rituals", "Theme-Based Setup", IMAGES.themeStageLights),
+    makeRefNode("category", "mayra-and-rituals", "Mayra and Rituals", IMAGES.showcase5, "Mayra and traditional wedding ritual decoration setups.", [
+      makeRefNode("theme", "traditional-mayra", "Traditional Setup", IMAGES.showcase5),
+      makeRefNode("theme", "colorful-mayra", "Colorful Setup", IMAGES.themeHoliColors),
+      makeRefNode("theme", "floral-mayra", "Floral Setup", IMAGES.galWedding1),
+      makeRefNode("theme", "rajasthani-mayra", "Rajasthani Setup", IMAGES.showcase5),
+      makeRefNode("theme", "theme-based-mayra", "Theme-Based Setup", IMAGES.themeStageLights),
     ]),
   ]),
   makeRefNode("category", "services", "Services", IMAGES.showcase7, "Event services available for weddings.", [
@@ -903,7 +896,9 @@ function normalizeLegacyProductPath(prod) {
   // Legacy wedding URLs omitted the Wedding Events wrapper for functions.
   if (p[0] === "wedding" && p[1] !== "wedding-events" && p[1] !== "services") {
     const weddingFunctions = new Set([
-      "haldi", "mehndi", "sangeet", "wedding", "reception", "engagement", "maira", "rituals",
+      "haldi", "mehndi", "sangeet", "sangeet-night", "wedding", "reception",
+      "reception-styling", "engagement", "ring-ceremony", "maira", "mayra",
+      "rituals", "mayra-and-rituals",
     ]);
     if (weddingFunctions.has(p[1])) return ["wedding", "wedding-events", ...p.slice(1)];
   }
@@ -1013,10 +1008,20 @@ function getLiveOccasions() {
 }
 
 export function listOccasions() {
-  // Admin-managed occasions are the public source of truth. Every normal
-  // occasion created in Catalog is therefore available in Shop by Occasion;
-  // only internal Event Services branches marked addonOnly stay hidden.
-  return getLiveOccasions().filter((o) => !o.addonOnly);
+  // Keep the six public Shop by Occasion cards in the requested order.
+  // Admin/catalog data can still update their labels/images/children, but
+  // its array order must not change the public navigation order.
+  const order = [
+    "wedding",
+    "birthday",
+    "anniversary",
+    "kids-family",
+    "corporate",
+    "festivals-culture",
+  ];
+  const live = getLiveOccasions().filter((o) => !o.addonOnly);
+  const bySlug = new Map(live.map((o) => [o.slug, o]));
+  return order.map((slug) => bySlug.get(slug)).filter(Boolean);
 }
 
 export function findOccasion(slug) {
@@ -1025,14 +1030,17 @@ export function findOccasion(slug) {
 
 export function weddingFunctionLinks() {
   const wedding = findOccasion("wedding");
-  if (!wedding || !Array.isArray(wedding.children) || wedding.children.length === 0) {
-    return [];
-  }
-  return wedding.children.map((child) => ({
+  if (!wedding || !Array.isArray(wedding.children)) return [];
+
+  // The wedding page's function rail must show the actual functions, not the
+  // two structural wrapper nodes ("Wedding Events" and "Services").
+  const events = wedding.children.find((child) => child?.slug === "wedding-events");
+  const functions = Array.isArray(events?.children) ? events.children : [];
+  return functions.map((child) => ({
     label: child.label,
     img: child.image || child.heroImg || IMAGES.heroWedding,
     image: child.image || child.heroImg || IMAGES.heroWedding,
-    href: pathFor([wedding, child]),
+    href: pathFor([wedding, events, child]),
     slug: child.slug,
   }));
 }
@@ -1057,11 +1065,18 @@ const PATH_ALIASES = {
   "princess-themes": "princess-theme",
   "barbie-themes": "barbie-theme",
   "wedding-car-decoration": "wedding-car",
-  "sangeet": "sangeet-night",
-  "reception": "reception-styling",
-  "wedding-ceremony": "mandap-ceremony-decor",
-  "mandap": "mandap-ceremony-decor",
-  "engagement": "ring-ceremony",
+  // Wedding function aliases: support the old URLs as well as the current
+  // canonical Wedding Events hierarchy. This prevents existing bookmarks,
+  // menu links and shared links from landing on Not Found.
+  "sangeet-night": "sangeet",
+  "reception-styling": "reception",
+  "ring-ceremony": "engagement",
+  "wedding-ceremony": "wedding",
+  "mandap": "wedding",
+  "engagement": "engagement",
+  "maira": "mayra-and-rituals",
+  "mayra": "mayra-and-rituals",
+  "rituals": "mayra-and-rituals",
 };
 
 function tryResolveSegments(slugs) {
@@ -1112,7 +1127,9 @@ export function resolvePath(slugs) {
   // Backward-compatible URL support for old wedding function links.
   if (slugs[0] === "wedding" && slugs.length >= 2) {
     const weddingFunctions = new Set([
-      "haldi", "mehndi", "sangeet", "wedding", "reception", "engagement", "maira", "rituals",
+      "haldi", "mehndi", "sangeet", "sangeet-night", "wedding", "reception",
+      "reception-styling", "engagement", "ring-ceremony", "maira", "mayra",
+      "rituals", "mayra-and-rituals",
     ]);
     if (weddingFunctions.has(slugs[1])) {
       const result = tryResolveSegments(["wedding", "wedding-events", ...slugs.slice(1)]);
