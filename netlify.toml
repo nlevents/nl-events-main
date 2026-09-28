@@ -6,10 +6,16 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# NOTE: /api/* routing is handled by public/_redirects (higher priority).
-# That file routes /api/* → /.netlify/functions/api/:splat before the SPA fallback.
+# NOTE: all routing (API, missing-asset 404, SPA fallback) lives in
+# public/_redirects, which Netlify evaluates before this file. Caching headers
+# live in public/_headers. Keep them there so there is a single source of truth.
 
-# SPA fallback for React Router.
+# Safety-net SPA fallback (only reached if public/_redirects is not deployed).
+[[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

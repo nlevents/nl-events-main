@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-const AUTOPLAY_MS = 5000;
+const AUTOPLAY_MS = 4000;
 const RESUME_MS = 6000;
 const SWIPE_THRESHOLD = 35; // minimum horizontal px to register a swipe
 
@@ -95,8 +95,6 @@ export default function HeroCarousel({ slides }) {
       aria-roledescription="carousel"
       aria-label="Featured events"
       style={{ touchAction: "pan-y" }}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

@@ -1,7 +1,13 @@
-# Route /api/* to the Netlify Function BEFORE the SPA fallback catches it.
-# Without this, the catch-all below would serve index.html for every API call,
-# causing 404/405 errors in the admin panel.
+# 1) API calls go to the Netlify Function before anything else.
 /api/*  /.netlify/functions/api/:splat  200
 
-# SPA fallback for React Router (all non-API, non-asset routes).
-/*    /index.html   200
+# 2) A missing hashed build file must be a real 404, never index.html.
+#    Without this rule the SPA fallback below answers a request for a deleted
+#    chunk (e.g. /assets/Gallery-AbC123.js after a redeploy) with the HTML page
+#    and status 200. The browser then fails with "Failed to fetch dynamically
+#    imported module" / a MIME-type error, and can cache the bad response.
+#    Real files in /assets still win because this rule is not forced.
+/assets/*  /404.html  404
+
+# 3) SPA fallback for React Router (every other path).
+/*  /index.html  200

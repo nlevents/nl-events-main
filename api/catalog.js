@@ -1,4 +1,4 @@
-import { readStates, readStateUpdatedAt } from "../shared/stateStore.js";
+import { readStates, readStateVersions } from "../shared/stateStore.js";
 
 // Keep the public bootstrap response intentionally small. Products are the
 // largest state bucket (~2.7 MB in production) and must not be downloaded on
@@ -13,19 +13,20 @@ const PUBLIC_KEYS = [
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
-    const [state, productsUpdatedAt] = await Promise.all([
-      readStates(process.env, PUBLIC_KEYS),
-      readStateUpdatedAt(process.env, "nle_catalog_v2_products"),
-    ]);
+    const versionKeys = [...PUBLIC_KEYS, "nle_catalog_v2_products"];
+    const versions = await readStateVersions(process.env, versionKeys);
 
-    // This endpoint is small enough to cache briefly. It only carries catalog
-    // metadata/lightweight state; the product payload has its own endpoint.
-    res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=60");
-    return res.status(200).json({
-      ok: true,
-      state,
-      versions: { products: productsUpdatedAt },
-    });
+    // Polling only needs tiny version metadata. The full public state is sent
+    // on the initial load or when one of these versions actually changes.
+    const versionsOnly = String(req.query?.meta || "") === "1";
+    if (versionsOnly) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      return res.status(200).json({ ok: true, versions });
+    }
+
+    const state = await readStates(process.env, PUBLIC_KEYS);
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    return res.status(200).json({ ok: true, state, versions });
   } catch (err) {
     console.error("Catalog API error:", err);
     return res.status(500).json({ ok: false, error: "Unable to load catalog." });

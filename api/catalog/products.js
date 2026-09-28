@@ -6,11 +6,15 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const products = await readState(process.env, "nle_catalog_v2_products");
-    // Products can be cached briefly by the browser/CDN. Admin writes update
-    // app_state.updated_at, and the lightweight /api/catalog endpoint exposes
-    // that version so clients know when to refresh.
-    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
-    return res.status(200).json({ ok: true, data: products ?? [] });
+    const cleanProducts = Array.isArray(products)
+      ? products.filter((product) => {
+          const id = String(product?.id || "");
+          return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+        })
+      : [];
+    // Product data is admin-owned and must never be served from a browser seed.
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    return res.status(200).json({ ok: true, data: cleanProducts });
   } catch (err) {
     console.error("Products API error:", err);
     return res.status(500).json({ ok: false, error: "Unable to load products." });

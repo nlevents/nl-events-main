@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IMAGES, waLink } from "../data/images";
 import usePageMeta from "../hooks/usePageMeta";
-import { addonsFor } from "../data/addons";
 import { BIRTHDAY_AGE_CATEGORIES } from "../data/birthdayAgeCategories";
 import { birthdayThemeLinks } from "../data/occasions";
+import AutoScrollRail from "../components/AutoScrollRail";
 
 
 const SERVICES = [
@@ -58,7 +58,7 @@ function SectionHead({ eyebrow, title, link }) {
 }
 
 function Rail({ children, className = "" }) {
-  return <div className={`birthday-rail ${className}`}>{children}</div>;
+  return <AutoScrollRail className={`birthday-rail ${className}`} interval={4000}>{children}</AutoScrollRail>;
 }
 
 function BirthdayHero() {
@@ -135,7 +135,7 @@ function BirthdayCategories() {
 }
 
 function BirthdayServices() {
-  const [services, setServices] = useState(() => addonsFor([{ slug: "birthday" }]));
+  const [services, setServices] = useState([]);
   useEffect(() => {
     let cancelled = false;
     const refresh = () =>
@@ -144,21 +144,14 @@ function BirthdayServices() {
           if (!cancelled) setServices(getAddonsForOccasion("birthday"));
         })
         .catch(() => {});
-    const schedule = () => {
-      if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(refresh, { timeout: 5000 });
-      } else {
-        window.setTimeout(refresh, 1200);
-      }
-    };
-    schedule();
+    refresh();
     window.addEventListener("nle-catalog-updated", refresh);
     return () => {
       cancelled = true;
       window.removeEventListener("nle-catalog-updated", refresh);
     };
   }, []);
-  const items = services.length ? services.map((service, i) => [service.label, service.subLabel, service.image || SERVICES[i % SERVICES.length]?.[3]]) : SERVICES;
+  const items = services.map((service, i) => [service.label, service.subLabel, service.image || SERVICES[i % SERVICES.length]?.[3]]);
   return (
     <section className="birthday-light-section">
       <div className="birthday-container">
@@ -170,7 +163,7 @@ function BirthdayServices() {
               <div className="birthday-service-icon">✦</div>
               <strong>{title}</strong>
               <span>{sub}</span>
-              <img src={image} alt="" loading="lazy" decoding="async" />
+              <img src={image} alt={title} loading="lazy" decoding="async" />
             </Link>
           ))}
         </div>
@@ -255,7 +248,7 @@ function BirthdayReviews() {
         <div className="birthday-review-grid">
           {REVIEWS.map((review) => (
             <article className="birthday-review-card" key={review.name}>
-              <img src={review.image} alt="" loading="lazy" decoding="async" />
+              <img src={review.image} alt={`${review.name} review`} loading="lazy" decoding="async" />
               <div>
                 <strong>{review.name}</strong>
                 <span>{review.city}</span>

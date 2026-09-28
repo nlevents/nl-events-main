@@ -1,10 +1,15 @@
-# The SPA fallback serves index.html for every React Router URL. Do not let a
-# phone keep an old HTML shell that points at deleted Vite chunk filenames.
-/*
-  Cache-Control: no-cache, no-store, must-revalidate
-  Pragma: no-cache
-  Expires: 0
-
-# Vite asset filenames are content-hashed, so these files are safe to cache.
+# Vite content-hashes everything in /assets, so those files never change and
+# can be cached forever.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Everything else (index.html and the SPA routes that resolve to it) uses
+# Netlify's default "public, max-age=0, must-revalidate": the browser always
+# revalidates the HTML shell, so it can never keep pointing at deleted chunk
+# filenames, but it still gets cheap 304s and the back/forward cache keeps
+# working on mobile.
+#
+# Do NOT add a blanket "/*" Cache-Control here. Netlify merges matching rules,
+# so a "/*" no-cache/no-store line is combined with the /assets/* line above
+# instead of being overridden by it, and "no-store" also disables the browser's
+# back/forward cache.

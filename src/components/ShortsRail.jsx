@@ -1,3 +1,4 @@
+import useAutoRail from "../hooks/useAutoRail";
 import { useEffect, useRef, useState } from "react";
 import { getInstaVideos } from "../lib/catalogStore";
 import { youtubeId, youtubeThumbnail } from "../lib/video";
@@ -107,6 +108,7 @@ export default function ShortsRail() {
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
   const railRef = useRef(null);
+  useAutoRail(railRef, { selector: ".insta-card", interval: 4000, enabled: videos.length > 1 });
 
   useEffect(() => {
     function refresh() {

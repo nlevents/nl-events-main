@@ -1,5 +1,5 @@
 import { requireAdmin } from "../../shared/auth/supabaseAuth.js";
-import { readStates, writeState } from "../../shared/stateStore.js";
+import { readStates, readStateVersions, writeState } from "../../shared/stateStore.js";
 
 const KEYS = [
   "nle_catalog_v2_products", "nle_catalog_v2_occasions", "nle_catalog_v2_media", "nle_catalog_v2_gallery",
@@ -15,27 +15,67 @@ async function auth(req, res) {
   return result.user;
 }
 
+function validateProductsPayload(data) {
+  if (!Array.isArray(data)) throw new Error("Products catalog must be an array.");
+  const products = data.filter((product) => {
+    const id = String(product?.id || "");
+    return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+  });
+  const ids = new Set(products.map((product) => String(product?.id || "")).filter(Boolean));
+  const byId = new Map(products.map((product) => [String(product?.id || ""), product]));
+  for (const product of products) {
+    if (product?.catalogKind !== "package") continue;
+    if (!Array.isArray(product.packageItems) || product.packageItems.length === 0) {
+      throw new Error(`Package "${product.name || product.id || "Untitled"}" must contain at least one product.`);
+    }
+    for (const item of product.packageItems) {
+      const productId = String(item?.productId || item?.id || "");
+      if (!ids.has(productId)) throw new Error(`Package "${product.name || product.id || "Untitled"}" contains a product that no longer exists.`);
+      if (byId.get(productId)?.catalogKind === "package") throw new Error(`Package "${product.name || product.id || "Untitled"}" cannot contain another package.`);
+    }
+  }
+  return products;
+}
+
 export default async function handler(req, res) {
   const user = await auth(req, res);
   if (!user) return;
   try {
     if (req.method === "GET") {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      return res.status(200).json({ ok: true, state: await readStates(process.env, KEYS) });
+      const state = await readStates(process.env, KEYS);
+      const versions = await readStateVersions(process.env, KEYS);
+      const products = Array.isArray(state.nle_catalog_v2_products) ? state.nle_catalog_v2_products : [];
+      const cleanProducts = products.filter((product) => {
+        const id = String(product?.id || "");
+        return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+      });
+      if (JSON.stringify(products) !== JSON.stringify(cleanProducts)) {
+        state.nle_catalog_v2_products = cleanProducts;
+        await writeState(process.env, "nle_catalog_v2_products", cleanProducts, user.id);
+      }
+      return res.status(200).json({ ok: true, state, versions });
     }
     if (req.method === "PUT") {
-      const { key, data } = req.body || {};
+      const { key, data, expectedUpdatedAt } = req.body || {};
       if (!KEYS.includes(key)) return res.status(400).json({ ok: false, error: "Unknown state key." });
       if (data === undefined) return res.status(400).json({ ok: false, error: "Missing data." });
-      await writeState(process.env, key, data, user.id);
-      return res.status(200).json({ ok: true, key });
+      const safeData = key === "nle_catalog_v2_products" ? validateProductsPayload(data) : data;
+      const result = await writeState(process.env, key, safeData, user.id, expectedUpdatedAt || null);
+      return res.status(200).json({ ok: true, key, updatedAt: result.updatedAt || null });
     }
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   } catch (err) {
     console.error("Admin state API error:", err);
     const message = String(err?.message || "");
+    if (message.includes("catalog was changed by another admin")) {
+      return res.status(409).json({ ok: false, error: message });
+    }
+    if (message.includes("must contain at least one product") || message.includes("contains a product that no longer exists") || message.includes("catalog must be an array")) {
+      return res.status(400).json({ ok: false, error: message });
+    }
     if (message.includes("Supabase is not configured on the server")) {
-      return res.status(503).json({ ok: false, error: "Admin cloud storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Vercel environment variables, then redeploy." });
+      return res.status(503).json({ ok: false, error: "Admin cloud storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Netlify environment variables, then redeploy." });
     }
     return res.status(500).json({ ok: false, error: message || "Unable to save admin data." });
   }

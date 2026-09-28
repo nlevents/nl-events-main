@@ -23,27 +23,45 @@ export async function readStateUpdatedAt(env, key) {
   return rows?.[0]?.updated_at ?? null;
 }
 
-export async function writeState(env, key, data, userId = null) {
+export async function readStateVersions(env, keys) {
+  const db = getServerSupabase(env);
+  if (!db || !Array.isArray(keys) || !keys.length) return {};
+  const params = keys.map((key) => `"${String(key).replaceAll('"', '\\"')}"`).join(",");
+  const rows = await db.query(`app_state?key=in.(${params})&select=key,updated_at`, { method: "GET" });
+  return Object.fromEntries((rows || []).filter((row) => row?.key && row?.updated_at).map((row) => [row.key, row.updated_at]));
+}
+
+export async function writeState(env, key, data, userId = null, expectedUpdatedAt = null) {
   const db = getServerSupabase(env);
   if (!db) throw new Error("Supabase is not configured on the server.");
 
-  // Upsert atomically on the unique `key` column. The old PATCH-then-POST
-  // approach could race with another admin save and, when the row did not
-  // exist yet, could also attempt a duplicate insert.
+  const updatedAt = new Date().toISOString();
+  const body = { key, data, updated_at: updatedAt, updated_by: userId };
+
+  // When the client knows the version it last read, use a conditional PATCH.
+  // PostgREST evaluates the updated_at predicate in the database, preventing
+  // one admin from silently overwriting another admin's newer catalog.
+  if (expectedUpdatedAt) {
+    const filter = `key=eq.${encodeURIComponent(key)}&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`;
+    const rows = await db.query(`app_state?${filter}`, {
+      method: "PATCH",
+      prefer: "return=representation",
+      body: { data, updated_at: updatedAt, updated_by: userId },
+    });
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new Error("This catalog was changed by another admin. Please refresh the Admin Panel and try again.");
+    }
+    return { key, updatedAt: rows[0]?.updated_at || updatedAt };
+  }
+
+  // First-time writes still use an atomic upsert when there is no known
+  // version (for example, a brand-new app_state bucket).
   await db.query("app_state?on_conflict=key", {
     method: "POST",
-    // Admin writes never need the full JSONB row echoed back. In particular,
-    // the products bucket is ~2.7 MB, so returning the representation would
-    // create unnecessary Supabase egress on every save.
     prefer: "resolution=merge-duplicates,return=minimal",
-    body: {
-      key,
-      data,
-      updated_at: new Date().toISOString(),
-      updated_by: userId,
-    },
+    body,
   });
-  return { key };
+  return { key, updatedAt };
 }
 
 export async function writeMissingStates(env, state, userId = null) {

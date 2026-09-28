@@ -97,7 +97,7 @@ export default function Products() {
         <div className="fk-cat-row" role="navigation" aria-label="Shop by category">
           {occasions.map((o) => (
             <Link key={o.slug} to={"/occasion/" + o.slug} className="fk-cat-item">
-              <span className="fk-cat-icon"><img src={o.image} alt="" loading="lazy"  onError={onImgError}/></span>
+              <span className="fk-cat-icon"><img src={o.image} alt={o.label} loading="lazy"  onError={onImgError}/></span>
               <span>{o.label}</span>
             </Link>
           ))}

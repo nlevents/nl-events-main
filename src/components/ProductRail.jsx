@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useCity } from "../context/CityContext";
 import { cityPrice, fmtINR } from "../lib/pricing";
 import { onImgError } from "../lib/imageFallback";
+import useAutoRail from "../hooks/useAutoRail";
 
 // Reusable horizontal product/package carousel: touch-swipe native scroll on
 // mobile, arrow buttons on desktop, keyboard accessible. `items` must be
@@ -13,6 +14,7 @@ export default function ProductRail({ title, viewAllHref, items, tone }) {
   const trackRef = useRef(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  useAutoRail(trackRef, { selector: ".rail-card", interval: 4000, enabled: Array.isArray(items) && items.length > 1 });
 
   function updateArrows() {
     const el = trackRef.current;

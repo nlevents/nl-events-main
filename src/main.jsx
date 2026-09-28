@@ -9,6 +9,7 @@ import './styles/products.css'
 import './styles/chatbot.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { recoverIfNewBuild } from './lib/lazyWithRetry'
 const rootFallback = (
   <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
     <div>
@@ -26,6 +27,22 @@ const rootFallback = (
 )
 
 if (typeof window !== "undefined") {
+  // Older builds appended ?nle_reload=<timestamp> to the URL while trying to
+  // bust a stale cache. Remove it so it never ends up in canonical URLs,
+  // shared links or analytics.
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("nle_reload")) {
+      url.searchParams.delete("nle_reload");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+  } catch { /* cosmetic only */ }
+
+  // Vite fires this when a preloaded chunk/CSS file 404s — the signature of a
+  // tab that was opened before a new deployment. Reload (once, and only when
+  // the server really has a newer build) so it picks up the new index.html.
+  window.addEventListener("vite:preloadError", () => { recoverIfNewBuild(); });
+
   // The public storefront has a local/seed fallback, so cloud hydration does
   // not need to compete with the first render. Run it when the browser is idle.
   const PUBLIC_CATALOG_KEYS = new Set([
@@ -50,13 +67,12 @@ if (typeof window !== "undefined") {
     }
   });
 
-  // Keep the storefront connected to the admin catalog even when the admin
-  // panel and public website are open in different tabs, browsers, or devices.
-  // The sync endpoint is intentionally tiny; the ~2.7 MB product catalog is
-  // fetched only when its cloud updated_at version changes.
+  // Keep the storefront connected to the admin catalog across tabs, browsers
+  // and devices. Polling checks only tiny version metadata; the large product
+  // catalog is downloaded only when its cloud version actually changes.
   const startCatalogSync = () =>
     import('./lib/cloudStore')
-      .then(({ startPublicCatalogSync }) => startPublicCatalogSync({ intervalMs: 30000 }))
+      .then(({ startPublicCatalogSync }) => startPublicCatalogSync({ intervalMs: 5000 }))
       .catch(() => { /* best-effort background synchronization */ });
 
   if ("requestIdleCallback" in window) {

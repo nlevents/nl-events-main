@@ -116,7 +116,7 @@ export default function ProductGallery({ images, alt }) {
               aria-selected={i === active}
               onClick={() => setActive(i)}
             >
-              <img src={src} alt=""  loading="lazy" decoding="async" onError={onImgError}/>
+              <img src={src} alt={`${alt} thumbnail`} loading="lazy" decoding="async" onError={onImgError}/>
             </button>
           ))}
         </div>

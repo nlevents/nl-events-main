@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 import { ThemeProvider } from "./context/ThemeContext";
 import { CityProvider } from "./context/CityContext";
@@ -11,28 +12,28 @@ import { lazyWithRetry } from "./lib/lazyWithRetry";
 
 // Route-level code splitting: each page is fetched only when visited,
 // keeping the initial JS payload small.
-const Landing = lazyWithRetry(() => import("./pages/Landing"));
+import Landing from "./pages/Landing.jsx";
 import Home from "./pages/Home.jsx";
-const Services = lazyWithRetry(() => import("./pages/Services"));
-const Products = lazyWithRetry(() => import("./pages/Products"));
-const Packages = lazyWithRetry(() => import("./pages/Packages"));
-const PackageDetails = lazyWithRetry(() => import("./pages/PackageDetails"));
-const ShopByOccasion = lazyWithRetry(() => import("./pages/ShopByOccasion"));
-const OccasionBrowser = lazyWithRetry(() => import("./pages/OccasionBrowser"));
-const Wedding = lazyWithRetry(() => import("./pages/Wedding"));
-const Birthday = lazyWithRetry(() => import("./pages/Birthday"));
-const OccasionLanding = lazyWithRetry(() => import("./pages/OccasionLanding"));
-const Gallery = lazyWithRetry(() => import("./pages/Gallery"));
-const About = lazyWithRetry(() => import("./pages/About"));
-const Contact = lazyWithRetry(() => import("./pages/Contact"));
-const BookEvent = lazyWithRetry(() => import("./pages/BookEvent"));
+import Services from "./pages/Services.jsx";
+import Products from "./pages/Products.jsx";
+import Packages from "./pages/Packages.jsx";
+import PackageDetails from "./pages/PackageDetails.jsx";
+import ShopByOccasion from "./pages/ShopByOccasion.jsx";
+import OccasionBrowser from "./pages/OccasionBrowser.jsx";
+import Wedding from "./pages/Wedding.jsx";
+import Birthday from "./pages/Birthday.jsx";
+import OccasionLanding from "./pages/OccasionLanding.jsx";
+import Gallery from "./pages/Gallery.jsx";
+import About from "./pages/About.jsx";
+import Contact from "./pages/Contact.jsx";
+import BookEvent from "./pages/BookEvent.jsx";
 import BookingSuccess from "./pages/BookingSuccess";
-const Cart = lazyWithRetry(() => import("./pages/Cart"));
-const Checkout = lazyWithRetry(() => import("./pages/Checkout"));
+import Cart from "./pages/Cart.jsx";
+import Checkout from "./pages/Checkout.jsx";
 import BookingConfirmation from "./pages/BookingConfirmation";
-const Terms = lazyWithRetry(() => import("./pages/Terms"));
-const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
-const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+import Terms from "./pages/Terms.jsx";
+import Privacy from "./pages/Privacy.jsx";
+import NotFound from "./pages/NotFound.jsx";
 
 
 // Admin panel — not linked from the public navigation.
@@ -63,6 +64,29 @@ function RouteFallback() {
   return <div style={{ minHeight: "60vh" }} aria-hidden="true"></div>;
 }
 
+// Wraps every route (including admin and landing, which sit outside <Layout>).
+// Resets on navigation so a failed lazy chunk or a crashing page never traps the
+// user on an error screen.
+function RouteBoundary({ children }) {
+  const { pathname } = useLocation();
+  return (
+    <ErrorBoundary
+      resetKey={pathname}
+      fallback={({ reset }) => (
+        <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24, fontFamily: "system-ui, sans-serif" }} role="alert">
+          <div>
+            <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Something went wrong.</p>
+            <p style={{ color: "#5b6b80", marginBottom: 16 }}>This page could not be loaded. Please try again.</p>
+            <button type="button" onClick={reset} style={{ padding: "10px 20px", borderRadius: 999, border: 0, background: "#c19743", color: "#faf7f0", fontWeight: 600, cursor: "pointer" }}>Try again</button>
+          </div>
+        </div>
+      )}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -71,6 +95,7 @@ export default function App() {
           <CartProvider>
             <ChatbotProvider>
             <BrowserRouter>
+              <RouteBoundary>
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
                   <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
@@ -150,6 +175,7 @@ export default function App() {
                   </Route>
                 </Routes>
               </Suspense>
+              </RouteBoundary>
             </BrowserRouter>
             </ChatbotProvider>
           </CartProvider>

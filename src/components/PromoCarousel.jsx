@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { onImgError } from "../lib/imageFallback";
+import useAutoRail from "../hooks/useAutoRail";
 
 export default function PromoCarousel({ slides }) {
   const trackRef = useRef(null);
   const [active, setActive] = useState(0);
   const touchStart = useRef({ x: 0, y: 0 });
   const isTouching = useRef(false);
+  useAutoRail(trackRef, { selector: ".promo-slide", interval: 4000, enabled: Array.isArray(slides) && slides.length > 1 });
 
   function onScroll() {
     const track = trackRef.current;
@@ -47,6 +49,16 @@ export default function PromoCarousel({ slides }) {
 
   return (
     <div className="promo-carousel reveal">
+      {slides.length > 1 && (
+        <>
+          <button type="button" className="promo-arrow promo-arrow-prev" aria-label="Previous slide" onClick={() => scrollToIndex(active - 1)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
+          <button type="button" className="promo-arrow promo-arrow-next" aria-label="Next slide" onClick={() => scrollToIndex(active + 1)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
+        </>
+      )}
       <div
         className="promo-track"
         ref={trackRef}

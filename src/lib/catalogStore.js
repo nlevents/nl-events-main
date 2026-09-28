@@ -6,9 +6,7 @@
 import { OCCASIONS as SEED_OCCASIONS, flattenCategoryTree, categoryByPath, pathFor, allProductsOf } from "../data/occasions";
 import { GALLERY_ITEMS as SEED_GALLERY } from "../data/categories";
 import { IMAGES, CATALOG_IMAGES } from "../data/images";
-import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
 import { CITIES_DATA as SEED_CITIES } from "../data/cities";
-import { GLOBAL_ADDONS as SEED_GLOBAL_ADDONS, EXTRA_ADDONS_BY_OCCASION as SEED_EXTRA_ADDONS, SEED_ADDON_PRODUCTS } from "../data/addons";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
 import { queueCloudSync, syncCloudState, hydratePublicState } from "./cloudStore";
 import { uploadImageBlob, uploadImageUrl } from "./cloudinary";
@@ -33,14 +31,11 @@ const KEYS = {
   realShortsSeededV2: STORE_KEY_PREFIX + "real_shorts_seeded_v2",
   demoProductsPurged: STORE_KEY_PREFIX + "demo_products_purged",
   referenceHierarchyMigration: STORE_KEY_PREFIX + "reference_hierarchy_migration",
-  referenceDemoProductsSeeded: STORE_KEY_PREFIX + "reference_demo_products_seeded_v1",
-  referenceDemoProductsSeededV3: STORE_KEY_PREFIX + "reference_demo_products_seeded_v3",
-  addonProductsSeededV1: STORE_KEY_PREFIX + "addon_products_seeded_v1",
   serviceOccasionSplitV1: STORE_KEY_PREFIX + "service_occasion_split_v1",
-  serviceOccasionSplitV2: STORE_KEY_PREFIX + "service_occasion_split_v2",
+  adminOnlyServicesV1: STORE_KEY_PREFIX + "admin_only_services_v1",
 };
 
-const STORE_VERSION = "4.8-netlify-api-and-delete-persistence";
+const STORE_VERSION = "5.0-admin-catalog-only";
 const REFERENCE_HIERARCHY_MIGRATION = "3";
 let seedsInitialized = false;
 
@@ -215,64 +210,6 @@ function hrefToCategoryPath(href) {
   return href.replace(/^\/occasion\//, "").split("/").filter(Boolean);
 }
 
-function extractAllSeedAddons() {
-  const list = [];
-  (SEED_GLOBAL_ADDONS || []).forEach((a) => {
-    const { price: _price, href: _href, ...rest } = a;
-    const scopes = a.slug === "sfx" ? ["wedding"] : ["wedding", "birthday"];
-    list.push({
-      ...rest,
-      id: uid("addon"),
-      categoryPath: hrefToCategoryPath(_href),
-      scopes,
-      scope: scopes[0],
-      active: true,
-      createdAt: new Date().toISOString(),
-    });
-  });
-  Object.entries(SEED_EXTRA_ADDONS || {}).forEach(([occasionSlug, items]) => {
-    (items || []).forEach((a) => {
-      const { price: _price, href: _href, ...rest } = a;
-      list.push({
-        ...rest,
-        id: uid("addon"),
-        categoryPath: hrefToCategoryPath(_href),
-        scope: occasionSlug,
-        active: true,
-        createdAt: new Date().toISOString(),
-      });
-    });
-  });
-  return list;
-}
-
-function seedAddonProductsIfNeeded() {
-  if (localStorage.getItem(KEYS.addonProductsSeededV1)) return;
-  const existing = readStorage(KEYS.products, []);
-  const existingSlugs = new Set(existing.map((p) => p?.slug).filter(Boolean));
-  const seeded = (SEED_ADDON_PRODUCTS || [])
-    .filter((p) => !existingSlugs.has(p.slug))
-    .map((p, i) => ({
-      ...p,
-      id: uid("addon-prod"),
-      type: "product",
-      occasionSlug: "event-services",
-      categoryPath: ["event-services", p.categorySlug],
-      isAddon: true,
-      status: "active",
-      rating: 4.7,
-      reviewCount: 18 + i * 4,
-      includes: Array.isArray(p.includes) ? p.includes : [],
-      addons: [],
-      cities: ["Ranchi", "Jamshedpur", "Patna"],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isDemo: true,
-    }));
-  if (seeded.length) writeStorage(KEYS.products, [...existing, ...seeded]);
-  localStorage.setItem(KEYS.addonProductsSeededV1, "1");
-}
-
 // One-time seed of the real Shorts/video links supplied for this site's
 // launch content — guarded purely by its own flag (not STORE_VERSION), so
 // it always runs exactly once no matter what version state a browser is
@@ -381,197 +318,6 @@ function mergeSeedOccasions(existing, seed) {
 }
 
 
-function referenceDemoProducts() {
-  const common = (p) => ({
-    id: uid("demo-prod"),
-    status: "active",
-    rating: p.rating || 4.7,
-    reviewCount: p.reviewCount || 46,
-    includes: p.includes || ["Professional setup", "Decoration materials", "Setup & takedown"],
-    addons: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    ...p,
-  });
-  const img = IMAGES;
-  const curated = [
-    // Kids Birthday — names and examples visible in the supplied reference recording.
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"simple-birthday-room-decoration-for-kids", name:"Simple Birthday Room Decoration For Kids", shortDesc:"A cheerful room setup with balloons, backdrop styling and a cake corner.", image:img.themeBalloonCelebration, price:2899, originalPrice:3209 }),
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"dreamy-unicorn-birthday-setup", name:"Dreamy Unicorn Birthday Setup", shortDesc:"Pastel unicorn styling with a dreamy balloon backdrop.", image:img.themePony, price:7800, originalPrice:8200 }),
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"roblox-theme-birthday-decoration-with-blue-balloon-arch", name:"Roblox Theme Birthday Decoration with Blue Balloon Arch", shortDesc:"Blue balloon arch and gaming-inspired Roblox party styling.", image:img.pkgBirthdayBash, price:6499, originalPrice:7499 }),
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"premium-dinosaur-theme-birthday-decoration", name:"Premium Dinosaur Theme Birthday Decoration", shortDesc:"Premium dinosaur party setup with themed backdrop and props.", image:img.themeDinosaurToy, price:29500, originalPrice:32000 }),
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"harry-potter-theme-birthday-balloon-decoration", name:"Harry Potter Theme Birthday Balloon Decoration", shortDesc:"Wizarding-inspired balloon and backdrop decoration for kids.", image:img.themeStageLights, price:7400, originalPrice:8200 }),
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"pastel-unicorn-theme-birthday-balloon-decoration", name:"Pastel Unicorn Theme Birthday Balloon Decoration", shortDesc:"Soft pastel unicorn balloon styling for a magical birthday.", image:img.themePony, price:6799, originalPrice:7499 }),
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"barbie-theme-birthday-backdrop-decoration", name:"Barbie Theme Birthday Backdrop Decoration", shortDesc:"Pink Barbie-inspired backdrop with coordinated balloons.", image:img.themePony, price:3999, originalPrice:4509 }),
-    common({ occasionSlug:"birthday", categorySlug:"kids-birthday", slug:"rainbow-theme-birthday-decoration-with-pastel-balloon-arch", name:"Rainbow Theme Birthday Decoration with Pastel Balloon Arch", shortDesc:"Colourful rainbow backdrop with a pastel balloon arch.", image:img.themeBalloonCelebration, price:6800, originalPrice:7509 }),
-
-    // Car Theme — reference recording examples.
-    common({ occasionSlug:"birthday", categorySlug:"car-theme", slug:"car-theme-decoration", name:"Car Theme Decoration", shortDesc:"Car-themed birthday backdrop and balloon decoration.", image:img.pkgBirthdayBash, price:22199, originalPrice:22400 }),
-    common({ occasionSlug:"birthday", categorySlug:"car-theme", slug:"spiderman-theme-decoration", name:"Spiderman Theme Decoration", shortDesc:"Spiderman-inspired birthday backdrop and balloon styling.", image:img.pkgBirthdayBash, price:21799, originalPrice:22400 }),
-    common({ occasionSlug:"birthday", categorySlug:"car-theme", slug:"super-hero-theme-decoration", name:"Super Hero Theme Decoration", shortDesc:"Superhero birthday decoration with bold comic styling.", image:img.pkgBirthdayBash, price:21799, originalPrice:22400 }),
-    common({ occasionSlug:"birthday", categorySlug:"car-theme", slug:"car-theme-party-decoration", name:"Car Theme Party Decoration", shortDesc:"Racing-inspired car theme for a kids birthday party.", image:img.pkgBirthdayBash, price:6999, originalPrice:7999 }),
-
-    // Frozen / Princess examples from the recording.
-    common({ occasionSlug:"birthday", categorySlug:"frozen-theme", slug:"frozen-theme-decoration-for-kids-birthday", name:"Frozen Theme Decoration for Kids Birthday", shortDesc:"Blue and white winter-wonderland Frozen decoration.", image:img.heroBirthday, price:21999, originalPrice:25999 }),
-    common({ occasionSlug:"birthday", categorySlug:"frozen-theme", slug:"disney-princess-theme-decoration", name:"Disney Princess Theme Decoration", shortDesc:"Princess-inspired birthday setup with elegant pastel styling.", image:img.themeTiaraCrown, price:21999, originalPrice:25099 }),
-    common({ occasionSlug:"birthday", categorySlug:"princess-theme", slug:"premium-barbie-decoration", name:"Premium Barbie Decoration", shortDesc:"Premium Barbie-inspired party backdrop and balloon styling.", image:img.themePony, price:11999, originalPrice:13999 }),
-
-    // Wedding Car — reference recording examples.
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"white-car-decoration-for-wedding", name:"White Car Decoration For Wedding", shortDesc:"Elegant white floral wedding car decoration.", image:img.showcase1, price:35999, originalPrice:37999 }),
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"car-dashboard-decoration-for-marriage", name:"Car Dashboard Decoration For Marriage", shortDesc:"Floral dashboard decoration for a wedding car.", image:img.showcase1, price:37999, originalPrice:42209 }),
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"car-decor-with-rose", name:"Car Decor With Rose", shortDesc:"Rose-focused wedding car decoration.", image:img.showcase1, price:10999, originalPrice:12499 }),
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"simple-car-flower-decoration", name:"Simple Car Flower Decoration", shortDesc:"Clean floral styling for a wedding car.", image:img.showcase1, price:36499, originalPrice:37309 }),
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"car-marriage-decoration", name:"Car Marriage Decoration", shortDesc:"Traditional floral wedding car setup.", image:img.showcase1, price:33899, originalPrice:34509 }),
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"ribbon-wedding-car-decoration", name:"Ribbon Wedding Car Decoration", shortDesc:"Ribbon and floral styling for wedding transportation.", image:img.showcase1, price:34999, originalPrice:35599 }),
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"simple-car-ribbon-decoration", name:"Simple Car Ribbon Decoration", shortDesc:"Minimal ribbon-led wedding car decoration.", image:img.showcase1, price:34199, originalPrice:34709 }),
-    common({ occasionSlug:"wedding", categorySlug:"wedding-car", slug:"classic-wedding-car-decoration", name:"Classic Wedding Car Decoration", shortDesc:"Classic floral wedding car styling.", image:img.showcase1, price:32999, originalPrice:34999 }),
-
-    // Haldi — reference recording examples.
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"simple-haldi-backdrop", name:"Simple Haldi Backdrop", shortDesc:"Bright marigold-inspired Haldi backdrop for an intimate ceremony.", image:img.themeJungleLeaves, price:14999, originalPrice:15709 }),
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"flower-and-tassel-haldi", name:"Flower and Tassel Haldi", shortDesc:"Floral and tassel styling for a colourful Haldi ceremony.", image:img.themeJungleLeaves, price:12999, originalPrice:14299 }),
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"mehndi-green-backdrop-setup", name:"Mehndi Green Backdrop Setup", shortDesc:"Green backdrop setup with floral and traditional accents.", image:img.themeMehndiHenna, price:16999, originalPrice:19999 }),
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"elegant-mehndi-decoration", name:"Elegant Mehndi Decoration", shortDesc:"Elegant green and floral Mehndi ceremony styling.", image:img.themeMehndiHenna, price:27999, originalPrice:28999 }),
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"home-flower-decoration", name:"Home Flower Decoration", shortDesc:"Floral home decoration for a pre-wedding ceremony.", image:img.themeJungleLeaves, price:15999, originalPrice:17499 }),
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"elegant-haldi-setup", name:"Elegant Haldi Setup", shortDesc:"Premium Haldi setup with coordinated floral styling.", image:img.themeJungleLeaves, price:15999, originalPrice:17499 }),
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"marigold-haldi-decoration", name:"Marigold Haldi Decoration", shortDesc:"Traditional marigold-led Haldi ceremony decoration.", image:img.themeJungleLeaves, price:21999, originalPrice:26399 }),
-    common({ occasionSlug:"wedding", categorySlug:"haldi", slug:"premium-haldi-floral-setup", name:"Premium Haldi Floral Setup", shortDesc:"Premium floral Haldi backdrop and seating-area styling.", image:img.themeJungleLeaves, price:13999, originalPrice:15999 }),
-
-    // Root birthday categories — enough mixed content to make the reference-style
-    // Birthday page look populated without pretending these are real inventory.
-    common({ occasionSlug:"birthday", categorySlug:"balloon-decor", slug:"simple-birthday-balloon-decoration", name:"Simple Birthday Balloon Decoration", shortDesc:"Classic balloon backdrop for birthdays.", image:img.themeBalloonCelebration, price:2499, originalPrice:2999 }),
-    common({ occasionSlug:"birthday", categorySlug:"balloon-decor", slug:"elegant-birthday-balloon-decoration", name:"Elegant Birthday Balloon Decoration", shortDesc:"Elegant balloon styling with a photo-ready backdrop.", image:img.themeBalloonArch, price:4499, originalPrice:5499 }),
-    common({ occasionSlug:"birthday", categorySlug:"canopy-decor", slug:"birthday-canopy-decoration", name:"Birthday Canopy Decoration", shortDesc:"Canopy-style birthday setup with balloons and lights.", image:img.themePony, price:5999, originalPrice:6999 }),
-    common({ occasionSlug:"birthday", categorySlug:"car-boot-decor", slug:"birthday-car-boot-decoration", name:"Birthday Car Boot Decoration", shortDesc:"Car boot styling for a birthday surprise.", image:img.pkgBirthdayBash, price:4999, originalPrice:5999 }),
-  ];
-
-
-  const slugifyLocal = (value) => String(value || "item").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  const KNOWN_NESTED_PATHS = {
-    "animal-theme": ["birthday", "kids-birthday", "animal-theme"],
-    "car-theme": ["birthday", "kids-birthday", "car-theme"],
-    "frozen-theme": ["birthday", "kids-birthday", "frozen-theme"],
-    "superhero-theme": ["birthday", "kids-birthday", "superhero-theme"],
-    "princess-theme": ["birthday", "kids-birthday", "princess-theme"],
-    "barbie-theme": ["birthday", "kids-birthday", "barbie-theme"],
-    "wedding-car": ["wedding", "wedding-car"],
-  };
-  const pathForCategory = (occasionSlug, categorySlug) => {
-    if (KNOWN_NESTED_PATHS[categorySlug]) return KNOWN_NESTED_PATHS[categorySlug];
-    let result = null;
-    function walk(node, trail) {
-      if (!node || result) return;
-      const next = [...trail, node];
-      if (node.slug === categorySlug && next[0]?.slug === occasionSlug) { result = next.map((n) => n.slug); return; }
-      (node.children || []).forEach((child) => walk(child, next));
-    }
-    const occ = SEED_OCCASIONS.find((o) => o.slug === occasionSlug);
-    if (occ) walk(occ, []);
-    return result || [occasionSlug, categorySlug].filter(Boolean);
-  };
-
-  const imageFor = (slug, variant = 0) => realCatalogImageFor(slug, variant);
-
-  // Preserve the named examples from the reference recording, but make every
-  // product use the artwork for its actual category/theme and store the full
-  // hierarchy path. This prevents unrelated cake/wedding images from appearing
-  // under themes such as Car, Frozen, SFX, Haldi, etc.
-  curated.forEach((p, i) => {
-    const path = pathForCategory(p.occasionSlug, p.categorySlug);
-    p.categoryPath = path;
-    const leafSlug = path[path.length - 1] || p.categorySlug;
-    p.image = imageFor(leafSlug, i);
-    p.gallery = [imageFor(leafSlug, i), imageFor(leafSlug, i + 1), imageFor(leafSlug, i + 2)];
-    p.isDemo = true;
-  });
-
-  // Add 4 believable dummy packages to every leaf category/theme in the tree.
-  // Parents automatically aggregate these products, so every level of the
-  // hierarchy has useful catalog content without duplicating inventory.
-  const generated = [];
-  const suffixes = [
-    ["Classic", "Setup"],
-    ["Premium", "Decoration"],
-    ["Elegant", "Package"],
-    ["Signature", "Experience"],
-  ];
-  function addLeafProducts(node, occasionSlug, trail) {
-    const nextTrail = [...trail, node];
-    const children = Array.isArray(node.children) ? node.children : [];
-    if (children.length) {
-      children.forEach((child) => addLeafProducts(child, occasionSlug, nextTrail));
-      return;
-    }
-    if (!node.slug || node.slug === "dummy-event" || node.type === "product") return;
-    const label = node.label || "Event";
-    for (let i = 0; i < suffixes.length; i += 1) {
-      const [adjective, noun] = suffixes[i];
-      const slug = `${occasionSlug}-${node.slug}-${slugifyLocal(adjective)}-${slugifyLocal(noun)}`;
-      if (curated.some((p) => p.slug === slug) || generated.some((p) => p.slug === slug)) continue;
-      const base = 2499 + ((node.slug.length * 731 + i * 1733) % 27000);
-      const path = nextTrail.map((n) => n.slug);
-      generated.push(common({
-        occasionSlug,
-        categorySlug: node.slug,
-        categoryPath: path,
-        slug,
-        name: `${adjective} ${label} ${noun}`,
-        shortDesc: `${adjective} ${label.toLowerCase()} setup with coordinated styling, props and professional installation.`,
-        description: `A ${adjective.toLowerCase()} ${label.toLowerCase()} package designed to match the theme, venue and celebration style.`,
-        image: imageFor(node.slug, i),
-        gallery: [imageFor(node.slug, i), imageFor(node.slug, i + 1), imageFor(node.slug, i + 2)],
-        price: base,
-        originalPrice: base + Math.max(500, Math.round(base * 0.14)),
-        includes: ["Theme-specific backdrop/styling", "Coordinated props", "Balloon/floral accents where applicable", "Professional setup & takedown"],
-        isDemo: true,
-      }));
-    }
-  }
-  (SEED_OCCASIONS || []).forEach((occ) => {
-    if (occ.slug === "dummy-event") return;
-    addLeafProducts(occ, occ.slug, []);
-  });
-
-  // Add every product/card transcribed from the supplied reference PDF.
-  // Cards without a displayed price remain quote-only instead of inventing a price.
-  const pdfProducts = (PDF_REFERENCE_PRODUCTS || []).map((p, i) => {
-    const categoryPath = [p.occasionSlug, p.categorySlug].filter(Boolean);
-    const leafSlug = p.categorySlug || p.occasionSlug;
-    const baseImage = imageFor(leafSlug, i);
-    return common({
-      occasionSlug: p.occasionSlug,
-      categorySlug: p.categorySlug,
-      categoryPath,
-      slug: `pdf-${p.page}-${slugifyLocal(p.occasionSlug)}-${slugifyLocal(p.categorySlug)}-${slugifyLocal(p.name)}-${i + 1}`,
-      name: p.name,
-      shortDesc: p.quoteOnly
-        ? `${p.name} — reference design from the supplied catalog PDF. Contact us for the final customised quote.`
-        : `${p.name} — reference package from the supplied catalog PDF.`,
-      description: `Reference catalog item shown on page ${p.page} of the supplied PDF. Final styling, venue requirements and availability are confirmed before booking.`,
-      image: baseImage,
-      gallery: [baseImage, imageFor(leafSlug, i + 1), imageFor(leafSlug, i + 2)],
-      price: p.quoteOnly ? null : p.price,
-      originalPrice: null,
-      quoteOnly: Boolean(p.quoteOnly),
-      referencePage: p.page,
-      includes: ["Reference design / package styling", "Professional setup", "Final customisation confirmed before event"],
-      isDemo: true,
-    });
-  });
-
-  return [...curated, ...generated, ...pdfProducts];
-}
-
-function seedReferenceDemoProductsIfNeeded() {
-  if (localStorage.getItem(KEYS.referenceDemoProductsSeededV3)) return;
-  const existing = readStorage(KEYS.products, []);
-  // Only remove records created by our previous demo seeds. Admin-created
-  // products are preserved untouched.
-  const preserved = existing.filter((p) => !(p && (p.isDemo === true || String(p.id || "").startsWith("demo-prod"))));
-  const demo = referenceDemoProducts();
-  writeStorage(KEYS.products, [...preserved, ...demo]);
-  localStorage.setItem(KEYS.referenceDemoProductsSeededV3, "1");
-}
-
 function initializeSeedsIfNeeded() {
   if (seedsInitialized) return;
   seedsInitialized = true;
@@ -593,18 +339,6 @@ function initializeSeedsIfNeeded() {
       writeStorage(KEYS.addons, migrated);
     }
     localStorage.setItem(KEYS.serviceOccasionSplitV1, "1");
-  }
-  // Second migration: add birthday-specific featured services to existing
-  // installations without touching any admin-created service records.
-  if (!localStorage.getItem(KEYS.serviceOccasionSplitV2)) {
-    const existing = readStorage(KEYS.addons, []);
-    const existingSlugs = new Set(existing.map((a) => a?.slug).filter(Boolean));
-    const birthdaySeeds = [
-      { id: uid("addon"), slug: "birthday-entertainment", label: "Birthday Entertainment", subLabel: "Hosts, games & kids entertainment", image: IMAGES.galConcert2, icon: "sparkle", categoryPath: ["event-services", "artists"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
-      { id: uid("addon"), slug: "kids-activities", label: "Kids Activities", subLabel: "Games, activities & fun zones", image: IMAGES.themeBalloonCelebration, icon: "star", categoryPath: ["event-services", "wedding-activity"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
-    ].filter((a) => !existingSlugs.has(a.slug));
-    if (birthdaySeeds.length) writeStorage(KEYS.addons, [...birthdaySeeds, ...existing]);
-    localStorage.setItem(KEYS.serviceOccasionSplitV2, "1");
   }
   // Backward-compatible rename: Event Add-ons -> Event Services.
   // Existing admin/catalog data is kept intact when users upgrade.
@@ -630,7 +364,7 @@ function initializeSeedsIfNeeded() {
   // could already have the current store version while the separate YouTube
   // seed had never run, leaving the homepage Shorts/review sections empty.
   const videosSeeded = localStorage.getItem(KEYS.realShortsSeededV2) === "1";
-  if (currentVersion === STORE_VERSION && localStorage.getItem(KEYS.referenceHierarchyMigration) === REFERENCE_HIERARCHY_MIGRATION && localStorage.getItem(KEYS.referenceDemoProductsSeededV3) === "1" && videosSeeded) return;
+  if (currentVersion === STORE_VERSION && localStorage.getItem(KEYS.referenceHierarchyMigration) === REFERENCE_HIERARCHY_MIGRATION && videosSeeded) return;
 
   // One-time cleanup when upgrading from an older build: earlier versions
   // auto-seeded placeholder Instagram reels and a placeholder YouTube video
@@ -710,13 +444,23 @@ function initializeSeedsIfNeeded() {
     }
   }
 
-  // Initialize the reference catalog. These products are copied
-  // from the supplied reference recording so the hierarchy can be tested visually.
-  // They are normal catalog records and can be edited/deleted from Admin.
-  if (!localStorage.getItem(KEYS.products)) {
-    writeStorage(KEYS.products, []);
+  // Products/packages are admin-owned data only. The old build seeded reference
+  // products into the browser, which made the storefront appear to have a
+  // hardcoded catalog. Keep the product bucket empty unless it came from the
+  // admin/cloud catalog. Remove only known legacy seed records on upgrade;
+  // never delete real admin-created products.
+  {
+    const storedProducts = readStorage(KEYS.products, []);
+    const cleanedProducts = Array.isArray(storedProducts)
+      ? storedProducts.filter((product) => {
+          const id = String(product?.id || "");
+          return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+        })
+      : [];
+    if (!localStorage.getItem(KEYS.products) || JSON.stringify(cleanedProducts) !== JSON.stringify(storedProducts)) {
+      writeStorage(KEYS.products, cleanedProducts);
+    }
   }
-  seedReferenceDemoProductsIfNeeded();
 
   // Migrate any older service products into the explicit service namespace so
   // the normal Products & Packages screen can safely hide them.
@@ -729,7 +473,8 @@ function initializeSeedsIfNeeded() {
     });
     if (changed) writeStorage(KEYS.products, stored);
   }
-  seedAddonProductsIfNeeded();
+  // Event Services categories remain available, but sellable service products
+  // must also be created/managed by Admin. Never seed them into the product bucket.
 
   // Initialize Media
   if (!localStorage.getItem(KEYS.media)) {
@@ -761,27 +506,22 @@ function initializeSeedsIfNeeded() {
     );
   }
 
-  // Initialize Event Services. Service cards are featured doorways into the
-  // real Event Services catalog tree; they are not sellable products themselves.
-  const storedAddons = readStorage(KEYS.addons, null);
-  if (!Array.isArray(storedAddons)) {
-    writeStorage(KEYS.addons, extractAllSeedAddons());
-  } else {
-    const legacyAddonSlugs = new Set(["sfx", "artists", "photography", "wedding-activity", "baraat-procession"]);
-    const migratedAddons = storedAddons.map((a) => {
-      const path = Array.isArray(a.categoryPath) ? a.categoryPath.filter(Boolean) : [];
-      return path.length === 1 && legacyAddonSlugs.has(path[0])
-        ? { ...a, categoryPath: ["event-services", path[0]] }
-        : a;
-    });
-    const seeded = extractAllSeedAddons();
-    seeded.push(
-      { id: uid("addon"), slug: "birthday-entertainment", label: "Birthday Entertainment", subLabel: "Hosts, games & kids entertainment", image: IMAGES.galConcert2, icon: "sparkle", categoryPath: ["event-services", "artists"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
-      { id: uid("addon"), slug: "kids-activities", label: "Kids Activities", subLabel: "Games, activities & fun zones", image: IMAGES.themeBalloonCelebration, icon: "star", categoryPath: ["event-services", "wedding-activity"], scopes: ["birthday"], scope: "birthday", active: true, createdAt: new Date().toISOString() },
-    );
-    const existingKeys = new Set(migratedAddons.map((a) => `${(Array.isArray(a.scopes) && a.scopes.length ? a.scopes.join(",") : a.scope || "")}::${a.slug}`));
-    const missing = seeded.filter((a) => !existingKeys.has(`${(a.scopes || [a.scope || ""]).join(",")}::${a.slug}`));
-    writeStorage(KEYS.addons, [...missing, ...migratedAddons]);
+  // Event Services are admin-owned data only. Older builds seeded featured
+  // service cards locally, which could make the storefront look populated
+  // before the admin had created any real service products. Purge only the
+  // known launch seed slugs once; future service cards come exclusively from
+  // the admin catalog.
+  if (!localStorage.getItem(KEYS.adminOnlyServicesV1)) {
+    const legacySeedSlugs = new Set([
+      "sfx", "artists", "photography", "birthday-entertainment",
+      "kids-activities", "wedding-activity", "baraat-procession",
+    ]);
+    const existing = readStorage(KEYS.addons, []);
+    if (Array.isArray(existing)) {
+      const cleaned = existing.filter((addon) => !legacySeedSlugs.has(String(addon?.slug || "")));
+      if (cleaned.length !== existing.length) writeStorage(KEYS.addons, cleaned);
+    }
+    localStorage.setItem(KEYS.adminOnlyServicesV1, "1");
   }
 
   // Initialize Sample Coupons
@@ -867,18 +607,41 @@ export function getProducts() {
   const raw = localStorage.getItem(KEYS.products) || "";
   if (productsCacheValue && productsCacheRaw === raw) return productsCacheValue;
   productsCacheRaw = raw;
-  productsCacheValue = readStorage(KEYS.products, []).map((product) => {
+  const rawProducts = readStorage(KEYS.products, []);
+  const byId = new Map(rawProducts.map((product) => [String(product?.id || ""), product]));
+  productsCacheValue = rawProducts.map((product) => {
     const primaryImage = sanitizeUrl(product?.image) || (Array.isArray(product?.images) && sanitizeUrl(product.images[0])) || (Array.isArray(product?.gallery) && sanitizeUrl(product.gallery[0])) || IMAGES.pkgDreamWedding;
     const gallery = Array.from(new Set([
       primaryImage,
       ...(Array.isArray(product?.images) ? product.images : []),
       ...(Array.isArray(product?.gallery) ? product.gallery : []),
     ].map((url) => sanitizeUrl(url)).filter(Boolean)));
+
+    // Package contents reference live product IDs. Rebuild the display snapshot
+    // from the current product record so renames/prices/images never become
+    // stale inside an existing package. Missing products are omitted rather
+    // than leaving a dead package item behind.
+    const packageItems = product?.catalogKind === "package" && Array.isArray(product.packageItems)
+      ? product.packageItems.map((item) => {
+          const source = byId.get(String(item?.productId || item?.id || ""));
+          if (!source || source.catalogKind === "package") return null;
+          return {
+            productId: source.id,
+            id: source.id,
+            name: source.name,
+            qty: Math.max(1, Number(item?.qty || item?.quantity || 1)),
+            price: Number(source.price) || 0,
+            image: source.image || "",
+          };
+        }).filter(Boolean)
+      : product?.packageItems;
+
     return {
       ...product,
       image: primaryImage,
       images: gallery,
       gallery,
+      ...(product?.catalogKind === "package" ? { packageItems } : {}),
     };
   });
   return productsCacheValue;
@@ -892,6 +655,17 @@ export function getProduct(idOrSlug) {
 export function saveProduct(product) {
   const list = getProducts();
   const now = new Date().toISOString();
+  const catalogKind = ["product", "package", "service"].includes(product?.catalogKind)
+    ? product.catalogKind
+    : (product?.isAddon ? "service" : "product");
+
+  if (catalogKind === "package") {
+    const items = Array.isArray(product?.packageItems) ? product.packageItems : [];
+    if (!items.length) throw new Error("A package must contain at least one product.");
+    const sourceIds = new Set(list.filter((p) => p.catalogKind !== "package").map((p) => String(p.id)));
+    const invalid = items.some((item) => !sourceIds.has(String(item?.productId || item?.id || "")));
+    if (invalid) throw new Error("One or more package products no longer exist. Refresh the catalog and select the products again.");
+  }
 
     const primaryImage = sanitizeUrl(product.image) || (Array.isArray(product.images) && sanitizeUrl(product.images[0])) || (Array.isArray(product.gallery) && sanitizeUrl(product.gallery[0])) || IMAGES.pkgDreamWedding;
     const galleryList = Array.from(new Set([
@@ -902,7 +676,7 @@ export function saveProduct(product) {
 
     const safeProduct = {
       ...product,
-      catalogKind: ["product", "package", "service"].includes(product.catalogKind) ? product.catalogKind : (product.isAddon ? "service" : "product"),
+      catalogKind,
       type: "product",
       slug: sanitizeSlug(product.slug || product.name || "package"),
       name: sanitizeText(product.name || "Untitled Package"),
@@ -923,6 +697,20 @@ export function saveProduct(product) {
     importantInfo: Array.isArray(product.importantInfo) ? product.importantInfo.map(sanitizeText).filter(Boolean) : [],
     addons: Array.isArray(product.addons)
       ? product.addons.map((a) => ({ name: sanitizeText(a.name), price: sanitizeNumber(a.price) }))
+      : [],
+    packageItems: catalogKind === "package"
+      ? (Array.isArray(product.packageItems) ? product.packageItems.map((item) => {
+          const productId = sanitizeText(item?.productId || item?.id || "");
+          const source = list.find((entry) => String(entry?.id || "") === productId);
+          return source ? {
+            productId: source.id,
+            id: source.id,
+            name: sanitizeText(source.name),
+            qty: Math.max(1, sanitizeNumber(item?.qty || item?.quantity, 1, 9999, 1)),
+            price: sanitizeNumber(source.price, 0, 10000000, 0),
+            image: sanitizeUrl(source.image) || "",
+          } : null;
+        }).filter(Boolean) : [])
       : [],
     cities: Array.isArray(product.cities) ? product.cities.map(sanitizeText) : [],
     categoryPath: Array.isArray(product.categoryPath) ? product.categoryPath.map(sanitizeSlug).filter(Boolean) : [],
@@ -960,15 +748,21 @@ export async function saveProductToCloud(product) {
   return saved;
 }
 
-export function deleteProduct(idOrSlug) {
+export async function deleteProduct(idOrSlug) {
   const list = getProducts();
+  const targetId = String(list.find((p) => p.id === idOrSlug || p.slug === idOrSlug)?.id || idOrSlug);
+  const referencingPackage = list.find((p) => p.catalogKind === "package" && Array.isArray(p.packageItems) && p.packageItems.some((item) => String(item?.productId || item?.id || "") === targetId));
+  if (referencingPackage) {
+    throw new Error(`Cannot delete this product because it is included in package "${referencingPackage.name}". Remove it from that package first.`);
+  }
   const next = list.filter((p) => p.id !== idOrSlug && p.slug !== idOrSlug);
   persist(KEYS.products, next);
   dispatchCatalogUpdate();
+  await syncCloudState(KEYS.products, next);
   return true;
 }
 
-export function duplicateProduct(idOrSlug) {
+export async function duplicateProduct(idOrSlug) {
   const target = getProduct(idOrSlug);
   if (!target) return null;
 
@@ -981,10 +775,12 @@ export function duplicateProduct(idOrSlug) {
     updatedAt: new Date().toISOString(),
   };
 
-  return saveProduct(clone);
+  const saved = saveProduct(clone);
+  await syncCloudState(KEYS.products, getProducts());
+  return saved;
 }
 
-export function bulkUpdateProducts(ids, updates) {
+export async function bulkUpdateProducts(ids, updates) {
   const list = getProducts();
   let count = 0;
   const next = list.map((p) => {
@@ -1008,14 +804,21 @@ export function bulkUpdateProducts(ids, updates) {
 
   persist(KEYS.products, next);
   dispatchCatalogUpdate();
+  await syncCloudState(KEYS.products, next);
   return count;
 }
 
-export function bulkDeleteProducts(ids) {
+export async function bulkDeleteProducts(ids) {
   const list = getProducts();
+  const selected = new Set(ids.map(String));
+  const referencingPackage = list.find((p) => p.catalogKind === "package" && Array.isArray(p.packageItems) && p.packageItems.some((item) => selected.has(String(item?.productId || item?.id || ""))));
+  if (referencingPackage) {
+    throw new Error(`Cannot delete selected products because package "${referencingPackage.name}" still uses one of them. Remove the item from that package first.`);
+  }
   const next = list.filter((p) => !ids.includes(p.id) && !ids.includes(p.slug));
   persist(KEYS.products, next);
   dispatchCatalogUpdate();
+  await syncCloudState(KEYS.products, next);
   return true;
 }
 
@@ -1453,6 +1256,56 @@ export function deleteGalleryItem(id) {
   persist(KEYS.gallery, next);
   dispatchCatalogUpdate();
   return true;
+}
+
+export async function uploadGalleryImageFile(file, metadata = {}) {
+  if (!file) throw new Error("No file selected.");
+
+  const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!validTypes.includes(file.type)) {
+    throw new Error("Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed.");
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Image size exceeds maximum limit of 5MB.");
+  }
+
+  const blob = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const source = new Image();
+      source.onload = () => {
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(source.naturalWidth || source.width, source.naturalHeight || source.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((source.naturalWidth || source.width) * scale));
+        canvas.height = Math.max(1, Math.round((source.naturalHeight || source.height) * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Unable to process image."));
+          return;
+        }
+        ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((output) => {
+          if (!output) reject(new Error("Unable to encode image."));
+          else resolve(output);
+        }, "image/webp", 0.82);
+      };
+      source.onerror = () => reject(new Error("Failed to decode image file."));
+      source.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error("Failed to read image file."));
+    reader.readAsDataURL(file);
+  });
+
+  const uploaded = await uploadImageBlob(blob, `${(metadata.alt || file.name).replace(/[^a-z0-9_-]+/gi, "-")}.webp`);
+  return saveGalleryItemToCloud({
+    img: uploaded.secure_url,
+    alt: metadata.alt || file.name.replace(/\.[^/.]+$/, ""),
+    category: metadata.category || "weddings",
+    tall: !!metadata.tall,
+    cloudinaryPublicId: uploaded.public_id || "",
+  });
 }
 
 export async function saveGalleryItemToCloud(item) {

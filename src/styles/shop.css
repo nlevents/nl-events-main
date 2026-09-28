@@ -616,9 +616,11 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 .video-home-category-card>span:last-child{ display:block; margin-top:10px; font-size:14px; line-height:1.25; font-weight:700; color:#03152d; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .video-home .shop-section{ padding:15px 0 18px; }
+/* Keep the home Popular Packages rail aligned with the wider home sections. */
+.video-home .shop-section > .container{ max-width:1240px; padding-left:0; padding-right:0; }
 .video-home .shop-head{ margin-bottom:9px; }
 .video-home .shop-head h2{ font-family:var(--font-body); font-size:17px; font-weight:800; letter-spacing:-.02em; }
-.video-home .shop-head a{ color:#7140c8; font-size:9px; text-transform:none; letter-spacing:0; }
+.video-home .shop-head a{ display:inline-flex; align-items:center; justify-content:center; min-height:34px; padding:0 14px; border:0; border-radius:6px; background:#fff; color:#7140c8; font-size:14px; font-weight:800; text-transform:none; letter-spacing:0; }
 .video-home .rail{ position:relative; }
 .video-home .rail-track{ gap:10px; }
 .video-home .rail-card{ flex-basis:calc((100% - 40px)/5); min-width:0; border:1px solid #e7e7e7; border-radius:7px; background:#fff; box-shadow:0 1px 5px rgba(0,0,0,.05); overflow:hidden; }
@@ -653,6 +655,7 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 .video-home-city-note{ display:none; }
 
 @media (max-width:899px){
+  .video-home .shop-section > .container{ padding-left:16px; padding-right:16px; }
   .video-home-hero{ width:calc(100% - 24px); height:250px; margin-top:10px; border-radius:7px; }
   .video-home-hero-copy{ padding:22px; }
   .video-home-hero h1{ font-size:28px; }
@@ -775,12 +778,34 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 .ref-home-dark-copy{font-size:11px;color:rgba(255,255,255,.73);margin:6px 0 18px;max-width:650px;line-height:1.5}
 .ref-home-slider{display:flex;gap:13px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 9px;scrollbar-width:none}
 .ref-home-slider::-webkit-scrollbar{display:none}
+
+/* Home service/concept rail: make desktop navigation controls easy to see and reach. */
+@media (min-width:900px){
+  .ref-home-slider-wrap .rail-arrow{
+    display:flex;
+    width:46px;
+    height:46px;
+    top:50%;
+    transform:translateY(-50%);
+    border:1px solid #d8c9a9;
+    box-shadow:0 5px 16px rgba(3,21,45,.16);
+  }
+  .ref-home-slider-wrap .rail-arrow svg{width:20px;height:20px}
+  .ref-home-slider-wrap .rail-arrow-prev{left:-24px}
+  .ref-home-slider-wrap .rail-arrow-next{right:-24px}
+}
 .ref-home-card{flex:0 0 180px}
 .ref-home-concept-card{flex:0 0 145px;scroll-snap-align:start;color:#fff}
+@media (min-width:1200px){
+  .ref-home-concept-card{flex-basis:calc((100% - 78px) / 7)}
+}
 .ref-home-concept-card img{display:block;width:100%;height:160px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,.12);box-shadow:0 5px 14px rgba(0,0,0,.20)}
 .ref-home-concept-card strong{display:block;margin-top:8px;font-size:10px;text-align:center;color:#fff}
 
 .ref-home-light-section{background:#f8f7f3;padding:36px 0 42px}
+.ref-home-head-right{display:flex;flex-direction:column;align-items:stretch}
+.ref-home-head-right>a{align-self:flex-end;display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:8px;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none;color:#c59a3a;font-size:14px;font-weight:800;letter-spacing:.01em;line-height:1.35;white-space:nowrap;text-decoration:none;transition:color .2s ease,transform .2s ease}
+.ref-home-head-right>a:hover{background:transparent;color:#a77d20;transform:translateX(-2px)}
 .ref-home-service-card{flex:0 0 150px;scroll-snap-align:start;color:#13253a;background:#fff;border:1px solid #ebe8e0;border-radius:5px;overflow:hidden}
 .ref-home-service-card img{display:block;width:100%;height:105px;object-fit:cover}
 .ref-home-service-card strong{display:block;font-size:10px;padding:8px 8px 2px;line-height:1.2}
@@ -840,7 +865,7 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
   .ref-home-hero-content small{font-size:10px;max-width:350px}
   .ref-home-hero-stats{gap:15px 20px;margin-top:28px}
   .ref-home-hero-stats b{font-size:13px}.ref-home-hero-stats span{font-size:7px}
-  .ref-home-head{align-items:flex-start}.ref-home-head h2{font-size:24px}.ref-home-head>a{font-size:8px;margin-top:3px}
+  .ref-home-head{align-items:flex-start}.ref-home-head h2{font-size:24px}.ref-home-light-section .ref-home-head-right,.ref-home-birthday .ref-home-head-right{display:contents}.ref-home-light-section .ref-home-container,.ref-home-birthday .ref-home-container{display:flex;flex-direction:column}.ref-home-light-section .ref-home-head-right>div,.ref-home-birthday .ref-home-head-right>div{order:1}.ref-home-light-section .ref-home-intro,.ref-home-birthday .ref-home-intro{order:2}.ref-home-light-section .ref-home-head-right>a,.ref-home-birthday .ref-home-head-right>a{order:3;align-self:flex-end;font-size:13px;margin-top:8px;margin-bottom:12px}.ref-home-light-section .ref-home-slider-wrap,.ref-home-birthday .ref-home-slider-wrap{order:4}
   .ref-home-celebrations,.ref-home-dark-section,.ref-home-light-section,.ref-home-birthday,.ref-home-recent,.ref-home-addons,.ref-home-usp{padding-top:28px;padding-bottom:32px}
   .ref-home-celebration-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 10px}
   .ref-home-celebration-card{width:100%}
@@ -935,7 +960,9 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 .wedding-review-section{background:#f6f4ee}
 .wedding-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .wedding-review-card{background:#fff;border:1px solid #e6e1d6;border-radius:7px;padding:18px;display:grid;grid-template-columns:46px 1fr;column-gap:11px;box-shadow:0 5px 18px rgba(10,30,48,.05)}
-.wedding-review-card>img{width:46px;height:46px;object-fit:cover;border-radius:50%;grid-row:span 2}
+.wedding-review-avatar{width:46px;height:46px;border-radius:50%;overflow:hidden;position:relative;display:grid;place-items:center;background:#eadfca;color:#9a6d1e;font-size:11px;font-weight:800;line-height:1;flex:0 0 auto;grid-row:span 2}
+.wedding-review-avatar span{position:absolute;inset:0;display:grid;place-items:center}
+.wedding-review-avatar img{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;border-radius:50%;background:#eadfca}
 .wedding-review-card strong{display:block;font-size:11px;color:#0b2036}
 .wedding-review-card>div>span{display:block;margin-top:2px;font-size:8px;color:#8a8f98}
 .wedding-stars{margin-top:5px;color:#d4a32e;font-size:10px;letter-spacing:1px}
@@ -1208,3 +1235,24 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
   .occasion-pro-featured-arrow.prev{left:0}
   .occasion-pro-featured-arrow.next{right:0}
 }
+
+/* Autoplay controls for horizontal content rails. Desktop arrows only. */
+.auto-rail-wrap{position:relative}
+@media (min-width:900px){
+  .auto-rail-wrap > .rail-arrow{display:flex}
+}
+@media (max-width:899px){
+  .auto-rail-wrap > .rail-arrow{display:none}
+}
+
+/* Desktop navigation for promo sliders. Hidden on mobile so touch gestures remain clean. */
+.promo-carousel{position:relative}
+.promo-arrow{
+  position:absolute;top:50%;z-index:3;transform:translateY(-50%);
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--border-soft);
+  background:var(--surface);color:var(--text-primary);display:none;align-items:center;justify-content:center;
+  cursor:pointer;box-shadow:0 6px 16px -8px rgba(3,21,45,.3)
+}
+.promo-arrow svg{width:17px;height:17px}
+.promo-arrow-prev{left:8px}.promo-arrow-next{right:8px}
+@media (min-width:900px){.promo-arrow{display:flex}}

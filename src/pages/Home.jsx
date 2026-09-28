@@ -1,18 +1,19 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import ShortsRail from "../components/ShortsRail";
+import VideoReviewGrid from "../components/VideoReviewGrid";
 import { IMAGES, CATALOG_IMAGES, waLink } from "../data/images";
-import { GLOBAL_ADDONS } from "../data/addons";
 import { onImgError } from "../lib/imageFallback";
+import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 import usePageMeta from "../hooks/usePageMeta";
 import { listOccasions, weddingFunctionLinks, birthdayThemeLinks } from "../data/occasions";
-const ShortsRail = lazy(() => import("../components/ShortsRail"));
-const VideoReviewGrid = lazy(() => import("../components/VideoReviewGrid"));
 import Faq from "../components/Faq";
 import ProductRail from "../components/ProductRail";
+import AutoScrollRail from "../components/AutoScrollRail";
 
 const CELEBRATIONS = [
   { label: "Weddings", href: "/occasion/wedding", img: IMAGES.typeWedding },
-  { label: "Birthdays", href: "/occasion/birthday", img: IMAGES.typeBirthday },
+  { label: "Birthdays", href: "/occasion/birthday", img: cloudinaryAsset("/assets/images/birthday-shop-occasion.jpeg") },
   { label: "Corporate Events", href: "/occasion/corporate", img: IMAGES.typeCorporate },
   { label: "Kids & Family Events", href: "/occasion/kids-family", img: IMAGES.typeBabyShower },
   { label: "Anniversary", href: "/occasion/anniversary", img: IMAGES.typeAnniversary },
@@ -125,9 +126,9 @@ function HomeHero() {
   );
 }
 
-function RefSectionHead({ eyebrow, title, link }) {
+function RefSectionHead({ eyebrow, title, link, linkClass = "" }) {
   return (
-    <div className="ref-home-head">
+    <div className={`ref-home-head ${linkClass}`}>
       <div>
         {eyebrow && <span>{eyebrow}</span>}
         <h2>{title}</h2>
@@ -139,7 +140,7 @@ function RefSectionHead({ eyebrow, title, link }) {
 
 function HorizontalCards({ items, cardClass = "ref-home-card", dark = false }) {
   return (
-    <div className={`ref-home-slider ${dark ? "is-dark" : ""}`}>
+    <AutoScrollRail className={`ref-home-slider ${dark ? "is-dark" : ""}`} selector={`.${cardClass}`} interval={4000} wrapperClassName="ref-home-slider-wrap">
       {items.map((item) => (
         <Link className={cardClass} to={item.href || "/book-event"} key={item.label}>
           <img src={item.img} alt={item.label} data-context={item.label} loading="lazy" decoding="async" onError={onImgError} />
@@ -147,7 +148,7 @@ function HorizontalCards({ items, cardClass = "ref-home-card", dark = false }) {
           {item.sub && <span>{item.sub}</span>}
         </Link>
       ))}
-    </div>
+    </AutoScrollRail>
   );
 }
 
@@ -183,7 +184,7 @@ function CelebrationSection() {
             return {
               label: occ.label,
               href: matching?.href || `/occasion/${occ.slug}`,
-              img: occ.image || occ.heroImg || matching?.img || IMAGES.typeWedding,
+              img: occ.slug === "birthday" ? (matching?.img || occ.image || occ.heroImg || IMAGES.typeWedding) : (occ.image || occ.heroImg || matching?.img || IMAGES.typeWedding),
             };
           })
         );
@@ -242,7 +243,7 @@ function WeddingSection() {
 
       <section className="ref-home-light-section">
         <div className="ref-home-container">
-          <RefSectionHead title="Everything You Need for Your Event" link={{ label: "Explore all services", href: "/services" }} />
+          <RefSectionHead title="Everything You Need for Your Event" link={{ label: "Explore all services", href: "/services" }} linkClass="ref-home-head-right" />
           <p className="ref-home-intro">One team. All your event needs. Hassle-free planning, stunning execution.</p>
           <HorizontalCards items={WEDDING_SERVICES} cardClass="ref-home-service-card" />
         </div>
@@ -272,7 +273,7 @@ function BirthdaySection() {
   return (
     <section className="ref-home-birthday">
       <div className="ref-home-container">
-        <RefSectionHead title="A World of Imagination for Little Celebrations" link={{ label: "Explore kids birthday themes", href: "/occasion/birthday/kids-birthday" }} />
+        <RefSectionHead title="A World of Imagination for Little Celebrations" link={{ label: "Explore kids birthday themes", href: "/occasion/birthday/kids-birthday" }} linkClass="ref-home-head-right" />
         <p className="ref-home-intro">Magical themes, joyful setups and unforgettable moments for your little one.</p>
         <HorizontalCards items={themes} cardClass="ref-home-theme-card" />
       </div>
@@ -318,14 +319,30 @@ function PopularPackagesSection() {
 }
 
 function AddonsSection() {
-  const items = GLOBAL_ADDONS.map((item) => ({
-    ...item,
-    // Service data stores the thumbnail as `image`, while the shared
-    // HorizontalCards component reads `img`.
-    img: item.image,
-    sub: item.subLabel,
-    href: item.href,
-  }));
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    const load = () => import("../lib/catalogStore")
+      .then(({ getAddonsForOccasion }) => {
+        const live = ["wedding", "birthday"]
+          .flatMap((slug) => getAddonsForOccasion(slug))
+          .filter((item, index, list) => list.findIndex((x) => x.id === item.id) === index)
+          .map((item) => ({
+            ...item,
+            img: item.image,
+            sub: item.subLabel,
+            href: item.href,
+          }));
+        if (active) setItems(live);
+      })
+      .catch(() => {});
+    load();
+    window.addEventListener("nle-catalog-updated", load);
+    return () => { active = false; window.removeEventListener("nle-catalog-updated", load); };
+  }, []);
+
+  if (!items.length) return null;
 
   return (
     <section className="ref-home-addons">
@@ -519,13 +536,9 @@ export default function Home() {
       {/* Homepage media order is intentional: YouTube Shorts → Customer Reviews → Review Videos.
           Render these directly instead of observing a display:contents wrapper,
           so the media sections cannot be skipped by IntersectionObserver. */}
-      <Suspense fallback={null}>
-        <ShortsRail />
-      </Suspense>
+      <ShortsRail />
       <CustomerReviews />
-      <Suspense fallback={null}>
-        <VideoReviewGrid />
-      </Suspense>
+      <VideoReviewGrid />
       <HomeTrustSections />
     </main>
   );

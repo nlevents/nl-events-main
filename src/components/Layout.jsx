@@ -6,6 +6,18 @@ import BottomNav from "./BottomNav";
 import Chatbot from "./Chatbot";
 import ErrorBoundary from "./ErrorBoundary";
 
+// Shown only if a page itself throws. Header, footer and bottom navigation stay
+// mounted, and the error clears automatically as soon as the route changes.
+const pageFallback = ({ reset }) => (
+  <section className="container success-wrap" role="alert">
+    <h1 style={{ fontSize: "clamp(22px,5vw,30px)" }}>Something went wrong.</h1>
+    <p style={{ color: "var(--text-secondary)", marginTop: 12 }}>
+      This page could not be displayed. You can try again, or use the menu to go somewhere else.
+    </p>
+    <button type="button" className="btn btn-primary" style={{ marginTop: 24 }} onClick={reset}>Try again</button>
+  </section>
+);
+
 export default function Layout() {
   const location = useLocation();
 
@@ -37,7 +49,9 @@ export default function Layout() {
     <>
       {!isProductDetail && <Header />}
       <main className={isProductDetail ? "product-detail-shell" : undefined}>
-        <Outlet />
+        <ErrorBoundary resetKey={location.pathname} fallback={pageFallback}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <Footer />
       {!isProductDetail && <BottomNav />}

@@ -1552,9 +1552,9 @@
 
 /* Dynamic category pages: keep mobile content on a clean, consistent rail. */
 @media(max-width:640px){
-  /* The mobile chrome reserves 118px at the top of the document. Let the
-     category hero occupy that reserved area instead of leaving a blank band. */
-  .occ-category-page{ margin-top:-118px; }
+  /* Keep the category hero pulled into the mobile header's reserved space; the taller hero fills the remaining visual gap. */
+  body:has(.occ-category-page){ padding-top:0 !important; }
+  .occ-category-page{ margin-top:0; }
   .occ-category-content{ padding-left:16px; padding-right:16px; padding-bottom:20px; }
   .occ-category-related{ padding-left:16px; padding-right:16px; padding-top:20px; }
   .occ-category-content .occ-block{ padding-top:28px; margin-top:28px; }

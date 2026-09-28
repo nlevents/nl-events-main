@@ -1,7 +1,7 @@
 // ============================================================================
 // CLOUD DATA BRIDGE
 // Keeps the existing synchronous UI stores fast while persisting business
-// data to Supabase through the same-origin Vercel API. Browser localStorage is
+// data to Supabase through the same-origin Netlify Function API. Browser localStorage is
 // only a cache; the database is the source of truth in production.
 // ============================================================================
 
@@ -29,7 +29,27 @@ export const ADMIN_STATE_KEYS = [
 
 const ADMIN_SESSION_KEY = "nle-admin-supabase-session";
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
-const PRODUCTS_CLOUD_VERSION_KEY = "nle_catalog_v2_products_cloud_version";
+const CLOUD_VERSION_PREFIX = "nle_catalog_v2_cloud_version_";
+
+function cloudVersionKey(key) { return `${CLOUD_VERSION_PREFIX}${key}`; }
+
+function getCloudVersion(key) {
+  try { return localStorage.getItem(cloudVersionKey(key)) || ""; } catch { return ""; }
+}
+
+function setCloudVersion(key, value) {
+  if (!value) return;
+  try { localStorage.setItem(cloudVersionKey(key), value); } catch { /* cache only */ }
+}
+
+function removeLegacySeedProducts(products) {
+  if (!Array.isArray(products)) return [];
+  return products.filter((product) => {
+    const id = String(product?.id || "");
+    return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+  });
+}
+
 
 function getAdminAccessToken() {
   try {
@@ -77,11 +97,15 @@ function enqueueCloudWrite(key, data) {
   const previous = cloudWriteChains.get(key) || Promise.resolve();
   const next = previous
     .catch(() => {})
-    .then(() => request(`${API_BASE}/admin/state`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ key, data }),
-    }));
+    .then(async () => {
+      const result = await request(`${API_BASE}/admin/state`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ key, data, expectedUpdatedAt: getCloudVersion(key) || undefined }),
+      });
+      setCloudVersion(key, result?.updatedAt || "");
+      return result;
+    });
 
   cloudWriteChains.set(key, next);
   next.finally(() => {
@@ -103,13 +127,29 @@ export function queueCloudSync(key, data) {
   });
 }
 
-export async function hydratePublicState() {
-  // The bootstrap endpoint contains only lightweight public state plus the
-  // product version. This prevents the ~2.7 MB product catalog from being
-  // downloaded on every page load.
-  const data = await request(`${API_BASE}/catalog`, { cache: "no-store" });
+export async function hydratePublicState({ versionsOnly = false } = {}) {
+  // The metadata request is tiny and is used for polling. The full request is
+  // reserved for first load or when an actual catalog version changed.
+  const data = await request(`${API_BASE}/catalog${versionsOnly ? "?meta=1" : ""}`, { cache: "no-store" });
+  const versions = data?.versions || {};
+
+  if (versionsOnly) {
+    let changed = false;
+    Object.entries(versions).forEach(([key, value]) => {
+      const previous = getCloudVersion(key);
+      if (value && previous && previous !== value) changed = true;
+      if (value && !previous) changed = true;
+    });
+    if (changed) return hydratePublicState();
+    Object.entries(versions).forEach(([key, value]) => setCloudVersion(key, value));
+    return { versions };
+  }
+
   const state = data?.state || {};
   let changed = false;
+  const previousVersions = Object.fromEntries(Object.keys(versions).map((key) => [key, getCloudVersion(key)]));
+
+  Object.entries(versions).forEach(([key, value]) => setCloudVersion(key, value));
 
   Object.entries(state).forEach(([key, value]) => {
     if (!PUBLIC_STATE_KEYS.includes(key) || key === "nle_catalog_v2_products") return;
@@ -122,41 +162,29 @@ export async function hydratePublicState() {
     } catch { /* cache only */ }
   });
 
-  const cloudProductVersion = data?.versions?.products || "";
-  let localProductVersion = "";
-  try {
-    localProductVersion = localStorage.getItem(PRODUCTS_CLOUD_VERSION_KEY) || "";
-  } catch { /* cache only */ }
-
-  // Fetch the large product payload only on first load or after an admin
-  // changes the cloud product bucket.
+  const cloudProductVersion = versions.nle_catalog_v2_products || "";
+  const localProductVersion = previousVersions.nle_catalog_v2_products || "";
   const localProducts = (() => {
     try { return localStorage.getItem("nle_catalog_v2_products"); } catch { return null; }
   })();
 
   if (!localProducts || (cloudProductVersion && localProductVersion !== cloudProductVersion)) {
-    const productPayload = await request(`${API_BASE}/catalog/products`, { cache: "default" });
+    const productPayload = await request(`${API_BASE}/catalog/products`, { cache: "no-store" });
     const products = productPayload?.data;
     if (products !== undefined) {
+      const cleanProducts = removeLegacySeedProducts(products);
       try {
-        const nextRaw = JSON.stringify(products);
+        const nextRaw = JSON.stringify(cleanProducts);
         if (localProducts !== nextRaw) {
           localStorage.setItem("nle_catalog_v2_products", nextRaw);
           changed = true;
         }
-        if (cloudProductVersion) {
-          localStorage.setItem(PRODUCTS_CLOUD_VERSION_KEY, cloudProductVersion);
-        }
       } catch { /* cache only */ }
     }
-  } else if (cloudProductVersion && !localProductVersion) {
-    try { localStorage.setItem(PRODUCTS_CLOUD_VERSION_KEY, cloudProductVersion); } catch { /* cache only */ }
   }
 
-  if (changed) {
-    window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
-  }
-  return { ...state, ...(localProducts ? {} : {}) };
+  if (changed) window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
+  return { ...state, versions };
 }
 
 // Keep an already-open storefront synchronized with admin changes made in
@@ -168,7 +196,7 @@ let publicSyncTimer = null;
 let publicSyncInFlight = false;
 let publicSyncLastRun = 0;
 
-export function startPublicCatalogSync({ intervalMs = 30000, minRunGapMs = 5000 } = {}) {
+export function startPublicCatalogSync({ intervalMs = 5000, minRunGapMs = 1000 } = {}) {
   if (typeof window === "undefined") return () => {};
   if (publicSyncTimer) return () => stopPublicCatalogSync();
 
@@ -180,9 +208,9 @@ export function startPublicCatalogSync({ intervalMs = 30000, minRunGapMs = 5000 
     publicSyncLastRun = now;
     publicSyncInFlight = true;
     try {
-      await hydratePublicState();
+      await hydratePublicState({ versionsOnly: !force });
     } catch {
-      // The storefront always has a local/seed fallback.
+      // The storefront keeps its last-known local cache if the cloud is temporarily unavailable.
     } finally {
       publicSyncInFlight = false;
     }
@@ -216,9 +244,17 @@ export async function hydrateAdminState() {
     headers: { Authorization: `Bearer ${token}` },
   });
   const state = data?.state || {};
+  Object.entries(data?.versions || {}).forEach(([key, value]) => setCloudVersion(key, value));
   Object.entries(state).forEach(([key, value]) => {
     if (ADMIN_STATE_KEYS.includes(key)) {
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* cache only */ }
+      const nextValue = key === "nle_catalog_v2_products"
+        ? removeLegacySeedProducts(value)
+        : value;
+      try { localStorage.setItem(key, JSON.stringify(nextValue)); } catch { /* cache only */ }
+      // Clean known legacy seed records out of the durable cloud catalog too.
+      if (key === "nle_catalog_v2_products" && JSON.stringify(nextValue) !== JSON.stringify(value)) {
+        enqueueCloudWrite(key, nextValue).catch((err) => console.warn("Legacy product cleanup failed:", err?.message || err));
+      }
     }
   });
   window.dispatchEvent(new CustomEvent("nle-catalog-updated"));

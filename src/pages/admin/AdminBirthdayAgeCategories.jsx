@@ -163,7 +163,7 @@ export default function AdminBirthdayAgeCategories() {
         <div className="birthday-age-admin-list">
           {items.map((item, index) => (
             <article className={`birthday-age-admin-item ${item.active ? "" : "is-inactive"}`} key={item.id}>
-              <img src={item.image} alt="" className="birthday-age-admin-thumb" />
+              <img src={item.image} alt={item.title || "Birthday category"} className="birthday-age-admin-thumb" />
               <div className="birthday-age-admin-copy">
                 <strong>{item.title}</strong>
                 <span>{item.subtitle}</span>

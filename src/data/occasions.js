@@ -914,7 +914,18 @@ if (typeof window !== "undefined") {
 }
 
 function getLiveOccasions() {
-  if (typeof window === "undefined") return OCCASIONS;
+  if (typeof window === "undefined") {
+    const clone = JSON.parse(JSON.stringify(OCCASIONS));
+    // Product records are admin/database-owned. The built-in occasion tree is
+    // navigation/reference data only and must never act as a storefront catalog.
+    (function stripEmbeddedProducts(nodes) {
+      (nodes || []).forEach((node) => {
+        node.products = [];
+        stripEmbeddedProducts(node.children);
+      });
+    })(clone);
+    return clone;
+  }
   try {
     const rawOcc = localStorage.getItem("nle_catalog_v2_occasions");
     const rawProds = localStorage.getItem("nle_catalog_v2_products");
@@ -930,16 +941,15 @@ function getLiveOccasions() {
     const baseOccasions = hasStoredTree ? reconcilePublicHierarchy(parsedOcc) : OCCASIONS;
     const clone = JSON.parse(JSON.stringify(baseOccasions));
 
-    // The built-in occasion tree contains reference catalog products,
-    // but the live catalog is admin-owned. If the live product store exists and
-    // is empty, strip every embedded example product while preserving the full
-    // category hierarchy. Products added by Admin are injected below.
+    // The built-in occasion tree is navigation/reference data only.
+    // Sellable products are owned exclusively by the admin/database bucket.
     function stripEmbeddedProducts(nodes) {
       (nodes || []).forEach((node) => {
         node.products = [];
         stripEmbeddedProducts(node.children);
       });
     }
+    stripEmbeddedProducts(clone);
 
     // Preserve images stored by Admin. Seed presentation images are only
     // applied when there is no admin-owned catalog tree yet.

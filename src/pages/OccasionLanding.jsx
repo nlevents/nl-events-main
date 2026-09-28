@@ -117,7 +117,7 @@ function ImageCards({ items, className = "", large = false, rootSlugs = [] }) {
     {items.map(([title, text, image], i) => {
       const href = findCatalogPathByLabel(title, rootSlugs);
       return <Link className="occasion-pro-card" to={href || "/book-event"} key={title}>
-        <div className="occasion-pro-card-img"><img src={image} alt="" loading="lazy" decoding="async" /><span>{ICONS[i % ICONS.length]}</span></div>
+        <div className="occasion-pro-card-img"><img src={image} alt={title} loading="lazy" decoding="async" /><span>{ICONS[i % ICONS.length]}</span></div>
         <div className="occasion-pro-card-copy"><h3>{title}</h3>{text && <p>{text}</p>}<strong>Explore <b>→</b></strong></div>
       </Link>;
     })}

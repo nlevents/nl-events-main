@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     console.error("Admin bootstrap API error:", err);
     const message = String(err?.message || "");
     if (message.includes("Supabase is not configured on the server")) {
-      return res.status(503).json({ ok: false, error: "Admin cloud storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Vercel environment variables, then redeploy." });
+      return res.status(503).json({ ok: false, error: "Admin cloud storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Netlify environment variables, then redeploy." });
     }
     return res.status(500).json({ ok: false, error: message || "Unable to initialize cloud data." });
   }

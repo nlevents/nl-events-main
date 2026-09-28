@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 import { IMAGES, CATALOG_IMAGES, waLink } from "../data/images";
 import ProductCard from "../components/occasion/ProductCard";
 import { pathFor, sortProducts, weddingFunctionLinks, findOccasion } from "../data/occasions";
-import { PDF_REFERENCE_PRODUCTS } from "../data/pdfProducts";
 import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
 import usePageMeta from "../hooks/usePageMeta";
 import { onImgError } from "../lib/imageFallback";
+import AutoScrollRail from "../components/AutoScrollRail";
 
 const FUNCTIONS = [
   { label: "Haldi", img: CATALOG_IMAGES.haldi, href: "/occasion/wedding/wedding-events/haldi" },
@@ -90,7 +90,7 @@ function SectionHead({ eyebrow, title, link, dark = false }) {
 }
 
 function HorizontalRail({ children, className = "" }) {
-  return <div className={`wedding-horizontal-rail ${className}`}>{children}</div>;
+  return <AutoScrollRail className={`wedding-horizontal-rail ${className}`} interval={4000}>{children}</AutoScrollRail>;
 }
 
 function WeddingHero() {
@@ -209,6 +209,11 @@ function WeddingServices() {
 function FeaturedPackages() {
   const [index, setIndex] = useState(0);
   const active = PACKAGES[index];
+  useEffect(() => {
+    if (PACKAGES.length < 2) return undefined;
+    const timer = window.setInterval(() => setIndex((value) => (value + 1) % PACKAGES.length), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   const go = (next) => setIndex((next + PACKAGES.length) % PACKAGES.length);
 
   return (
@@ -291,27 +296,10 @@ function FeaturedPackageCarousel() {
       categorySlug: product.categorySlug || (Array.isArray(product.categoryPath) ? product.categoryPath[product.categoryPath.length - 1] : "wedding"),
     }));
 
-  // Last-resort catalog fallback: the project ships the original wedding
-  // catalog records from the supplied product data. This is only used when
-  // the live catalog has not hydrated yet or contains no wedding records;
-  // live/admin products always take priority.
-  const referenceProducts = (PDF_REFERENCE_PRODUCTS || [])
-    .filter((product) => isWeddingValue(product?.occasionSlug))
-    .map((product, index) => ({
-      ...product,
-      id: `reference-wedding-${index + 1}`,
-      image: product.categorySlug === "haldi" ? IMAGES.galWedding1 : IMAGES.galWedding2,
-      originalPrice: product.price ? Math.round(product.price * 1.1) : null,
-      rating: 4.7,
-      reviewCount: 46,
-      status: "active",
-      isAddon: false,
-      type: "product",
-    }));
-
-  const mergedProducts = catalogProducts.length || entryProducts.length
-    ? [...entryProducts, ...catalogProducts]
-    : referenceProducts;
+  // Packages/products are admin-owned data only. Never fall back to bundled
+  // reference records here: an empty cloud catalog must remain visibly empty
+  // until an admin creates the real wedding products/packages.
+  const mergedProducts = [...entryProducts, ...catalogProducts];
   const products = sortProducts(mergedProducts, "popular").reduce((unique, product) => {
     const key = product.slug || product.id;
     if (!unique.some((item) => (item.slug || item.id) === key)) unique.push(product);
@@ -339,6 +327,14 @@ function FeaturedPackageCarousel() {
   const gap = visibleCount === 1 ? 0 : 16;
   const translate = safeStart === 0 ? "translateX(0)" : `translateX(calc(-${safeStart * (100 / visibleCount)}% - ${safeStart * (gap / visibleCount)}px))`;
   const move = (delta) => setStartIndex((value) => Math.max(0, Math.min(maxStart, value + delta)));
+
+  useEffect(() => {
+    if (maxStart <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setStartIndex((value) => value >= maxStart ? 0 : value + 1);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [maxStart]);
 
   return (
     <section className="wedding-featured-section">
@@ -435,7 +431,19 @@ function WeddingReviews() {
         <div className="wedding-review-grid">
           {REVIEWS.map((review) => (
             <article className="wedding-review-card" key={review.name}>
-              <img src={review.image} alt="" loading="lazy" decoding="async" />
+              <div className="wedding-review-avatar" aria-hidden="true">
+                <span>{review.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>
+                <img
+                  src={review.image}
+                  alt={`${review.name} review`}
+                  loading="eager"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              </div>
               <div>
                 <strong>{review.name}</strong>
                 <span>{review.city}</span>

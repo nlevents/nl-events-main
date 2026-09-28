@@ -6,6 +6,10 @@
 import { supabase } from "./supabase";
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
+function validateEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
 async function buildProfile(session, fallbackUser = null) {
   const user = fallbackUser || session?.user;
   if (!session?.access_token || !user?.id) throw new Error("Authentication failed. Please try again.");

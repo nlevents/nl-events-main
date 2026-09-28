@@ -1,49 +1,5 @@
 import { IMAGES } from "./images";
 
-export const CATEGORY_DATA = {
-  weddings: {
-    explore: [
-      {
-        name: "Haldi",
-        products: [
-          { id: "haldi1", name: "Haldi Design A", image: IMAGES.galWedding1 },
-          { id: "haldi2", name: "Haldi Design B", image: IMAGES.galWedding2 }
-        ]
-      }
-      // Add more explore categories as needed
-    ],
-    addons: [
-      {
-        name: "SFX",
-        products: [
-          { id: "fireworks", name: "Fireworks", image: IMAGES.galConcert1 }
-        ]
-      }
-      // Add more addon categories as needed
-    ]
-  },
-  birthday: {
-    explore: [
-      {
-        name: "Barbie Themed",
-        products: [
-          { id: "barbie1", name: "Barbie Design 1", image: IMAGES.galBirthday3 }
-        ]
-      }
-      // Add more explore categories as needed
-    ],
-    addons: [
-      {
-        name: "SFX",
-        products: [
-          { id: "birthdayFireworks", name: "Fireworks", image: IMAGES.galConcert1 }
-        ]
-      }
-      // Add more addon categories as needed
-    ]
-  }
-};
-
 import { getProducts as getLiveProducts, getProduct as getLiveProduct } from "../lib/catalogStore";
 
 export const PRODUCTS = {};

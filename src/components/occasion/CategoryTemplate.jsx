@@ -16,7 +16,6 @@ import {
   sortProducts, isAvailableInCity, PRICE_BUCKETS, toRailItem, collectProductEntries,
   quickLinksFor, heroGalleryFor,
 } from "../../data/occasions";
-import { addonsFor } from "../../data/addons";
 
 const SHOP_REVIEWS = {
   wedding: { quote: "The wedding setup looked exactly like the vision we shared. Every function felt beautifully coordinated.", name: "Priya & Karan" },
@@ -89,10 +88,9 @@ export default function CategoryTemplate({ node, trail }) {
   // from the catalog store rather than the static data file, and kept in
   // sync with "nle-catalog-updated" so admin edits show without a reload.
   const topSlug = Array.isArray(trail) && trail.length > 0 ? trail[0].slug : null;
-  // Use the lightweight static service list for the first paint. The full
-  // admin/catalog store is loaded only when the browser is idle, so opening a
-  // category does not have to parse the entire admin data layer synchronously.
-  const [addonItems, setAddonItems] = useState(() => topSlug ? addonsFor([{ slug: topSlug }]) : []);
+  // Event services are admin-owned data. Start empty and load only the live
+  // catalog; never show bundled placeholder services when the cloud catalog is empty.
+  const [addonItems, setAddonItems] = useState([]);
   useEffect(() => {
     let cancelled = false;
     const refreshAddons = () =>
@@ -101,14 +99,7 @@ export default function CategoryTemplate({ node, trail }) {
           if (!cancelled) setAddonItems(getAddonsForOccasion(topSlug));
         })
         .catch(() => {});
-    const schedule = () => {
-      if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(refreshAddons, { timeout: 5000 });
-      } else {
-        window.setTimeout(refreshAddons, 1200);
-      }
-    };
-    schedule();
+    refreshAddons();
     window.addEventListener("nle-catalog-updated", refreshAddons);
     return () => {
       cancelled = true;

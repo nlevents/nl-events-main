@@ -13,6 +13,7 @@ import RatingStars from "../components/RatingStars";
 import ProductGallery from "../components/occasion/ProductGallery";
 import BookingPanel from "../components/BookingPanel";
 import ProductRail from "../components/ProductRail";
+import AutoScrollRail from "../components/AutoScrollRail";
 import Faq from "../components/Faq";
 import { onImgError } from "../lib/imageFallback";
 
@@ -379,7 +380,7 @@ export default function PackageDetails() {
               })}
             </div>
           </div>
-          <div className="review-carousel reveal">
+          <AutoScrollRail className="review-carousel reveal" interval={4000}>
             {product.reviews.map((r) => (
               <div className="review-card" key={r.name}>
                 <RatingStars rating={r.rating} size="sm" />
@@ -391,7 +392,7 @@ export default function PackageDetails() {
                 </div>
               </div>
             ))}
-          </div>
+          </AutoScrollRail>
         </section>
       )}
 

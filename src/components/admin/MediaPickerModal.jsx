@@ -159,8 +159,8 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple =
             />
             <div className="admin-dropzone">
               <Icon name="upload" />
-              <p>Choose an image from your device</p>
-              <span>PNG, JPG, WebP, GIF up to 5MB</span>
+              <p>{multiple ? "Choose one or more images from your device" : "Choose an image from your device"}</p>
+              <span>{multiple ? "Select multiple PNG, JPG, WebP or GIF files up to 5MB each" : "PNG, JPG, WebP, GIF up to 5MB"}</span>
               <input
                 type="file"
                 multiple={multiple}

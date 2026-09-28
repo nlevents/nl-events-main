@@ -230,7 +230,7 @@ export default function AdminVideoContent() {
             {orderedShorts.length === 0 ? <p className="admin-empty">No YouTube Shorts added yet.</p> : (
               <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Preview</th><th>Caption</th><th>Occasion</th><th>Location</th><th>Status</th><th>Order</th><th>Actions</th></tr></thead><tbody>
                 {orderedShorts.map((item) => <tr key={item.id}>
-                  <td>{youtubeId(item.url) ? <img src={item.thumbnail || youtubeThumbnail(youtubeId(item.url))} alt="" className="admin-table-thumb" /> : "—"}</td>
+                  <td>{youtubeId(item.url) ? <img src={item.thumbnail || youtubeThumbnail(youtubeId(item.url))} alt={item.name || "Video thumbnail"} className="admin-table-thumb" /> : "—"}</td>
                   <td><a href={item.url} target="_blank" rel="noopener noreferrer">{item.caption || item.url}</a></td>
                   <td>{item.occasion || "All"}</td><td>{item.location || "—"}</td>
                   <td>{item.active === false ? <span className="text-muted">Hidden</span> : <span className="text-success">Live</span>}</td>
@@ -296,7 +296,7 @@ export default function AdminVideoContent() {
             {orderedReviews.length === 0 ? <p className="admin-empty">No review videos added yet.</p> : (
               <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Preview</th><th>Customer</th><th>Caption</th><th>Occasion</th><th>Location</th><th>Status</th><th>Order</th><th>Actions</th></tr></thead><tbody>
                 {orderedReviews.map((item) => <tr key={item.id}>
-                  <td>{youtubeId(item.url) ? <img src={item.thumbnail || youtubeThumbnail(youtubeId(item.url))} alt="" className="admin-table-thumb" /> : "—"}</td>
+                  <td>{youtubeId(item.url) ? <img src={item.thumbnail || youtubeThumbnail(youtubeId(item.url))} alt={item.name || "Video thumbnail"} className="admin-table-thumb" /> : "—"}</td>
                   <td>{item.name || "Client"}</td><td><a href={item.url} target="_blank" rel="noopener noreferrer">{item.caption || item.url}</a></td>
                   <td>{item.occasion || "All"}</td><td>{item.location || "—"}</td>
                   <td>{item.active === false ? <span className="text-muted">Hidden</span> : <span className="text-success">Live</span>}</td><td>{Number(item.order) || 0}</td>

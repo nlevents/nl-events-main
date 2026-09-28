@@ -67,52 +67,72 @@ export default function AdminProducts() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function handleDelete(id, name) {
+  async function handleDelete(id, name) {
     if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      deleteProduct(id);
-      refresh();
-      setFeedback(`Deleted "${name}".`);
+      try {
+        await deleteProduct(id);
+        refresh();
+        setFeedback(`Deleted "${name}".`);
+      } catch (err) {
+        setFeedback(err.message || "Unable to delete product from the cloud.");
+      }
       setTimeout(() => setFeedback(""), 3000);
     }
   }
 
-  function handleDuplicate(id) {
-    const dup = duplicateProduct(id);
-    if (dup) {
-      refresh();
-      setFeedback(`Created copy "${dup.name}".`);
-      setTimeout(() => setFeedback(""), 3000);
+  async function handleDuplicate(id) {
+    try {
+      const dup = await duplicateProduct(id);
+      if (dup) {
+        refresh();
+        setFeedback(`Created copy "${dup.name}".`);
+      }
+    } catch (err) {
+      setFeedback(err.message || "Unable to duplicate product in the cloud.");
     }
+    setTimeout(() => setFeedback(""), 3000);
   }
 
-  function handleBulkStatusApply() {
+  async function handleBulkStatusApply() {
     if (!selectedIds.length || !bulkStatus) return;
-    const count = bulkUpdateProducts(selectedIds, { status: bulkStatus });
-    refresh();
-    setSelectedIds([]);
-    setBulkStatus("");
-    setFeedback(`Updated status for ${count} product(s) to "${bulkStatus}".`);
-    setTimeout(() => setFeedback(""), 3500);
-  }
-
-  function handleBulkPriceApply() {
-    const pct = parseFloat(bulkPricePct);
-    if (!selectedIds.length || isNaN(pct)) return;
-    const count = bulkUpdateProducts(selectedIds, { priceAdjustmentPercent: pct });
-    refresh();
-    setSelectedIds([]);
-    setBulkPricePct("");
-    setFeedback(`Adjusted prices for ${count} product(s) by ${pct > 0 ? "+" : ""}${pct}%.`);
-    setTimeout(() => setFeedback(""), 3500);
-  }
-
-  function handleBulkDelete() {
-    if (!selectedIds.length) return;
-    if (window.confirm(`Delete ${selectedIds.length} selected products? This cannot be undone.`)) {
-      bulkDeleteProducts(selectedIds);
+    try {
+      const count = await bulkUpdateProducts(selectedIds, { status: bulkStatus });
       refresh();
       setSelectedIds([]);
-      setFeedback(`Deleted selected products.`);
+      setBulkStatus("");
+      setFeedback(`Updated status for ${count} product(s) to "${bulkStatus}".`);
+    } catch (err) {
+      setFeedback(err.message || "Unable to save bulk changes to the cloud.");
+    }
+    setTimeout(() => setFeedback(""), 3500);
+  }
+
+  async function handleBulkPriceApply() {
+    const pct = parseFloat(bulkPricePct);
+    if (!selectedIds.length || isNaN(pct)) return;
+    try {
+      const count = await bulkUpdateProducts(selectedIds, { priceAdjustmentPercent: pct });
+      refresh();
+      setSelectedIds([]);
+      setBulkPricePct("");
+      setFeedback(`Adjusted prices for ${count} product(s) by ${pct > 0 ? "+" : ""}${pct}%.`);
+    } catch (err) {
+      setFeedback(err.message || "Unable to save bulk changes to the cloud.");
+    }
+    setTimeout(() => setFeedback(""), 3500);
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedIds.length) return;
+    if (window.confirm(`Delete ${selectedIds.length} selected products? This cannot be undone.`)) {
+      try {
+        await bulkDeleteProducts(selectedIds);
+        refresh();
+        setSelectedIds([]);
+        setFeedback(`Deleted selected products.`);
+      } catch (err) {
+        setFeedback(err.message || "Unable to delete selected products from the cloud.");
+      }
       setTimeout(() => setFeedback(""), 3000);
     }
   }

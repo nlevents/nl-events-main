@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import CategoryCard from "./CategoryCard";
+import useAutoRail from "../../hooks/useAutoRail";
 
 // Horizontal, swipeable carousel for browsing themes/subcategories (e.g. the
 // themes under Kids Birthday). Mirrors ProductRail's scroll-snap + arrow
@@ -8,6 +9,7 @@ export default function CategoryRail({ items, hrefFor }) {
   const trackRef = useRef(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  useAutoRail(trackRef, { selector: ".cat-rail-card", interval: 4000, enabled: Array.isArray(items) && items.length > 1 });
 
   function updateArrows() {
     const el = trackRef.current;

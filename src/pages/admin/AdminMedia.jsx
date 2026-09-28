@@ -6,6 +6,7 @@ import {
   deleteMediaItemFromCloud,
   getGalleryItems,
   saveGalleryItemToCloud,
+  uploadGalleryImageFile,
   deleteGalleryItemFromCloud,
   getProducts,
 } from "../../lib/catalogStore";
@@ -40,6 +41,8 @@ export default function AdminMedia() {
 
   // Gallery Add State
   const [newGalImg, setNewGalImg] = useState("");
+  const [newGalFiles, setNewGalFiles] = useState([]);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const [newGalAlt, setNewGalAlt] = useState("");
   const [newGalCat, setNewGalCat] = useState("weddings");
   const [newGalTall, setNewGalTall] = useState(false);
@@ -58,19 +61,29 @@ export default function AdminMedia() {
   }, []);
 
   async function handleFileUpload(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setError("");
     setUploading(true);
     try {
-      const saved = await uploadMediaFile(file);
+      // Upload sequentially to keep browser memory and Cloudinary usage low
+      // on the free tier while still allowing a single multi-select action.
+      const saved = [];
+      for (const file of files) {
+        saved.push(await uploadMediaFile(file));
+      }
       refresh();
-      setFeedback(`Uploaded "${saved.title}".`);
+      setFeedback(
+        saved.length === 1
+          ? `Uploaded "${saved[0].title}".`
+          : `Uploaded ${saved.length} pictures to the Media Library.`
+      );
       setTimeout(() => setFeedback(""), 3000);
     } catch (err) {
       setError(err.message || "Upload failed.");
     } finally {
       setUploading(false);
+      e.target.value = "";
     }
   }
 
@@ -114,24 +127,43 @@ export default function AdminMedia() {
 
   async function handleAddGalleryItem(e) {
     e.preventDefault();
-    if (!newGalImg.trim()) {
-      setError("Please provide an image URL for gallery item.");
+    if (!newGalImg.trim() && !newGalFiles.length) {
+      setError("Choose one or more images from your desktop or provide an image URL.");
       return;
     }
+    setError("");
+    setGalleryUploading(true);
     try {
-      await saveGalleryItemToCloud({
-        img: newGalImg.trim(),
-        alt: newGalAlt.trim() || "Event showcase",
-        category: newGalCat,
-        tall: newGalTall,
-      });
+      if (newGalFiles.length) {
+        for (const file of newGalFiles) {
+          await uploadGalleryImageFile(file, {
+            alt: newGalAlt.trim() || file.name.replace(/\.[^/.]+$/, ""),
+            category: newGalCat,
+            tall: newGalTall,
+          });
+        }
+      } else {
+        await saveGalleryItemToCloud({
+          img: newGalImg.trim(),
+          alt: newGalAlt.trim() || "Event showcase",
+          category: newGalCat,
+          tall: newGalTall,
+        });
+      }
       refresh();
       setNewGalImg("");
+      setNewGalFiles([]);
       setNewGalAlt("");
-      setFeedback("Added photo to public Gallery!");
+      setFeedback(
+        newGalFiles.length > 1
+          ? `Added ${newGalFiles.length} photos to the public Gallery!`
+          : "Added photo to public Gallery!"
+      );
       setTimeout(() => setFeedback(""), 3000);
     } catch (err) {
       setError(err.message || "Failed to save gallery item to the cloud.");
+    } finally {
+      setGalleryUploading(false);
     }
   }
 
@@ -192,9 +224,10 @@ export default function AdminMedia() {
           <div className="admin-panel admin-media-quickbar">
             <div className="admin-media-upload-tile">
               <label className="btn btn-primary" style={{ cursor: "pointer" }}>
-                <Icon name="upload" /> {uploading ? "Uploading..." : "Upload Local Picture"}
+                <Icon name="upload" /> {uploading ? "Uploading..." : "Upload Local Pictures"}
                 <input
                   type="file"
+                  multiple
                   accept="image/png, image/jpeg, image/webp, image/gif"
                   style={{ display: "none" }}
                   onChange={handleFileUpload}
@@ -296,15 +329,43 @@ export default function AdminMedia() {
             <h2>Add Photo to Public Gallery (/gallery)</h2>
             <form onSubmit={handleAddGalleryItem} className="admin-form-row" style={{ alignItems: "flex-end" }}>
               <div className="admin-form-group" style={{ flex: "2" }}>
-                <label className="admin-form-label">Photo URL *</label>
+                <label className="admin-form-label">Photo URL (optional)</label>
                 <input
                   type="url"
                   className="admin-input"
                   placeholder="https://..."
                   value={newGalImg}
-                  onChange={(e) => setNewGalImg(e.target.value)}
-                  required
+                  onChange={(e) => {
+                    setNewGalImg(e.target.value);
+                    if (e.target.value) setNewGalFiles([]);
+                  }}
+                  disabled={galleryUploading}
                 />
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">Or upload from desktop</label>
+                <label className="btn btn-outline" style={{ cursor: galleryUploading ? "not-allowed" : "pointer", marginBottom: 0 }}>
+                  <Icon name="upload" /> {newGalFiles.length === 1
+                    ? newGalFiles[0].name
+                    : newGalFiles.length > 1
+                      ? `${newGalFiles.length} images selected`
+                      : "Choose Images"}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png, image/jpeg, image/webp, image/gif"
+                    style={{ display: "none" }}
+                    disabled={galleryUploading}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setNewGalFiles(files);
+                      if (files.length) setNewGalImg("");
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <span className="admin-hint">Select multiple JPG, PNG, WebP or GIF files up to 5MB each</span>
               </div>
 
               <div className="admin-form-group" style={{ flex: "1.5" }}>
@@ -344,8 +405,8 @@ export default function AdminMedia() {
                 </label>
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ marginBottom: "14px" }}>
-                <Icon name="plus" /> Add to Gallery
+              <button type="submit" className="btn btn-primary" style={{ marginBottom: "14px" }} disabled={galleryUploading}>
+                <Icon name={galleryUploading ? "upload" : "plus"} /> {galleryUploading ? "Uploading..." : "Add to Gallery"}
               </button>
             </form>
           </div>

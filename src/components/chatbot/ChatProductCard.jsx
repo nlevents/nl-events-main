@@ -6,7 +6,7 @@ export default function ChatProductCard({ product, onClose }) {
   return (
     <Link to={product.href} className="chat-product" onClick={onClose}>
       <span className="chat-product-img">
-        <img src={product.image} alt="" loading="lazy"  onError={onImgError}/>
+        <img src={product.image} alt={product.name || "Product"} loading="lazy"  onError={onImgError}/>
         {product.discount > 0 && <span className="chat-product-badge">{product.discount}% OFF</span>}
       </span>
       <span className="chat-product-info">
