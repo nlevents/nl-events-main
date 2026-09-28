@@ -178,7 +178,7 @@ export default function CategoryTemplate({ node, trail }) {
   }, [parent, relatedFromParent, trail]);
 
   return (
-    <>
+    <div className="occ-category-page">
       <section className="hero hero-sm occ-hero">
         <div className="hero-media"><HeroImageCarousel images={heroImages} alt={node.label} /></div>
         <div className="hero-content">
@@ -188,7 +188,7 @@ export default function CategoryTemplate({ node, trail }) {
         </div>
       </section>
 
-      <section className="section-tight container">
+      <section className="section-tight container occ-category-content">
         <Breadcrumb items={crumbs} />
 
         {node.description && (
@@ -232,7 +232,7 @@ export default function CategoryTemplate({ node, trail }) {
 
       {similarProducts.length > 0 && <ProductRail title="Similar Products" viewAllHref={parent ? pathFor([...trail.slice(0, -1)]) : "/shop-by-occasion"} items={similarProducts} tone="surface" />}
 
-      <section className="section-tight container">
+      <section className="section-tight container occ-category-related">
         {parent && relatedFromParent.length > 0 && (
           <div className="occ-block" style={{ marginTop: 0, paddingTop: 0, borderTop: 0 }}>
             <div className="section-head reveal">
@@ -253,6 +253,6 @@ export default function CategoryTemplate({ node, trail }) {
       </section>
 
       <OccasionReview topSlug={topSlug} label={node.label} />
-    </>
+    </div>
   );
 }

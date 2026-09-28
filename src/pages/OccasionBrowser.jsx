@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { resolvePath } from "../data/occasions";
-const CategoryTemplate = lazy(() => import("../components/occasion/CategoryTemplate"));
-const ProductTemplate = lazy(() => import("../components/occasion/ProductTemplate"));
+import { lazyWithRetry } from "../lib/lazyWithRetry";
+const CategoryTemplate = lazyWithRetry(() => import("../components/occasion/CategoryTemplate"));
+const ProductTemplate = lazyWithRetry(() => import("../components/occasion/ProductTemplate"));
 import NotFound from "./NotFound";
 
 // Single route (path="/occasion/*") for the entire Shop-by-Occasion tree.

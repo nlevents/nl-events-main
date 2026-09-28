@@ -1,4 +1,5 @@
 import { IMAGES } from "./images";
+import { clientImageFor } from "./clientImages";
 
 // Display label for each product/package category key (matches the
 // `category` field used in ./products.js — e.g. "wedding", "birthday").
@@ -144,19 +145,19 @@ export const CATEGORIES = {
 };
 
 export const GALLERY_ITEMS = [
-  { img: IMAGES.galWedding1, alt: "Wedding mandap decor", category: "weddings", tall: true },
-  { img: IMAGES.galBirthday1, alt: "Birthday balloon backdrop", category: "birthdays" },
-  { img: IMAGES.galCorporate1, alt: "Corporate stage setup", category: "corporate" },
-  { img: IMAGES.galConcert1, alt: "Concert stage lighting", category: "concerts" },
-  { img: IMAGES.galDecor1, alt: "Premium floral decor", category: "decor" },
-  { img: IMAGES.galWedding2, alt: "Wedding reception styling", category: "weddings", tall: true },
-  { img: IMAGES.galBirthday2, alt: "Kids birthday theme decor", category: "birthdays" },
-  { img: IMAGES.galCorporate2, alt: "Product launch event", category: "corporate" },
-  { img: IMAGES.galConcert2, alt: "Live show production", category: "concerts" },
-  { img: IMAGES.galDecor2, alt: "Entrance floral installation", category: "decor" },
-  { img: IMAGES.galWedding3, alt: "Bridal entry decor", category: "weddings" },
-  { img: IMAGES.galBirthday3, alt: "Milestone birthday setup", category: "birthdays" },
-  { img: IMAGES.galCorporate3, alt: "Conference hall branding", category: "corporate" },
-  { img: IMAGES.galConcert3, alt: "Outdoor concert setup", category: "concerts" },
-  { img: IMAGES.galDecor3, alt: "Anniversary floral arch", category: "decor" },
+  { img: clientImageFor("wedding", 0), alt: "Wedding celebration", category: "weddings", tall: true },
+  { img: clientImageFor("wedding", 1), alt: "Wedding decor", category: "weddings" },
+  { img: clientImageFor("haldi", 0), alt: "Haldi celebration", category: "weddings" },
+  { img: clientImageFor("engagement", 0), alt: "Engagement celebration", category: "weddings" },
+  { img: clientImageFor("reception", 0), alt: "Wedding reception", category: "weddings", tall: true },
+  { img: clientImageFor("mehndi", 0), alt: "Mehndi celebration", category: "weddings" },
+  { img: clientImageFor("kids-family", 0), alt: "Kids and family celebration", category: "birthdays", tall: true },
+  { img: clientImageFor("baby-shower", 0), alt: "Family celebration decor", category: "birthdays" },
+  { img: clientImageFor("annaprashan", 0), alt: "Family celebration", category: "birthdays" },
+  { img: clientImageFor("decor", 0), alt: "Event decor", category: "decor", tall: true },
+  { img: clientImageFor("decor", 1), alt: "Premium event decor", category: "decor" },
+  { img: clientImageFor("tent-furniture", 0), alt: "Event venue setup", category: "decor" },
+  { img: clientImageFor("sound-technical", 0), alt: "Technical event production", category: "corporate" },
+  { img: clientImageFor("catering", 0), alt: "Corporate event catering", category: "corporate" },
+  { img: clientImageFor("sound-technical", 1), alt: "Live event production", category: "concerts" },
 ];

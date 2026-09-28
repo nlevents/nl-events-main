@@ -120,7 +120,7 @@ export default function AdminCatalog() {
   const [products, setProducts] = useState(getProducts);
   const [activeOccasion, setActiveOccasion] = useState("wedding");
   const [activeCategoryPath, setActiveCategoryPath] = useState([]);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("products");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("active");
   const [type, setType] = useState("all");
@@ -145,7 +145,7 @@ export default function AdminCatalog() {
   function flash(message) { setFeedback(message); setTimeout(() => setFeedback(""), 2800); }
 
   const currentOccasion = occasions.find((o) => o.slug === activeOccasion) || occasions[0];
-  const displayOccasions = tab === "service-categories" ? occasions.filter((o) => o.addonOnly) : occasions.filter((o) => !o.addonOnly);
+  const displayOccasions = tab === "services" ? occasions.filter((o) => o.addonOnly) : occasions.filter((o) => !o.addonOnly);
   const allCategoryOptions = useMemo(() => walkOptions(occasions), [occasions]);
   const activeCategory = useMemo(() => {
     let node = currentOccasion;
@@ -330,8 +330,14 @@ export default function AdminCatalog() {
     {feedback && <div className="admin-alert admin-alert--success">{feedback}</div>}
     {error && !modal && !categoryModal && <div className="admin-alert admin-alert--error">{error}</div>}
 
-    <div className="catalog-ref-tabs">
-      {[["overview","Overview","grid"],["occasions","Occasions","calendar"],["functions","Functions / Themes","sparkle"],["service-categories","Service Categories","settings"],["packages","Packages","layers"],["products","Products / Elements","package"]].map(([key,label,icon]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => { setTab(key); if (key === "service-categories") { setActiveOccasion("event-services"); setActiveCategoryPath([]); } else if (key !== "overview" && activeOccasion === "event-services") { setActiveOccasion("wedding"); setActiveCategoryPath([]); } if (key === "packages") setType("package"); else if (key === "products") setType("product"); else setType("all"); }} >{<Icon name={icon} />}{label}</button>)}
+    <div className="catalog-ref-tabs catalog-ref-tabs--simple">
+      {[["products","Products & Packages","package"],["services","Services","settings"],["categories","Categories & Occasions","grid"]].map(([key,label,icon]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => {
+        setTab(key);
+        setSearch("");
+        setActiveCategoryPath([]);
+        setType(key === "products" ? "all" : key === "services" ? "service" : "all");
+        setActiveOccasion(key === "services" ? "event-services" : (getOccasions().find((o) => !o.addonOnly)?.slug || "wedding"));
+      }}><Icon name={icon} />{label}</button>)}
     </div>
 
     <div className="catalog-stat-grid">
@@ -343,9 +349,9 @@ export default function AdminCatalog() {
       <div><span className="catalog-stat-ring">{stats.total ? Math.round((stats.active / Math.max(stats.total + stats.services, 1)) * 100) : 0}%</span><strong>{stats.active}</strong><small>Active Items</small><em>Visible on website</em></div>
     </div>
 
-    {(tab === "overview" || tab === "occasions" || tab === "functions" || tab === "service-categories") ? <div className="catalog-workspace">
+    {(tab === "products" || tab === "services" || tab === "categories") ? <div className="catalog-workspace">
       <aside className="catalog-category-panel">
-        <div className="catalog-panel-title"><div><h2>Category Tree</h2><p>Unlimited nesting</p></div><button className="btn btn-primary btn-sm" onClick={() => openCategoryEditor(activeOccasion, [])}><Icon name="plus" /> Add</button></div>
+        <div className="catalog-panel-title"><div><h2>{tab === "services" ? "Service Categories" : "Catalog Categories"}</h2><p>{tab === "services" ? "Choose where each service belongs" : "Occasion → function → category"}</p></div><button className="btn btn-primary btn-sm" onClick={() => openCategoryEditor(activeOccasion, [])}><Icon name="plus" /> Add</button></div>
         <div className="catalog-occasion-list">
           {displayOccasions.map((o) => <div key={o.slug}>
             <div className={`catalog-occasion-row-wrap ${o.slug === activeOccasion ? "active" : ""}`}>
@@ -360,7 +366,7 @@ export default function AdminCatalog() {
         </div>
       </aside>
       <section className="catalog-items-panel">
-        <div className="catalog-items-head"><div><div className="catalog-path">{currentOccasion?.label}{activeCategoryPath.map((slug, i) => <span key={slug}> › {flattenTree(currentOccasion?.children || []).find((x) => x.node.slug === slug)?.node.label || slug}</span>)}</div><h2>Items in {activeCategory?.label || currentOccasion?.label}</h2><p>Showing {visibleProducts.length} items</p></div><div className="catalog-item-actions"><button className={type === "package" ? "active" : ""} onClick={() => setType("package")}>Packages</button><button className={type === "product" ? "active" : ""} onClick={() => setType("product")}>Products</button><button className={type === "all" ? "active" : ""} onClick={() => setType("all")}>All Items</button><div className="catalog-inline-add-wrap"><button type="button" className="btn btn-primary" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> Add Item <span>⌄</span></button>{addMenu && <div className="catalog-add-menu catalog-add-menu--inline"><button type="button" onClick={() => openAdd("product")}><Icon name="package" /><span><strong>Product / Element</strong><small>Individual catalog item</small></span></button><button type="button" onClick={() => openAdd("package")}><Icon name="layers" /><span><strong>Package</strong><small>Bundle products and services</small></span></button><button type="button" onClick={() => openAdd("service")}><Icon name="settings" /><span><strong>Service</strong><small>Photography, catering, artists, etc.</small></span></button></div>}</div></div></div>
+        <div className="catalog-items-head"><div><div className="catalog-path">{currentOccasion?.label}{activeCategoryPath.map((slug) => <span key={slug}> › {flattenTree(currentOccasion?.children || []).find((x) => x.node.slug === slug)?.node.label || slug}</span>)}</div><h2>{tab === "services" ? `Services in ${activeCategory?.label || "Event Services"}` : tab === "categories" ? `Items in ${activeCategory?.label || currentOccasion?.label}` : `Products & Packages in ${activeCategory?.label || currentOccasion?.label}`}</h2><p>{tab === "categories" ? "Select a category to see and manage its items." : `Showing ${visibleProducts.length} items`}</p></div><div className="catalog-item-actions">{tab !== "services" && <><button className={type === "package" ? "active" : ""} onClick={() => setType("package")}>Packages</button><button className={type === "product" ? "active" : ""} onClick={() => setType("product")}>Products</button></>}<button className={type === "all" || (tab === "services" && type === "service") ? "active" : ""} onClick={() => setType(tab === "services" ? "service" : "all")}>{tab === "services" ? "All Services" : "All Items"}</button><div className="catalog-inline-add-wrap"><button type="button" className="btn btn-primary" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> Add Item <span>⌄</span></button>{addMenu && <div className="catalog-add-menu catalog-add-menu--inline"><button type="button" onClick={() => openAdd("product")}><Icon name="package" /><span><strong>Product / Element</strong><small>Individual catalog item</small></span></button><button type="button" onClick={() => openAdd("package")}><Icon name="layers" /><span><strong>Package</strong><small>Bundle products and services</small></span></button><button type="button" onClick={() => openAdd("service")}><Icon name="settings" /><span><strong>Service</strong><small>Photography, catering, artists, etc.</small></span></button></div>}</div></div></div>
         <div className="catalog-toolbar"><div className="catalog-search"><Icon name="search" /><input placeholder="Search items…" value={search} onChange={(e) => setSearch(e.target.value)} /></div><select value={type} onChange={(e) => setType(e.target.value)}><option value="all">Type: All</option><option value="product">Product</option><option value="package">Package</option><option value="service">Service</option></select><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">Status: All</option><option value="active">Status: Active</option><option value="draft">Status: Draft</option><option value="archived">Status: Archived</option></select><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Sort By: Latest</option><option value="name">Name</option><option value="price">Price</option></select><button className={view === "grid" ? "view-active" : ""} onClick={() => setView("grid")}><Icon name="grid" /></button><button className={view === "list" ? "view-active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
         {view === "grid" ? <div className="catalog-product-grid">{visibleProducts.map((p) => <ProductCard key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</div> : <div className="catalog-product-table"><table><thead><tr><th></th><th>Image</th><th>Name</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleProducts.map((p) => <ProductRow key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</tbody></table>{!visibleProducts.length && <div className="catalog-empty">No items here yet. Use <strong>Add New</strong> to create the first one.</div>}</div>}
       </section>

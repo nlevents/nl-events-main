@@ -4,11 +4,10 @@ import "../styles/landing.css";
 
 const EVENT_TYPES = [
   { label: "Wedding", icon: "rings" },
-  { label: "Birthday / Kitty Party", icon: "cake" },
+  { label: "Birthday", icon: "cake" },
   { label: "Corporate Event", icon: "briefcase" },
   { label: "Haldi / Mehendi / Sangeet", icon: "leaf" },
   { label: "Anniversary", icon: "glasses" },
-  { label: "Private Party", icon: "party" },
   { label: "Other", icon: "dots" },
 ];
 

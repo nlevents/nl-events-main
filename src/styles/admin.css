@@ -756,3 +756,5 @@
   .birthday-age-admin-actions{ width:100%; justify-content:flex-start; }
   .birthday-age-admin-image-field{ grid-template-columns:1fr; }
 }
+
+.catalog-ref-tabs--simple{grid-template-columns:repeat(3,1fr);max-width:760px}.catalog-ref-tabs--simple button{min-height:46px}.catalog-ref-tabs--simple button.active{font-weight:700}

@@ -1549,3 +1549,14 @@
 .occ-page-review-card strong{display:block;font-size:12px;color:var(--text-primary);}
 .occ-page-review-card span{display:block;margin-top:4px;font-size:10px;color:var(--text-secondary);}
 @media(max-width:599px){.occ-page-review{padding:30px 0 36px}.occ-page-review-card{padding:22px 16px}.occ-page-review-card p{font-size:17px;}}
+
+/* Dynamic category pages: keep mobile content on a clean, consistent rail. */
+@media(max-width:640px){
+  /* The mobile chrome reserves 118px at the top of the document. Let the
+     category hero occupy that reserved area instead of leaving a blank band. */
+  .occ-category-page{ margin-top:-118px; }
+  .occ-category-content{ padding-left:16px; padding-right:16px; padding-bottom:20px; }
+  .occ-category-related{ padding-left:16px; padding-right:16px; padding-top:20px; }
+  .occ-category-content .occ-block{ padding-top:28px; margin-top:28px; }
+  .occ-category-content .occ-prod-grid{ gap:10px; }
+}
