@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { PLACEHOLDER_IMAGE } from "../../lib/imageFallback";
 import usePageMeta from "../../hooks/usePageMeta";
 import useReveal from "../../hooks/useReveal";
 import Breadcrumb from "./Breadcrumb";
@@ -7,6 +8,7 @@ import CategoryCard from "./CategoryCard";
 import ProductCard from "./ProductCard";
 import OccasionQuickLinks from "./OccasionQuickLinks";
 import EventAddons from "./EventAddons";
+import EventServicesSection from "./EventServicesSection";
 import HeroImageCarousel from "../HeroImageCarousel";
 import ListingControls from "./ListingControls";
 import ProductRail from "../ProductRail";
@@ -47,8 +49,193 @@ function OccasionReview({ topSlug, label }) {
 // occasion page, a subcategory page, or a theme page. Same component —
 // what it shows (child cards vs. product grid vs. both) is driven purely
 // by whether `node.children` / `node.products` exist.
+
+function ServiceCatalogContent({ node, trail }) {
+  const [liveTree, setLiveTree] = useState(null);
+  const [liveProducts, setLiveProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const servicePath = useMemo(
+    () => (Array.isArray(trail) ? trail.map((item) => item.slug).filter(Boolean) : []),
+    [trail],
+  );
+
+  // Service content is hydrated asynchronously. The parent category page's
+  // reveal observer runs before these nodes exist, which can leave dynamically
+  // inserted `.reveal` elements at opacity:0 forever. Re-run the same existing
+  // reveal behavior whenever the live service tree/products arrive.
+  useReveal([servicePath.join("/"), liveTree, liveProducts, loading]);
+
+  const refreshServiceCatalog = async () => {
+    try {
+      // Force a fresh public-catalog read on service pages. This prevents a
+      // hard refresh from rendering a cached category before the latest
+      // Supabase service products have reached localStorage.
+      const { hydrateCatalogFromCloud, getAddonCategoryTree, getAddonProducts } = await import("../../lib/catalogStore");
+      await hydrateCatalogFromCloud();
+      const tree = getAddonCategoryTree();
+      const products = getAddonProducts();
+      setLiveTree(tree || null);
+      setLiveProducts(Array.isArray(products) ? products : []);
+    } catch {
+      try {
+        const { getAddonCategoryTree, getAddonProducts } = await import("../../lib/catalogStore");
+        setLiveTree(getAddonCategoryTree() || null);
+        setLiveProducts(getAddonProducts() || []);
+      } catch {
+        setLiveTree(null);
+        setLiveProducts([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const { getAddonCategoryTree, getAddonProducts, hydrateCatalogFromCloud } = await import("../../lib/catalogStore");
+        // Read the cache immediately so the page is never an empty white area.
+        if (!cancelled) {
+          setLiveTree(getAddonCategoryTree() || null);
+          setLiveProducts(getAddonProducts() || []);
+        }
+        await hydrateCatalogFromCloud();
+        if (!cancelled) {
+          setLiveTree(getAddonCategoryTree() || null);
+          setLiveProducts(getAddonProducts() || []);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    refresh();
+    window.addEventListener("nle-catalog-updated", refreshServiceCatalog);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nle-catalog-updated", refreshServiceCatalog);
+    };
+  }, [servicePath.join("/")]);
+
+  const activeNode = useMemo(() => {
+    if (!liveTree || !servicePath.length) return node;
+    let current = liveTree;
+    for (const slug of servicePath.slice(1)) {
+      current = (current?.children || []).find((child) => child.slug === slug);
+      if (!current) return node;
+    }
+    return current;
+  }, [liveTree, servicePath, node]);
+
+  const children = Array.isArray(activeNode?.children) ? activeNode.children : [];
+  const orderedProducts = useMemo(() => {
+    if (!servicePath.length) return [];
+    const prefix = servicePath.join("/");
+    const seen = new Set();
+    return liveProducts.filter((product) => {
+      if (!product || product.status === "archived" || product.status === "draft") return false;
+      const path = Array.isArray(product.categoryPath)
+        ? product.categoryPath.filter(Boolean)
+        : [];
+      const pathKey = path.join("/");
+      const matches = pathKey === prefix || pathKey.startsWith(`${prefix}/`);
+      if (!matches) return false;
+      const key = String(product.id || product.slug || product.name || "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).map((product) => {
+      // Rebuild the real category trail from the persisted categoryPath so a
+      // product nested under a service sub-category keeps the correct URL.
+      let categoryTrail = [...trail];
+      if (liveTree && Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services") {
+        let current = liveTree;
+        const rebuilt = [liveTree];
+        for (const slug of product.categoryPath.slice(1)) {
+          const child = (current?.children || []).find((item) => item.slug === slug);
+          if (!child) break;
+          rebuilt.push(child);
+          current = child;
+        }
+        if (rebuilt.length === product.categoryPath.length) categoryTrail = rebuilt;
+      }
+      return { ...product, __trail: [...categoryTrail, product] };
+    });
+  }, [liveProducts, liveTree, servicePath, trail]);
+
+  const isRoot = activeNode?.slug === "event-services";
+  const childCards = children.filter((child) => child && child.active !== false);
+
+  return (
+    <>
+      {childCards.length > 0 && (
+        <div className="occ-block" style={{ paddingTop: 0, marginTop: 0, borderTop: 0 }}>
+          <div className="section-head reveal">
+            <h2>{isRoot ? "Services Categories" : "More in " + activeNode.label}</h2>
+            <p>{isRoot ? "Browse the services available for your event." : "Choose a service category to explore."}</p>
+          </div>
+          <div className="occ-cat-grid reveal">
+            {childCards.map((child) => (
+              <CategoryCard
+                key={child.slug}
+                node={{ ...child, image: child.image || child.heroImg || PLACEHOLDER_IMAGE }}
+                href={pathFor([...trail, child])}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {orderedProducts.length > 0 && (
+        <div className="occ-block">
+          <div className="section-head reveal">
+            <div>
+              <h2>{isRoot ? "All Services" : activeNode.label + " Services"}</h2>
+              <p>{orderedProducts.length} service{orderedProducts.length === 1 ? "" : "s"} available.</p>
+            </div>
+          </div>
+          <div className="occ-prod-grid reveal">
+            {orderedProducts.map((product, index) => (
+              <ProductCard
+                key={`${product.id || product.slug || "service"}-${index}`}
+                product={{ ...product, image: product.image || product.images?.[0] || product.gallery?.[0] || PLACEHOLDER_IMAGE }}
+                href={pathFor(product.__trail)}
+                variant="occasion-market"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && !childCards.length && !orderedProducts.length && (
+        <div className="occ-block">
+          <div className="occ-empty reveal">
+            <strong>No services are available here yet.</strong>
+            <p>This service category is ready for products from Admin → Catalog → Services.</p>
+          </div>
+        </div>
+      )}
+
+      {loading && !childCards.length && !orderedProducts.length && (
+        <div className="occ-block">
+          <div className="occ-empty reveal" aria-live="polite">
+            <strong>Loading services…</strong>
+            <p>Getting the latest services from the catalog.</p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function CategoryTemplate({ node, trail }) {
   const { city } = useCity();
+  const location = useLocation();
+  const topSlug = Array.isArray(trail) && trail.length > 0 ? trail[0].slug : null;
+  const isServiceCatalog = topSlug === "event-services";
   const [sortKey, setSortKey] = useState("popular");
   const [priceFilter, setPriceFilter] = useState("all");
   const [cityOnly, setCityOnly] = useState(false);
@@ -71,6 +258,20 @@ export default function CategoryTemplate({ node, trail }) {
   const children = childrenOf(node);
   const parent = trail.length > 1 ? trail[trail.length - 2] : null;
 
+  // Services are admin-editable (Admin → Event Services), so they're read
+  // from the catalog store rather than the static data file, and kept in
+  // sync with "nle-catalog-updated" so admin edits show without a reload.
+  const serviceContextPath = useMemo(() => {
+    if (topSlug !== "event-services") {
+      return Array.isArray(trail) && trail.length ? trail.map((n) => n.slug) : [];
+    }
+    try {
+      const raw = new URLSearchParams(location.search).get("context") || "";
+      return raw.split("/").map((part) => part.trim()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }, [topSlug, trail, location.search]);
   // Mixed/aggregated product grid: every product nested under this node
   // (own + every descendant category/theme), not just ones attached
   // directly to it. A top-level listing (e.g. Birthday) shows every theme's
@@ -82,12 +283,21 @@ export default function CategoryTemplate({ node, trail }) {
     () => productEntries.map((e) => ({ ...e.product, __trail: e.trail })),
     [productEntries],
   );
+  const contextProducts = useMemo(() => {
+    if (!isServiceCatalog || !serviceContextPath.length) return products;
+    const isPrefix = (scope, context) => {
+      const a = String(scope || "").split("/").filter(Boolean);
+      const b = context;
+      if (!a.length || a.length > b.length) return false;
+      return a.every((part, index) => part === b[index]);
+    };
+    return products.filter((product) => {
+      const scopes = Array.isArray(product.serviceScopes) ? product.serviceScopes : [];
+      return !scopes.length || scopes.some((scope) => isPrefix(scope, serviceContextPath));
+    });
+  }, [products, isServiceCatalog, serviceContextPath]);
   const quickLinks = useMemo(() => quickLinksFor(node, trail), [node, trail]);
 
-  // Services are admin-editable (Admin → Event Services), so they're read
-  // from the catalog store rather than the static data file, and kept in
-  // sync with "nle-catalog-updated" so admin edits show without a reload.
-  const topSlug = Array.isArray(trail) && trail.length > 0 ? trail[0].slug : null;
   // Event services are admin-owned data. Start empty and load only the live
   // catalog; never show bundled placeholder services when the cloud catalog is empty.
   const [addonItems, setAddonItems] = useState([]);
@@ -96,7 +306,10 @@ export default function CategoryTemplate({ node, trail }) {
     const refreshAddons = () =>
       import("../../lib/catalogStore")
         .then(({ getAddonsForOccasion }) => {
-          if (!cancelled) setAddonItems(getAddonsForOccasion(topSlug));
+          if (cancelled) return;
+          let items = [];
+          try { items = getAddonsForOccasion(topSlug, serviceContextPath); } catch { items = []; }
+          setAddonItems(Array.isArray(items) ? items.filter((a) => a && typeof a === "object") : []);
         })
         .catch(() => {});
     refreshAddons();
@@ -105,12 +318,33 @@ export default function CategoryTemplate({ node, trail }) {
       cancelled = true;
       window.removeEventListener("nle-catalog-updated", refreshAddons);
     };
-  }, [topSlug]);
+  }, [topSlug, serviceContextPath.join("/")]);
   const heroImages = useMemo(() => heroGalleryFor(node, trail), [node, trail]);
+
+  if (isServiceCatalog) {
+    return (
+      <div className="occ-category-page">
+        <section className="hero hero-sm occ-hero">
+          <div className="hero-media"><HeroImageCarousel images={heroImages?.length ? heroImages : [node.heroImg || node.image || PLACEHOLDER_IMAGE]} alt={node.label} /></div>
+          <div className="hero-content">
+            <span className="eyebrow">{trail.length > 1 ? trail[trail.length - 2].label : "Event Services"}</span>
+            <h1>{node.label}</h1>
+            <p>{node.tagline || node.description}</p>
+          </div>
+        </section>
+        <section className="section-tight container occ-category-content">
+          <Breadcrumb items={crumbs} />
+          {node.description && <p className="occ-lead reveal">{node.description}</p>}
+          <ServiceCatalogContent node={node} trail={trail} />
+        </section>
+      </div>
+    );
+  }
+
 
 
   const visibleProducts = useMemo(() => {
-    let list = products;
+    let list = contextProducts;
     if (priceFilter !== "all") {
       const bucket = PRICE_BUCKETS.find((b) => b.key === priceFilter);
       if (bucket) list = list.filter((p) => p.price >= bucket.min && p.price < bucket.max);
@@ -118,7 +352,7 @@ export default function CategoryTemplate({ node, trail }) {
     if (cityOnly) list = list.filter((p) => isAvailableInCity(p, city));
     if (topRatedOnly) list = list.filter((p) => (p.rating || 0) >= 4.7);
     return sortProducts(list, sortKey);
-  }, [products, priceFilter, cityOnly, topRatedOnly, sortKey, city]);
+  }, [contextProducts, priceFilter, cityOnly, topRatedOnly, sortKey, city]);
 
   function resetFilters() {
     setPriceFilter("all");
@@ -188,15 +422,17 @@ export default function CategoryTemplate({ node, trail }) {
 
         <OccasionQuickLinks title={node.label + " Decoration Themes"} items={quickLinks} node={node} trail={trail} />
 
-        {!node.addonOnly && (
-          <EventAddons title="Services Categories" occasionLabel={node.label} items={addonItems} />
+        {!node.addonOnly && <EventServicesSection />}
+
+        {!node.addonOnly && addonItems.length > 0 && (
+          <EventAddons title="Services Categories" occasionLabel={node.label} items={addonItems} contextPath={serviceContextPath} />
         )}
 
         {products.length > 0 && (
           <div className="occ-block">
             <div className="section-head reveal">
               <h2>{children.length > 0 ? "Featured Packages" : "Packages & Setups"}</h2>
-              <p>{visibleProducts.length} option{visibleProducts.length === 1 ? "" : "s"} for {node.label.toLowerCase()}, fully customisable.</p>
+              <p>{visibleProducts.length} option{visibleProducts.length === 1 ? "" : "s"} for {String(node.label || "").toLowerCase()}, fully customisable.</p>
             </div>
 
             <ListingControls
@@ -208,8 +444,8 @@ export default function CategoryTemplate({ node, trail }) {
             />
 
             <div className="occ-prod-grid reveal">
-              {visibleProducts.map((p) => (
-                <ProductCard key={p.slug} product={p} href={pathFor(p.__trail)} variant="occasion-market" />
+              {visibleProducts.map((p, i) => (
+                <ProductCard key={`${p.slug || p.id || "p"}-${i}`} product={p} href={`${pathFor(p.__trail)}${isServiceCatalog && serviceContextPath.length ? `?context=${encodeURIComponent(serviceContextPath.join("/"))}` : ""}`} variant="occasion-market" />
               ))}
             </div>
             {visibleProducts.length === 0 && (

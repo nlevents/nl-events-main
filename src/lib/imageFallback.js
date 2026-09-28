@@ -1,21 +1,21 @@
-import { cloudinaryAsset } from "./cloudinaryAssets";
-
 // Shared broken-image safety net.
 //
 // Some catalogue images are remote Unsplash photos. A remote image can be
 // unavailable because of a deleted source, a network/carrier restriction, or
 // a temporary CDN failure. Never leave a broken-image icon on the storefront:
-// fall back to a real local event photo that is packaged with the site.
+// fall back to a stable event photo URL that is already used by the site.
 
-const LOCAL_FALLBACKS = {
-  birthday: cloudinaryAsset("/assets/images/categories/birthday-decor.webp"),
-  kids: cloudinaryAsset("/assets/images/categories/kids-birthday.webp"),
-  baby: cloudinaryAsset("/assets/images/categories/babyshower.webp"),
-  newborn: cloudinaryAsset("/assets/images/categories/newborn-welcome.webp"),
-  anniversary: cloudinaryAsset("/assets/images/catalog/romance.webp"),
-  wedding: cloudinaryAsset("/assets/images/categories/wedding.webp"),
-  default: cloudinaryAsset("/assets/images/categories/wedding.webp"),
+const REMOTE_FALLBACKS = {
+  wedding: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1100&q=75",
+  birthday: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1100&q=75",
+  kids: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1100&q=75",
+  baby: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1100&q=75",
+  newborn: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1100&q=75",
+  anniversary: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=1100&q=75",
+  default: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1100&q=75",
 };
+
+const LOCAL_FALLBACKS = REMOTE_FALLBACKS;
 
 export const PLACEHOLDER_IMAGE = LOCAL_FALLBACKS.default;
 

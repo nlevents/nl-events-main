@@ -49,7 +49,6 @@ const AdminBirthdayAgeCategories = lazyWithRetry(() => import("./pages/admin/Adm
 const AdminMedia = lazyWithRetry(() => import("./pages/admin/AdminMedia"));
 const AdminVideoContent = lazyWithRetry(() => import("./pages/admin/AdminVideoContent"));
 const AdminCoupons = lazyWithRetry(() => import("./pages/admin/AdminCoupons"));
-const AdminAddons = lazyWithRetry(() => import("./pages/admin/AdminAddons"));
 const AdminAvailability = lazyWithRetry(() => import("./pages/admin/AdminAvailability"));
 const AdminInquiries = lazyWithRetry(() => import("./pages/admin/AdminInquiries"));
 const AdminLeadDetails = lazyWithRetry(() => import("./pages/admin/AdminLeadDetails"));
@@ -61,7 +60,11 @@ const AdminSettings = lazyWithRetry(() => import("./pages/admin/AdminSettings"))
 const AdminPlaceholder = lazyWithRetry(() => import("./pages/admin/AdminPlaceholder"));
 
 function RouteFallback() {
-  return <div style={{ minHeight: "60vh" }} aria-hidden="true"></div>;
+  return (
+    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} aria-busy="true" aria-live="polite">
+      <span style={{ color: "var(--text-secondary, #5b6b80)" }}>Loading…</span>
+    </div>
+  );
 }
 
 // Wraps every route (including admin and landing, which sit outside <Layout>).
@@ -72,6 +75,7 @@ function RouteBoundary({ children }) {
   return (
     <ErrorBoundary
       resetKey={pathname}
+      autoRetry={2}
       fallback={({ reset }) => (
         <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24, fontFamily: "system-ui, sans-serif" }} role="alert">
           <div>
@@ -109,8 +113,8 @@ export default function App() {
                     <Route path="media" element={<AdminMedia />} />
                     <Route path="video-content" element={<AdminVideoContent />} />
                     <Route path="coupons" element={<AdminCoupons />} />
-                    <Route path="services" element={<AdminAddons />} />
-                    <Route path="addons" element={<AdminAddons />} />
+                    <Route path="services" element={<Navigate to="/admin/products?tab=services" replace />} />
+                    <Route path="addons" element={<Navigate to="/admin/products?tab=services" replace />} />
                     <Route path="services/products/new" element={<AdminProductForm />} />
                     <Route path="addons/products/new" element={<AdminProductForm />} />
                     <Route path="services/products/:id/edit" element={<AdminProductForm />} />

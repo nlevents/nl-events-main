@@ -9,7 +9,7 @@ import { onImgError } from "../../lib/imageFallback";
 // managed from Admin -> Event Services (see lib/catalogStore.js
 // getAddonsForOccasion). "items" is passed in already resolved for the
 // current occasion by CategoryTemplate.
-export default function EventAddons({ title, occasionLabel, items }) {
+export default function EventAddons({ title, occasionLabel, items, contextPath = [] }) {
   if (!Array.isArray(items) || items.length === 0) return null;
 
   // Service cards are category shortcuts, never cart items.
@@ -31,9 +31,16 @@ export default function EventAddons({ title, occasionLabel, items }) {
               <span className="occ-addon-body">
                 <h4>{addon.label}</h4>
                 {addon.subLabel ? <p>{addon.subLabel}</p> : null}
-                <span className="occ-addon-price">From {fmtINR(addon.price)}</span>
+                {Number.isFinite(Number(addon.price)) && Number(addon.price) > 0 ? (
+                  <span className="occ-addon-price">From {fmtINR(addon.price)}</span>
+                ) : (
+                  <span className="occ-addon-price">Explore services</span>
+                )}
                 {addon.href ? (
-                  <Link to={addon.href} className="addon-btn occ-addon-cta">
+                  <Link
+                    to={contextPath.length ? `${addon.href}?context=${encodeURIComponent(contextPath.join("/"))}` : addon.href}
+                    className="addon-btn occ-addon-cta"
+                  >
                     View Options
                   </Link>
                 ) : null}

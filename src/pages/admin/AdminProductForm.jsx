@@ -1,7 +1,7 @@
 import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
-import { getProduct, saveProductToCloud, getOccasions, getAddonCategoryOptions } from "../../lib/catalogStore";
+import { getProduct, saveProductToCloud, getOccasions, getAddonCategoryOptions, getServiceScopeOptions } from "../../lib/catalogStore";
 import { sanitizeSlug } from "../../lib/sanitize";
 import { fmtINR } from "../../lib/pricing";
 import { CITIES } from "../../data/cities";
@@ -25,6 +25,7 @@ export default function AdminProductForm() {
 
   const occasions = getOccasions();
   const addonCategoryOptions = getAddonCategoryOptions();
+  const serviceScopeOptions = getServiceScopeOptions();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -52,6 +53,7 @@ export default function AdminProductForm() {
     requiresTimeSlot: true,
     addons: [],
     cities: [],
+    serviceScopes: [],
   });
 
   const [newInclusion, setNewInclusion] = useState("");
@@ -94,6 +96,7 @@ export default function AdminProductForm() {
           addons: Array.isArray(p.addons) ? p.addons : [],
           cities: Array.isArray(p.cities) ? p.cities : ["Ranchi", "Jamshedpur"],
           categoryPath: Array.isArray(p.categoryPath) ? p.categoryPath : (p.categorySlug ? [p.occasionSlug, p.categorySlug] : []),
+          serviceScopes: Array.isArray(p.serviceScopes) ? p.serviceScopes : [],
         });
       } else {
         setError(`Product with ID/slug "${id}" not found.`);
@@ -689,6 +692,21 @@ export default function AdminProductForm() {
                     </select>
                   </div>
                 )}
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Available for Event Context</label>
+                  <select
+                    className="admin-select"
+                    multiple
+                    size={Math.min(8, Math.max(4, serviceScopeOptions.length))}
+                    value={Array.isArray(formData.serviceScopes) ? formData.serviceScopes : []}
+                    onChange={(e) => setFormData({ ...formData, serviceScopes: Array.from(e.target.selectedOptions).map((option) => option.value) })}
+                  >
+                    {serviceScopeOptions.map((option) => (
+                      <option key={option.path} value={option.path}>{option.label}</option>
+                    ))}
+                  </select>
+                  <p className="admin-hint" style={{ marginTop: 6 }}>Leave empty to show this service in every event context. Selecting a category also includes its child themes.</p>
+                </div>
               </>
             ) : (
               <>

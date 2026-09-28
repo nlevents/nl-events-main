@@ -23,23 +23,6 @@ export const LOCATION_TYPE_OPTIONS = [
   "Other",
 ];
 
-// Fallback services offered on every booking, on top of whatever
-// addons a specific product/package already defines (see BookingPanel).
-// This guarantees the "Services" section always has something to
-// offer, even for Shop-by-Occasion products that don't carry their own
-// addons list. Prices are Ranchi base rates — cityPrice() adjusts them
-// per-city the same way product prices are adjusted.
-export const DEFAULT_ADDONS = [
-  { name: "Photography (2 hrs)", price: 2500 },
-  { name: "Videography (2 hrs)", price: 3500 },
-  { name: "DJ & Music Setup", price: 4000 },
-  { name: "LED Decor Lighting", price: 1500 },
-  { name: "Cake (1 kg)", price: 900 },
-  { name: "Return Gifts (pack of 10)", price: 1200 },
-  { name: "Extra Balloon Decor", price: 1000 },
-  { name: "Anchor / Host", price: 3000 },
-];
-
 export const TIME_SLOT_OPTIONS = [
   "Morning (8 AM – 11 AM)",
   "Midday (11 AM – 2 PM)",

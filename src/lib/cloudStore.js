@@ -196,7 +196,7 @@ let publicSyncTimer = null;
 let publicSyncInFlight = false;
 let publicSyncLastRun = 0;
 
-export function startPublicCatalogSync({ intervalMs = 5000, minRunGapMs = 1000 } = {}) {
+export function startPublicCatalogSync({ intervalMs = 120000, minRunGapMs = 5000 } = {}) {
   if (typeof window === "undefined") return () => {};
   if (publicSyncTimer) return () => stopPublicCatalogSync();
 
@@ -208,7 +208,7 @@ export function startPublicCatalogSync({ intervalMs = 5000, minRunGapMs = 1000 }
     publicSyncLastRun = now;
     publicSyncInFlight = true;
     try {
-      await hydratePublicState({ versionsOnly: !force });
+      await hydratePublicState({ versionsOnly: true });
     } catch {
       // The storefront keeps its last-known local cache if the cloud is temporarily unavailable.
     } finally {

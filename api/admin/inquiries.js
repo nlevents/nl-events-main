@@ -10,7 +10,7 @@ const EVENT_TYPES = ["Wedding", "Birthday", "Corporate", "Festive Events", "Othe
 function clean(value, max = 1000) { return String(value ?? "").trim().slice(0, max); }
 function normalizePhone(value) { return clean(value, 40).replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); }
 function normalizeEmail(value) { return clean(value, 160).toLowerCase(); }
-function isValidSource(value) { return LEAD_SOURCES.includes(value); }
+function isValidSource(value) { return Boolean(clean(value, 120)); }
 function cleanSource(value) { return clean(value, 120); }
 const SOURCE_DETAIL_ALIASES = { landing: "Landing Page", contact: "Inquiry Form", inquiry: "Inquiry Form", manual: "CRM", website: "Website", booking: "Booking" };
 function displaySource(value) {
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
       const guestCount = clean(body.guestCount, 60);
       const budget = clean(body.budget, 80);
       const message = clean(body.message, 2000);
-      const leadSource = clean(body.leadSource, 40);
+      const leadSource = clean(body.leadSource, 120);
       const source = cleanSource(body.source || body.sourceDetail || "CRM");
       const status = clean(body.status || "new_lead", 40);
 
@@ -127,7 +127,7 @@ export default async function handler(req, res) {
       if (body.invoiceId !== undefined) patch.invoice_id = clean(body.invoiceId, 100);
       if (body.paymentStatus !== undefined) patch.payment_status = clean(body.paymentStatus, 30);
       if (body.leadSource !== undefined) {
-        const leadSource = clean(body.leadSource, 40);
+        const leadSource = clean(body.leadSource, 120);
         if (!isValidSource(leadSource)) return res.status(400).json({ ok: false, error: "Invalid lead source." });
         patch.lead_source = leadSource;
         patch.source_type = "MANUAL";

@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCity } from "../context/CityContext";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
 import { cityPrice, fmtINR } from "../lib/pricing";
-import { LOCATION_TYPE_OPTIONS, TIME_SLOT_OPTIONS, DEFAULT_ADDONS, todayISO, nextDates } from "../data/booking";
+import { LOCATION_TYPE_OPTIONS, TIME_SLOT_OPTIONS, todayISO, nextDates } from "../data/booking";
 import Icon from "./Icon";
 import CitySelectModal from "./CitySelectModal";
 
@@ -57,16 +57,34 @@ export default function BookingPanel({ product, productHref, addons, requiresTim
   const showToast = useToast();
   const navigate = useNavigate();
 
-  // Product-specific addons (set via Admin) come first; any default addon
-  // not already offered by the product is appended after, so every booking
-  // always has extra services the user can add — not just products that
-  // happen to have their own addons configured.
+  // Services are admin-created catalog products. Resolve them from the
+  // current product's occasion/category context so booking never renders a
+  // hardcoded service list. Explicit product addons remain supported for
+  // backwards compatibility, but no static fallback is appended.
+  const [catalogServices, setCatalogServices] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => import("../lib/catalogStore").then(({ getServiceProductsForContext }) => {
+      const categoryPath = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
+      const context = categoryPath[0] === "event-services"
+        ? ["event-services"]
+        : categoryPath.length
+          ? categoryPath
+          : [product?.occasionSlug].filter(Boolean);
+      const services = getServiceProductsForContext(context);
+      if (!cancelled) setCatalogServices(services);
+    }).catch(() => { if (!cancelled) setCatalogServices([]); });
+    load();
+    window.addEventListener("nle-catalog-updated", load);
+    return () => { cancelled = true; window.removeEventListener("nle-catalog-updated", load); };
+  }, [product?.id, product?.slug, product?.occasionSlug, JSON.stringify(product?.categoryPath || [])]);
+
   const addonList = useMemo(() => {
     const own = Array.isArray(addons) ? addons : [];
     const ownNames = new Set(own.map((a) => a.name));
-    const extras = DEFAULT_ADDONS.filter((a) => !ownNames.has(a.name));
-    return [...own, ...extras];
-  }, [addons]);
+    const live = catalogServices.filter((service) => !ownNames.has(service.name));
+    return [...own, ...live];
+  }, [addons, catalogServices]);
 
   const [selectedAddons, setSelectedAddons] = useState({});
   const detectedEventType = detectEventType(product, defaultEventType);

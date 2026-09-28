@@ -9,6 +9,7 @@ import {
   getAddonCategoryOptions,
   getAddonCategoryTree,
   getAddonProducts,
+  getServiceScopeOptions,
   saveCategory,
   deleteCategory,
 } from "../../lib/catalogStore";
@@ -20,7 +21,7 @@ import usePageMeta from "../../hooks/usePageMeta";
 const ICON_OPTIONS = ["sparkle", "user", "image", "package", "tag", "star", "compass", "layers", "sun", "moon"];
 
 function emptyAddon() {
-  return { label: "", subLabel: "", icon: "sparkle", image: "", categoryPath: [], scopes: ["wedding"], scope: "wedding", active: true };
+  return { label: "", subLabel: "", icon: "sparkle", image: "", categoryPath: [], scopes: [], scope: "", active: true };
 }
 
 function emptyCategory(parentTrail = [], image = "") {
@@ -49,6 +50,7 @@ export default function AdminAddons() {
   const [tab, setTab] = useState("products");
   const [addons, setAddons] = useState(getAddons);
   const [occasions] = useState(() => getOccasions().filter((o) => !o.addonOnly));
+  const [serviceScopeOptions, setServiceScopeOptions] = useState(getServiceScopeOptions);
   const [categoryOptions, setCategoryOptions] = useState(getAddonCategoryOptions);
   const [categoryTree, setCategoryTree] = useState(getAddonCategoryTree);
   const [addonProducts, setAddonProducts] = useState(getAddonProducts);
@@ -67,6 +69,7 @@ export default function AdminAddons() {
     setCategoryOptions(getAddonCategoryOptions());
     setCategoryTree(getAddonCategoryTree());
     setAddonProducts(getAddonProducts());
+    setServiceScopeOptions(getServiceScopeOptions());
   }
 
   useEffect(() => {
@@ -80,7 +83,11 @@ export default function AdminAddons() {
     window.setTimeout(() => setFeedback(""), 3000);
   }
 
-  const filteredAddons = addons.filter((a) => scopeFilter === "all" || (Array.isArray(a.scopes) ? a.scopes.includes(scopeFilter) : a.scope === scopeFilter));
+  const filteredAddons = addons.filter((a) => {
+    if (scopeFilter === "all") return true;
+    const scopes = Array.isArray(a.scopes) && a.scopes.length ? a.scopes : (a.scope ? [a.scope] : []);
+    return scopes.some((scope) => String(scope).split("/")[0] === scopeFilter);
+  });
   const filteredProducts = useMemo(() => addonProducts.filter((p) => {
     const q = productSearch.trim().toLowerCase();
     const matchSearch = !q || String(p.name || "").toLowerCase().includes(q) || String(p.slug || "").toLowerCase().includes(q);
@@ -92,7 +99,8 @@ export default function AdminAddons() {
   function scopeLabel(addon) {
     const scopes = Array.isArray(addon.scopes) && addon.scopes.length ? addon.scopes : (addon.scope ? [addon.scope] : []);
     if (!scopes.length) return "Not assigned";
-    return scopes.map((scope) => occasions.find((o) => o.slug === scope)?.label || scope).join(" + ");
+    const labels = new Map(serviceScopeOptions.map((option) => [option.path, option.label]));
+    return scopes.map((scope) => labels.get(scope) || occasions.find((o) => o.slug === scope)?.label || scope).join(" + ");
   }
 
   function handleSaveAddon(e) {
@@ -238,7 +246,7 @@ export default function AdminAddons() {
 
       {editingCategory && <div className="admin-modal-backdrop" onClick={() => setEditingCategory(null)}><div className="admin-modal-card" onClick={(e) => e.stopPropagation()}><div className="admin-modal-header"><h2>{editingCategory.cat.id ? `Edit ${editingCategory.cat.label}` : "Add Service Category"}</h2><button type="button" className="btn-icon" onClick={() => setEditingCategory(null)}><Icon name="close" /></button></div><form onSubmit={handleSaveCategory}><div className="admin-form-group"><label className="admin-form-label">Parent</label><div className="admin-calc-box"><strong>{editingCategory.parentLabel}</strong></div></div><div className="admin-form-group"><label className="admin-form-label">Category Name *</label><input className="admin-input" value={editingCategory.cat.label || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, label: e.target.value, slug: !p.cat.slug ? sanitizeSlug(e.target.value) : p.cat.slug } }))} required /></div><div className="admin-form-group"><label className="admin-form-label">Slug *</label><input className="admin-input" value={editingCategory.cat.slug || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, slug: sanitizeSlug(e.target.value) } }))} required /></div><div className="admin-form-group"><label className="admin-form-label">Description</label><textarea className="admin-textarea" rows="3" value={editingCategory.cat.description || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, description: e.target.value } }))} /></div><div className="admin-form-group"><label className="admin-form-label">Image URL</label><input className="admin-input" value={editingCategory.cat.image || ""} onChange={(e) => setEditingCategory((p) => ({ ...p, cat: { ...p.cat, image: e.target.value } }))} /></div><div className="admin-modal-actions"><button type="button" className="btn btn-ghost" onClick={() => setEditingCategory(null)}>Cancel</button><button type="submit" className="btn btn-primary">Save Category</button></div></form></div></div>}
 
-      {editingAddon && <div className="admin-modal-backdrop" onClick={() => setEditingAddon(null)}><div className="admin-modal-card" onClick={(e) => e.stopPropagation()}><div className="admin-modal-header"><h2>{editingAddon.id ? `Edit Featured Card: ${editingAddon.label}` : "New Featured Service Card"}</h2><button type="button" className="btn-icon" onClick={() => setEditingAddon(null)}><Icon name="close" /></button></div><form onSubmit={handleSaveAddon}><div className="admin-form-row"><div className="admin-form-group"><label className="admin-form-label">Card Title *</label><input className="admin-input" value={editingAddon.label} onChange={(e) => setEditingAddon({ ...editingAddon, label: e.target.value })} required /></div><div className="admin-form-group"><label className="admin-form-label">Subtitle</label><input className="admin-input" value={editingAddon.subLabel} onChange={(e) => setEditingAddon({ ...editingAddon, subLabel: e.target.value })} /></div></div><div className="admin-form-group"><label className="admin-form-label">Featured Service Category *</label><select className="admin-select" value={(editingAddon.categoryPath || []).join("/")} onChange={(e) => setEditingAddon({ ...editingAddon, categoryPath: e.target.value ? e.target.value.split("/") : [] })} required><option value="">Select a service category…</option>{categoryOptions.map((opt) => <option key={opt.path.join("/")} value={opt.path.join("/")}>{opt.label} ({opt.productCount} product{opt.productCount === 1 ? "" : "s"})</option>)}</select><p className="admin-hint" style={{ marginTop: 6 }}>This card points to the category. Manage the actual products in <strong>Service Products</strong>, not Products &amp; Packages.</p></div><div className="admin-form-row"><div className="admin-form-group"><label className="admin-form-label">Icon</label><select className="admin-select" value={editingAddon.icon} onChange={(e) => setEditingAddon({ ...editingAddon, icon: e.target.value })}>{ICON_OPTIONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}</select></div><div className="admin-form-group"><label className="admin-form-label">Available for *</label><div style={{ display: "flex", gap: 14, flexWrap: "wrap", paddingTop: 8 }}>{occasions.filter((o) => ["wedding", "birthday"].includes(o.slug)).map((o) => { const scopes = Array.isArray(editingAddon.scopes) ? editingAddon.scopes : (editingAddon.scope ? [editingAddon.scope] : []); return <label key={o.slug} className="admin-checkbox-label"><input type="checkbox" checked={scopes.includes(o.slug)} onChange={(e) => { const next = e.target.checked ? [...new Set([...scopes, o.slug])] : scopes.filter((s) => s !== o.slug); setEditingAddon({ ...editingAddon, scopes: next, scope: next[0] || "" }); }} /><span>{o.label}</span></label>; })}</div><p className="admin-hint">A service only appears on the selected occasion pages. Example: SFX / pyro can be Wedding-only.</p></div></div><div className="admin-form-group"><label className="admin-form-label">Card Image URL</label><input className="admin-input" value={editingAddon.image} onChange={(e) => setEditingAddon({ ...editingAddon, image: e.target.value })} /></div><label className="admin-checkbox-label"><input type="checkbox" checked={editingAddon.active !== false} onChange={(e) => setEditingAddon({ ...editingAddon, active: e.target.checked })} /><span>Visible on the live site</span></label><div className="admin-modal-actions"><button type="button" className="btn btn-ghost" onClick={() => setEditingAddon(null)}>Cancel</button><button type="submit" className="btn btn-primary">Save Featured Card</button></div></form></div></div>}
+      {editingAddon && <div className="admin-modal-backdrop" onClick={() => setEditingAddon(null)}><div className="admin-modal-card" onClick={(e) => e.stopPropagation()}><div className="admin-modal-header"><h2>{editingAddon.id ? `Edit Featured Card: ${editingAddon.label}` : "New Featured Service Card"}</h2><button type="button" className="btn-icon" onClick={() => setEditingAddon(null)}><Icon name="close" /></button></div><form onSubmit={handleSaveAddon}><div className="admin-form-row"><div className="admin-form-group"><label className="admin-form-label">Card Title *</label><input className="admin-input" value={editingAddon.label} onChange={(e) => setEditingAddon({ ...editingAddon, label: e.target.value })} required /></div><div className="admin-form-group"><label className="admin-form-label">Subtitle</label><input className="admin-input" value={editingAddon.subLabel} onChange={(e) => setEditingAddon({ ...editingAddon, subLabel: e.target.value })} /></div></div><div className="admin-form-group"><label className="admin-form-label">Featured Service Category *</label><select className="admin-select" value={(editingAddon.categoryPath || []).join("/")} onChange={(e) => setEditingAddon({ ...editingAddon, categoryPath: e.target.value ? e.target.value.split("/") : [] })} required><option value="">Select a service category…</option>{categoryOptions.map((opt) => <option key={opt.path.join("/")} value={opt.path.join("/")}>{opt.label} ({opt.productCount} product{opt.productCount === 1 ? "" : "s"})</option>)}</select><p className="admin-hint" style={{ marginTop: 6 }}>This card points to the category. Manage the actual products in <strong>Service Products</strong>, not Products &amp; Packages.</p></div><div className="admin-form-row"><div className="admin-form-group"><label className="admin-form-label">Icon</label><select className="admin-select" value={editingAddon.icon} onChange={(e) => setEditingAddon({ ...editingAddon, icon: e.target.value })}>{ICON_OPTIONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}</select></div><div className="admin-form-group"><label className="admin-form-label">Available for *</label><select className="admin-select" multiple size={Math.min(8, Math.max(4, serviceScopeOptions.length))} value={Array.isArray(editingAddon.scopes) ? editingAddon.scopes : (editingAddon.scope ? [editingAddon.scope] : [])} onChange={(e) => { const next = Array.from(e.target.selectedOptions).map((option) => option.value); setEditingAddon({ ...editingAddon, scopes: next, scope: next[0] || "" }); }}>{serviceScopeOptions.map((option) => <option key={option.path} value={option.path}>{option.label}</option>)}</select><p className="admin-hint">A service appears on the selected category and all of its child themes. Example: choose Sangeet to show it on Cinematic Sangeet and Royal Sangeet.</p></div></div><div className="admin-form-group"><label className="admin-form-label">Card Image URL</label><input className="admin-input" value={editingAddon.image} onChange={(e) => setEditingAddon({ ...editingAddon, image: e.target.value })} /></div><label className="admin-checkbox-label"><input type="checkbox" checked={editingAddon.active !== false} onChange={(e) => setEditingAddon({ ...editingAddon, active: e.target.checked })} /><span>Visible on the live site</span></label><div className="admin-modal-actions"><button type="button" className="btn btn-ghost" onClick={() => setEditingAddon(null)}>Cancel</button><button type="submit" className="btn btn-primary">Save Featured Card</button></div></form></div></div>}
     </div>
   );
 }

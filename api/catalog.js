@@ -20,12 +20,12 @@ export default async function handler(req, res) {
     // on the initial load or when one of these versions actually changes.
     const versionsOnly = String(req.query?.meta || "") === "1";
     if (versionsOnly) {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Cache-Control", "public, max-age=15, s-maxage=30, stale-while-revalidate=120");
       return res.status(200).json({ ok: true, versions });
     }
 
     const state = await readStates(process.env, PUBLIC_KEYS);
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Cache-Control", "public, max-age=15, s-maxage=60, stale-while-revalidate=300");
     return res.status(200).json({ ok: true, state, versions });
   } catch (err) {
     console.error("Catalog API error:", err);

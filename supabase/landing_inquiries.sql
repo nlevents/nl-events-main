@@ -15,7 +15,7 @@ alter table public.inquiries
   add column if not exists source_type text not null default 'AUTO';
 
 alter table public.inquiries drop constraint if exists inquiries_lead_source_check;
-alter table public.inquiries add constraint inquiries_lead_source_check check (lead_source in ('Website','Meta Ads','Google Ads','Organic Social','Google Organic','WhatsApp','Referral','Venue','Vendor','Direct','Repeat Client','Other'));
+-- lead_source intentionally accepts arbitrary custom source text.
 alter table public.inquiries drop constraint if exists inquiries_source_type_check;
 alter table public.inquiries add constraint inquiries_source_type_check check (source_type in ('AUTO','MANUAL'));
 

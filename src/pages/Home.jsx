@@ -31,14 +31,14 @@ const WEDDING_CONCEPTS = [
 ];
 
 const WEDDING_SERVICES = [
-  { label: "Décor", sub: "Packages & elements", img: CATALOG_IMAGES.decor },
-  { label: "Entry", sub: "Grand & unique entries", img: IMAGES.showcase4 },
-  { label: "Entertainment", sub: "Artists, DJ, live bands", img: CATALOG_IMAGES.entertainment },
-  { label: "Sound & Technical", sub: "Lighting, AV, effects", img: CATALOG_IMAGES["sound-technical"] },
-  { label: "Tent & Furniture", sub: "Tents, seating, tables", img: CATALOG_IMAGES["tent-furniture"] },
-  { label: "Photography & Videography", sub: "Capture every moment", img: CATALOG_IMAGES["photography-videography"] },
-  { label: "Catering", sub: "Delicious food experiences", img: CATALOG_IMAGES.catering },
-  { label: "Baraat / Procession", sub: "Make an unforgettable entry", img: CATALOG_IMAGES["baraat-procession"] },
+  { label: "Décor", sub: "Packages & elements", img: CATALOG_IMAGES.decor, href: "/occasion/event-services/decor" },
+  { label: "Entry", sub: "Grand & unique entries", img: IMAGES.showcase4, href: "/occasion/event-services/entry" },
+  { label: "Entertainment", sub: "Artists, DJ, live bands", img: CATALOG_IMAGES.entertainment, href: "/occasion/event-services/entertainment" },
+  { label: "Sound & Technical", sub: "Lighting, AV, effects", img: CATALOG_IMAGES["sound-technical"], href: "/occasion/event-services/sound-technical" },
+  { label: "Tent & Furniture", sub: "Tents, seating, tables", img: CATALOG_IMAGES["tent-furniture"], href: "/occasion/event-services/tent-furniture" },
+  { label: "Photography & Videography", sub: "Capture every moment", img: CATALOG_IMAGES["photography-videography"], href: "/occasion/event-services/photography-videography" },
+  { label: "Catering", sub: "Delicious food experiences", img: CATALOG_IMAGES.catering, href: "/occasion/event-services/catering" },
+  { label: "Baraat / Procession", sub: "Make an unforgettable entry", img: CATALOG_IMAGES["baraat-procession"], href: "/occasion/event-services/baraat-procession" },
 ];
 
 const BIRTHDAY_THEMES = [

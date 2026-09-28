@@ -13,7 +13,7 @@ export default async function handler(req, res) {
         })
       : [];
     // Product data is admin-owned and must never be served from a browser seed.
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Cache-Control", "public, max-age=30, s-maxage=60, stale-while-revalidate=300");
     return res.status(200).json({ ok: true, data: cleanProducts });
   } catch (err) {
     console.error("Products API error:", err);

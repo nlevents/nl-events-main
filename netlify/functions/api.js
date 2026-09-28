@@ -33,9 +33,6 @@ function routeFromEvent(event) {
     event?.url,
   ].filter(Boolean).map(String);
 
-  // Debug: log in production so Netlify Function logs reveal the actual path shapes
-  console.log("[api] routeFromEvent candidates:", JSON.stringify(candidates));
-
   for (const candidate of candidates) {
     // Strip query string first for cleaner matching
     const pathOnly = candidate.split("?")[0];

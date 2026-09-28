@@ -9,7 +9,7 @@ import './styles/products.css'
 import './styles/chatbot.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
-import { recoverIfNewBuild } from './lib/lazyWithRetry'
+import { isChunkLoadError, recoverFromChunkLoadError } from './lib/lazyWithRetry'
 const rootFallback = (
   <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
     <div>
@@ -41,7 +41,13 @@ if (typeof window !== "undefined") {
   // Vite fires this when a preloaded chunk/CSS file 404s — the signature of a
   // tab that was opened before a new deployment. Reload (once, and only when
   // the server really has a newer build) so it picks up the new index.html.
-  window.addEventListener("vite:preloadError", () => { recoverIfNewBuild(); });
+  window.addEventListener("vite:preloadError", () => { recoverFromChunkLoadError(); });
+  window.addEventListener("unhandledrejection", (event) => {
+    if (isChunkLoadError(event?.reason)) {
+      event.preventDefault();
+      recoverFromChunkLoadError();
+    }
+  });
 
   // The public storefront has a local/seed fallback, so cloud hydration does
   // not need to compete with the first render. Run it when the browser is idle.
@@ -72,7 +78,7 @@ if (typeof window !== "undefined") {
   // catalog is downloaded only when its cloud version actually changes.
   const startCatalogSync = () =>
     import('./lib/cloudStore')
-      .then(({ startPublicCatalogSync }) => startPublicCatalogSync({ intervalMs: 5000 }))
+      .then(({ startPublicCatalogSync }) => startPublicCatalogSync({ intervalMs: 120000 }))
       .catch(() => { /* best-effort background synchronization */ });
 
   if ("requestIdleCallback" in window) {

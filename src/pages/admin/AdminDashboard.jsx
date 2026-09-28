@@ -120,7 +120,7 @@ export default function AdminDashboard() {
         <div className="admin-stat-card">
           <span>Service Products</span>
           <strong>{addonProducts.filter((p) => p.status !== "archived").length}</strong>
-          <span className="admin-stat-sub"><Link to="/admin/services">Manage in Event Services</Link></span>
+          <span className="admin-stat-sub"><Link to="/admin/products?tab=services">Manage in Event Services</Link></span>
         </div>
         <div className="admin-stat-card">
           <span>Occasions & Themes</span>

@@ -1446,6 +1446,14 @@
    Desktop styles above remain unchanged.
    =========================================================== */
 @media (max-width:899px){
+  /* Product detail pages intentionally hide the global fixed header. The
+     shop stylesheet reserves 118px of body top-space for that header, which
+     becomes an empty gap here. Remove only that reservation on product-detail
+     pages so the search bar starts at the top of the mobile content. */
+  body:has(.product-detail-shell){
+    padding-top:0 !important;
+  }
+
   .product-detail-shell{
     margin-top:0 !important;
     padding-top:0 !important;
@@ -1559,4 +1567,38 @@
   .occ-category-related{ padding-left:16px; padding-right:16px; padding-top:20px; }
   .occ-category-content .occ-block{ padding-top:28px; margin-top:28px; }
   .occ-category-content .occ-prod-grid{ gap:10px; }
+}
+
+/* ---------- Event services rail on every occasion/category page ---------- */
+.occ-services-section{
+  margin-top:44px;
+  padding:36px 0 42px;
+  background:#f8f7f3;
+  border-top:1px solid #e8e5dc;
+  border-bottom:1px solid #e8e5dc;
+}
+.occ-services-container{width:100%;max-width:none;margin:0;padding:0;box-sizing:border-box}
+.occ-services-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px}
+.occ-services-head h2{margin:0;font-family:var(--font-display);font-size:30px;line-height:1.08;color:#111}
+.occ-services-head a{color:#c59a3a;font-size:14px;font-weight:800;white-space:nowrap;text-decoration:none}
+.occ-services-head a:hover{color:#a77d20}
+.occ-services-intro{margin:10px 0 18px;color:#222;font-size:15px;line-height:1.4}
+.occ-services-rail{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 0 3px;scrollbar-width:none}
+.occ-services-rail::-webkit-scrollbar{display:none}
+.occ-service-card{flex:0 0 190px;scroll-snap-align:start;display:block;overflow:hidden;background:#fff;border:1px solid #ebe8e0;border-radius:5px;color:#13253a;text-decoration:none}
+.occ-service-card img{display:block;width:100%;height:132px;object-fit:cover}
+.occ-service-card strong{display:block;font-size:12px;padding:9px 10px 2px;line-height:1.2}
+.occ-service-card span{display:block;padding:0 10px 11px;color:#7c8792;font-size:10px;line-height:1.3}
+
+@media(max-width:620px){
+  .occ-services-section{margin-top:29px;padding:28px 0 32px}
+  .occ-services-container{width:100%;max-width:none;margin:0;padding:0}
+  .occ-services-head{align-items:flex-start;flex-direction:column;gap:8px}
+  .occ-services-head h2{font-size:25px}
+  .occ-services-head a{font-size:13px;align-self:flex-end;margin-top:-2px}
+  .occ-services-intro{font-size:11px;margin:7px 0 14px}
+  .occ-service-card{flex-basis:145px}
+  .occ-service-card img{height:100px}
+  .occ-service-card strong{font-size:10px;padding:8px 8px 2px}
+  .occ-service-card span{font-size:8px;padding:0 8px 10px}
 }

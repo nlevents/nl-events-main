@@ -1,6 +1,7 @@
 import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import { CATALOG_IMAGES } from "../../data/images";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
 import {
@@ -76,9 +77,11 @@ function initialItem(kind = "product") {
     teamSize: "",
     deliverables: "",
     workflow: "",
+    serviceScopes: [],
     inclusionsText: "",
     exclusionsText: "",
     packageItems: [],
+    packageOccasions: ["wedding"],
   };
 }
 
@@ -148,8 +151,12 @@ export default function AdminCatalog() {
   const [expanded, setExpanded] = useState({});
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [statFilter, setStatFilter] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   function refresh() {
+    // Event Services is an admin-owned branch. The seed only provides the
+    // initial structure; after that, saved cloud/local state is authoritative.
     setOccasions(getOccasions());
     setProducts(getProducts());
   }
@@ -158,6 +165,17 @@ export default function AdminCatalog() {
     window.addEventListener("nle-catalog-updated", fn);
     return () => window.removeEventListener("nle-catalog-updated", fn);
   }, []);
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (!["products", "services", "packages"].includes(requestedTab || "")) return;
+    setTab(requestedTab);
+    setShowAllCatalog(true);
+    setSearch("");
+    setActiveCategoryPath([]);
+    setType(requestedTab === "products" ? "all" : requestedTab === "services" ? "service" : "package");
+    setStatFilter("all");
+    setActiveOccasion(requestedTab === "services" ? "event-services" : (getOccasions().find((o) => !o.addonOnly)?.slug || "wedding"));
+  }, [searchParams]);
   function flash(message) { setFeedback(message); setTimeout(() => setFeedback(""), 2800); }
 
   const currentOccasion = occasions.find((o) => o.slug === activeOccasion) || occasions[0];
@@ -169,11 +187,22 @@ export default function AdminCatalog() {
     return node || currentOccasion;
   }, [currentOccasion, activeCategoryPath]);
   const categoryProducts = useMemo(() => {
-    const catalogProducts = products.filter((p) => p.catalogKind !== "service" && p.isAddon !== true);
+    if (tab === "packages") {
+      return products.filter((p) => p.catalogKind === "package");
+    }
+    const isServiceTab = tab === "services";
+    const catalogProducts = products.filter((p) => {
+      const isService = p.catalogKind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
+      return isServiceTab ? isService : !isService;
+    });
     if (showAllCatalog) return catalogProducts;
     const path = [activeOccasion, ...activeCategoryPath].join("/");
-    return catalogProducts.filter((p) => (p.categoryPath || []).join("/") === path || (!activeCategoryPath.length && p.occasionSlug === activeOccasion && !(p.categoryPath || []).length));
-  }, [products, activeOccasion, activeCategoryPath, showAllCatalog]);
+    return catalogProducts.filter((p) => {
+      const productPath = (p.categoryPath || []).join("/");
+      if (productPath === path) return true;
+      return !activeCategoryPath.length && p.occasionSlug === activeOccasion && !(p.categoryPath || []).length;
+    });
+  }, [products, activeOccasion, activeCategoryPath, showAllCatalog, tab]);
   const visibleProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return categoryProducts.filter((p) => {
@@ -189,9 +218,10 @@ export default function AdminCatalog() {
     });
   }, [categoryProducts, search, status, type, sort]);
 
-  function selectOccasion(slug) { setShowAllCatalog(false); setActiveOccasion(slug); setActiveCategoryPath([]); }
-  function selectCategory(path) { setShowAllCatalog(false); setActiveCategoryPath(path); }
+  function selectOccasion(slug) { setStatFilter("all"); setShowAllCatalog(false); setActiveOccasion(slug); setActiveCategoryPath([]); }
+  function selectCategory(path) { setStatFilter("all"); setShowAllCatalog(false); setActiveCategoryPath(path); }
   function selectAllCatalog() {
+    setStatFilter("all");
     setTab("products");
     setShowAllCatalog(true);
     setActiveCategoryPath([]);
@@ -200,22 +230,50 @@ export default function AdminCatalog() {
     setSearch("");
     setActiveOccasion(getOccasions().find((o) => !o.addonOnly)?.slug || "wedding");
   }
+  function selectStatFilter(filter) {
+    setStatFilter(filter);
+    setShowAllCatalog(true);
+    setActiveCategoryPath([]);
+    setStatus(filter === "active" ? "active" : "all");
+    setSearch("");
+    if (filter === "services") {
+      setTab("services");
+      setType("service");
+    } else if (filter === "packages") {
+      setTab("packages");
+      setType("package");
+    } else {
+      setTab("products");
+      setType("all");
+    }
+    setActiveOccasion(getOccasions().find((o) => !o.addonOnly)?.slug || "wedding");
+  }
   function openAdd(kind) {
     setAddMenu(false);
     const item = initialItem(kind);
     item.occasionSlug = kind === "service" ? "event-services" : activeOccasion;
     item.categoryPath = kind === "service" ? ((getAddonCategoryOptions()[0]?.path) || ["event-services"]) : [activeOccasion, ...activeCategoryPath];
+    if (kind === "package") {
+      item.packageOccasions = [activeOccasion || "wedding"];
+      item.categoryPath = [activeOccasion || "wedding"];
+    }
     setModal({ mode: "create", kind, item });
   }
   function openEdit(product) {
-    setModal({ mode: "edit", kind: product.catalogKind || (product.isAddon ? "service" : "product"), item: { ...initialItem(product.catalogKind || "product"), ...product, packageItems: product.packageItems || [] } });
+    const kind = product.catalogKind || (product.isAddon ? "service" : "product");
+    const packageOccasions = Array.isArray(product.packageOccasions) && product.packageOccasions.length
+      ? product.packageOccasions
+      : (Array.isArray(product.occasions) && product.occasions.length ? product.occasions : [product.occasionSlug || "wedding"]);
+    setModal({ mode: "edit", kind, item: { ...initialItem(kind), ...product, packageItems: product.packageItems || [], packageOccasions } });
   }
   async function saveItem(item) {
     setError("");
     if (!item.name.trim()) return setError("Name is required.");
     if (!item.price || Number(item.price) <= 0) return setError("Enter a valid price.");
-    if (!item.categoryPath?.length) return setError("Choose a catalog category.");
-    if (modal.kind === "package" && !item.packageItems?.length) return setError("Add at least one product to this package.");
+    if (modal.kind !== "package" && !item.categoryPath?.length) return setError(modal.kind === "service" ? "Choose a service category." : "Choose a catalog category.");
+    if (modal.kind === "service" && item.categoryPath[0] !== "event-services") return setError("Choose a category from Event Services.");
+    if (modal.kind === "package" && !item.packageItems?.length) return setError("Add at least one product or service to this package.");
+    if (modal.kind === "package" && (!Array.isArray(item.packageOccasions) || !item.packageOccasions.length)) return setError("Select at least one occasion for this package.");
     try {
       const primaryImg = item.image || (Array.isArray(item.images) && item.images[0]) || (Array.isArray(item.gallery) && item.gallery[0]) || DEFAULT_IMAGE;
       const gallery = Array.from(new Set([
@@ -228,8 +286,9 @@ export default function AdminCatalog() {
         slug: sanitizeSlug(item.slug || item.name),
         catalogKind: modal.kind,
         isAddon: modal.kind === "service",
-        occasionSlug: modal.kind === "service" ? "event-services" : item.categoryPath[0],
-        categoryPath: modal.kind === "service" ? item.categoryPath : item.categoryPath,
+        occasionSlug: modal.kind === "service" ? "event-services" : (modal.kind === "package" ? (item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding") : item.categoryPath[0]),
+        categoryPath: modal.kind === "service" ? item.categoryPath : (modal.kind === "package" ? [item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding"] : item.categoryPath),
+        packageOccasions: modal.kind === "package" ? item.packageOccasions : [],
         categorySlug: item.categoryPath[item.categoryPath.length - 1],
         image: primaryImg,
         images: gallery,
@@ -331,8 +390,10 @@ export default function AdminCatalog() {
   function toggleNode(key) { setExpanded((p) => ({ ...p, [key]: p[key] === false })); }
 
   function countProductsForPath(occasionSlug, categoryPath = []) {
+    const isServiceTab = tab === "services";
     return products.filter((p) => {
-      if (p.catalogKind === "service" || p.isAddon === true) return false;
+      const isService = p.catalogKind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
+      if (isService !== isServiceTab) return false;
       const path = Array.isArray(p.categoryPath) ? p.categoryPath : [];
       if (path[0] !== occasionSlug) return false;
       return categoryPath.every((slug, index) => path[index + 1] === slug);
@@ -359,6 +420,62 @@ export default function AdminCatalog() {
     });
   }
 
+  const catalogNodes = useMemo(() => {
+    const out = [];
+    const walk = (nodes, occasion, trail = []) => {
+      (nodes || []).forEach((node) => {
+        const next = [...trail, node];
+        out.push({
+          entityType: "function",
+          id: `function:${occasion.slug}:${next.map((n) => n.slug).join("/")}`,
+          name: node.label,
+          typeLabel: node.type === "theme" ? "Theme" : "Function / Category",
+          image: node.image || DEFAULT_IMAGE,
+          occasionLabel: occasion.label,
+          occasionSlug: occasion.slug,
+          trail: next,
+          status: "active",
+        });
+        walk(node.children, occasion, next);
+      });
+    };
+    occasions.filter((o) => !o.addonOnly).forEach((occasion) => {
+      out.push({
+        entityType: "occasion",
+        id: `occasion:${occasion.slug}`,
+        name: occasion.label,
+        typeLabel: "Occasion",
+        image: occasion.image || DEFAULT_IMAGE,
+        occasionLabel: occasion.label,
+        occasionSlug: occasion.slug,
+        trail: [],
+        status: "active",
+      });
+      walk(occasion.children, occasion);
+    });
+    return out;
+  }, [occasions]);
+
+  const statEntities = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const sellables = products.filter((p) => {
+      const kind = p.catalogKind || (p.isAddon ? "service" : "product");
+      if (statFilter === "services") return kind === "service";
+      if (statFilter === "packages") return kind === "package";
+      if (statFilter === "active") return p.status === "active";
+      return kind !== "service";
+    });
+    if (statFilter === "occasions" || statFilter === "functions") {
+      return catalogNodes.filter((x) => statFilter === "occasions" ? x.entityType === "occasion" : x.entityType === "function")
+        .filter((x) => !q || `${x.name} ${x.occasionLabel} ${x.typeLabel}`.toLowerCase().includes(q));
+    }
+    const structural = statFilter === "active" ? catalogNodes : [];
+    const normalized = sellables
+      .filter((p) => !q || [p.name, p.slug, p.sku, p.serviceCategory].some((v) => String(v || "").toLowerCase().includes(q)))
+      .map((p) => ({ entityType: "item", product: p, id: p.id || p.slug }));
+    return [...structural, ...normalized];
+  }, [products, catalogNodes, statFilter, search]);
+
   const stats = {
     total: products.filter((p) => p.catalogKind !== "service" && p.isAddon !== true).length,
     occasions: occasions.filter((o) => !o.addonOnly).length,
@@ -381,26 +498,39 @@ export default function AdminCatalog() {
     {error && !modal && !categoryModal && <div className="admin-alert admin-alert--error">{error}</div>}
 
     <div className="catalog-ref-tabs catalog-ref-tabs--simple">
-      {[["products","Products & Packages","package"],["services","Services","settings"],["categories","Categories & Occasions","grid"]].map(([key,label,icon]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => {
+      {[["products","Products & Packages","package"],["services","Services","settings"],["packages","Packages","layers"]].map(([key,label,icon]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => {
         setTab(key);
+        setSearchParams({ tab: key });
         setShowAllCatalog(false);
         setSearch("");
         setActiveCategoryPath([]);
-        setType(key === "products" ? "all" : key === "services" ? "service" : "all");
+        setType(key === "products" ? "all" : key === "services" ? "service" : "package");
         setActiveOccasion(key === "services" ? "event-services" : (getOccasions().find((o) => !o.addonOnly)?.slug || "wedding"));
       }}><Icon name={icon} />{label}</button>)}
     </div>
 
     <div className="catalog-stat-grid">
-      <div className={`catalog-stat-card-clickable ${showAllCatalog ? "active" : ""}`} role="button" tabIndex={0} onClick={selectAllCatalog} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectAllCatalog(); } }} title="Show all products and packages"><span className="catalog-stat-icon"><Icon name="package" /></span><strong>{stats.total}</strong><small>Total Items</small><em>Packages + Products</em></div>
-      <div><span className="catalog-stat-icon"><Icon name="calendar" /></span><strong>{stats.occasions}</strong><small>Occasions</small><em>Wedding, Birthday, Corporate…</em></div>
-      <div><span className="catalog-stat-icon"><Icon name="layers" /></span><strong>{stats.categories}</strong><small>Functions / Themes</small><em>Nested catalog nodes</em></div>
-      <div><span className="catalog-stat-icon"><Icon name="settings" /></span><strong>{stats.services}</strong><small>Services</small><em>Service products</em></div>
-      <div><span className="catalog-stat-icon"><Icon name="layers" /></span><strong>{stats.packages}</strong><small>Packages</small><em>Pre-defined bundles</em></div>
-      <div><span className="catalog-stat-ring">{stats.total ? Math.round((stats.active / Math.max(stats.total + stats.services, 1)) * 100) : 0}%</span><strong>{stats.active}</strong><small>Active Items</small><em>Visible on website</em></div>
+      <div className={`catalog-stat-card-clickable ${statFilter === "all" ? "active" : ""}`} role="button" tabIndex={0} onClick={selectAllCatalog} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectAllCatalog(); } }} title="Show all products and packages"><span className="catalog-stat-icon"><Icon name="package" /></span><strong>{stats.total}</strong><small>Total Items</small><em>Packages + Products</em></div>
+      <div className={statFilter === "occasions" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("occasions")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("occasions"); } }} title="Show all occasions"><span className="catalog-stat-icon"><Icon name="calendar" /></span><strong>{stats.occasions}</strong><small>Occasions</small><em>Wedding, Birthday, Corporate…</em></div>
+      <div className={statFilter === "functions" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("functions")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("functions"); } }} title="Show all functions and themes"><span className="catalog-stat-icon"><Icon name="layers" /></span><strong>{stats.categories}</strong><small>Functions / Themes</small><em>Nested catalog nodes</em></div>
+      <div className={statFilter === "services" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("services")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("services"); } }} title="Show all services"><span className="catalog-stat-icon"><Icon name="settings" /></span><strong>{stats.services}</strong><small>Services</small><em>Service products</em></div>
+      <div className={statFilter === "packages" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("packages")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("packages"); } }} title="Show all packages"><span className="catalog-stat-icon"><Icon name="layers" /></span><strong>{stats.packages}</strong><small>Packages</small><em>Pre-defined bundles</em></div>
+      <div className={statFilter === "active" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("active")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("active"); } }} title="Show all active catalog entries"><span className="catalog-stat-ring">{stats.total ? Math.round((stats.active / Math.max(stats.total + stats.services, 1)) * 100) : 0}%</span><strong>{stats.active}</strong><small>Active Items</small><em>Visible on website</em></div>
     </div>
 
-    {(tab === "products" || tab === "services" || tab === "categories") ? <div className="catalog-workspace">
+    {(statFilter === "occasions" || statFilter === "functions" || statFilter === "active") ? <div className="catalog-workspace">
+      <section className="catalog-items-panel" style={{ gridColumn: "1 / -1" }}>
+        <div className="catalog-items-head"><div><div className="catalog-path">Catalog Overview</div><h2>{statFilter === "occasions" ? "All Occasions" : statFilter === "functions" ? "All Functions & Themes" : "All Active Catalog Items"}</h2><p>{`Showing ${statEntities.length} ${statFilter === "occasions" ? "occasions" : statFilter === "functions" ? "functions / themes" : "active catalog entries"}`}</p></div></div>
+        <div className="catalog-toolbar"><div className="catalog-search"><Icon name="search" /><input placeholder={`Search ${statFilter === "occasions" ? "occasions" : statFilter === "functions" ? "functions and themes" : "active items"}…`} value={search} onChange={(e) => setSearch(e.target.value)} /></div><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Sort By: Latest</option><option value="name">Name</option><option value="price">Price</option></select><button className={view === "list" ? "view-active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
+        <div className="catalog-product-table"><table><thead><tr><th></th><th>Image</th><th>Name</th><th>Type</th><th>Context / Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{statEntities.map((entry) => {
+          if (entry.entityType === "item") {
+            const p = entry.product;
+            return <ProductRow key={entry.id} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />;
+          }
+          return <tr key={entry.id}><td><input type="checkbox" /></td><td><img className="catalog-thumb" src={entry.image || DEFAULT_IMAGE} alt="" /></td><td><strong>{entry.name}</strong></td><td>{entry.typeLabel}</td><td>{entry.occasionLabel}</td><td><span className="catalog-status active">Active</span></td><td><div className="catalog-actions">{entry.entityType === "occasion" ? <><button type="button" onClick={() => openOccasionEditor(occasions.find((o) => o.slug === entry.occasionSlug))} title="Edit"><Icon name="edit" /></button><button type="button" onClick={() => removeOccasion(occasions.find((o) => o.slug === entry.occasionSlug))} title="Delete"><Icon name="trash" /></button></> : <><button type="button" onClick={() => openCategoryEditor(entry.occasionSlug, entry.trail, "edit")} title="Edit"><Icon name="edit" /></button><button type="button" onClick={() => removeCategory(entry.occasionSlug, entry.trail)} title="Delete"><Icon name="trash" /></button></>}</div></td></tr>;
+        })}</tbody></table>{!statEntities.length && <div className="catalog-empty">No matching items found.</div>}</div>
+      </section>
+    </div> : (tab === "products" || tab === "services") ? <div className="catalog-workspace">
       <aside className="catalog-category-panel">
         <div className="catalog-panel-title"><div><h2>{tab === "services" ? "Service Categories" : "Catalog Categories"}</h2><p>{tab === "services" ? "Choose where each service belongs" : "Occasion → function → category"}</p></div><button className="btn btn-primary btn-sm" onClick={() => openCategoryEditor(activeOccasion, [])}><Icon name="plus" /> Add</button></div>
         <div className="catalog-occasion-list">
@@ -417,11 +547,17 @@ export default function AdminCatalog() {
         </div>
       </aside>
       <section className="catalog-items-panel">
-        <div className="catalog-items-head"><div><div className="catalog-path">{showAllCatalog ? "All Categories" : <>{currentOccasion?.label}{activeCategoryPath.map((slug) => <span key={slug}> › {flattenTree(currentOccasion?.children || []).find((x) => x.node.slug === slug)?.node.label || slug}</span>)}</>}</div><h2>{showAllCatalog ? "All Products & Packages" : tab === "services" ? `Services in ${activeCategory?.label || "Event Services"}` : tab === "categories" ? `Items in ${activeCategory?.label || currentOccasion?.label}` : `Products & Packages in ${activeCategory?.label || currentOccasion?.label}`}</h2><p>{tab === "categories" ? "Select a category to see and manage its items." : `Showing ${visibleProducts.length} items`}</p></div><div className="catalog-item-actions">{tab !== "services" && <><button className={type === "package" ? "active" : ""} onClick={() => setType("package")}>Packages</button><button className={type === "product" ? "active" : ""} onClick={() => setType("product")}>Products</button></>}<button className={type === "all" || (tab === "services" && type === "service") ? "active" : ""} onClick={() => setType(tab === "services" ? "service" : "all")}>{tab === "services" ? "All Services" : "All Items"}</button><div className="catalog-inline-add-wrap"><button type="button" className="btn btn-primary" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> Add Item <span>⌄</span></button>{addMenu && <div className="catalog-add-menu catalog-add-menu--inline"><button type="button" onClick={() => openAdd("product")}><Icon name="package" /><span><strong>Product / Element</strong><small>Individual catalog item</small></span></button><button type="button" onClick={() => openAdd("package")}><Icon name="layers" /><span><strong>Package</strong><small>Bundle products and services</small></span></button><button type="button" onClick={() => openAdd("service")}><Icon name="settings" /><span><strong>Service</strong><small>Photography, catering, artists, etc.</small></span></button></div>}</div></div></div>
+        <div className="catalog-items-head"><div><div className="catalog-path">{showAllCatalog ? "All Categories" : <>{currentOccasion?.label}{activeCategoryPath.map((slug) => <span key={slug}> › {flattenTree(currentOccasion?.children || []).find((x) => x.node.slug === slug)?.node.label || slug}</span>)}</>}</div><h2>{showAllCatalog ? "All Products & Packages" : tab === "services" ? `Services in ${activeCategory?.label || "Event Services"}` : `Products & Packages in ${activeCategory?.label || currentOccasion?.label}`}</h2><p>{`Showing ${visibleProducts.length} items`}</p></div><div className="catalog-item-actions">{tab !== "services" && <><button className={type === "package" ? "active" : ""} onClick={() => setType("package")}>Packages</button><button className={type === "product" ? "active" : ""} onClick={() => setType("product")}>Products</button></>}<button className={type === "all" || (tab === "services" && type === "service") ? "active" : ""} onClick={() => setType(tab === "services" ? "service" : "all")}>{tab === "services" ? "All Services" : "All Items"}</button><div className="catalog-inline-add-wrap"><button type="button" className="btn btn-primary" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> Add Item <span>⌄</span></button>{addMenu && <div className="catalog-add-menu catalog-add-menu--inline"><button type="button" onClick={() => openAdd("product")}><Icon name="package" /><span><strong>Product / Element</strong><small>Individual catalog item</small></span></button><button type="button" onClick={() => openAdd("package")}><Icon name="layers" /><span><strong>Package</strong><small>Bundle products and services</small></span></button><button type="button" onClick={() => openAdd("service")}><Icon name="settings" /><span><strong>Service</strong><small>Photography, catering, artists, etc.</small></span></button></div>}</div></div></div>
         <div className="catalog-toolbar"><div className="catalog-search"><Icon name="search" /><input placeholder="Search items…" value={search} onChange={(e) => setSearch(e.target.value)} /></div><select value={type} onChange={(e) => setType(e.target.value)}><option value="all">Type: All</option><option value="product">Product</option><option value="package">Package</option><option value="service">Service</option></select><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">Status: All</option><option value="active">Status: Active</option><option value="draft">Status: Draft</option><option value="archived">Status: Archived</option></select><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Sort By: Latest</option><option value="name">Name</option><option value="price">Price</option></select><button className={view === "grid" ? "view-active" : ""} onClick={() => setView("grid")}><Icon name="grid" /></button><button className={view === "list" ? "view-active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
         {view === "grid" ? <div className="catalog-product-grid">{visibleProducts.map((p) => <ProductCard key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</div> : <div className="catalog-product-table"><table><thead><tr><th></th><th>Image</th><th>Name</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleProducts.map((p) => <ProductRow key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</tbody></table>{!visibleProducts.length && <div className="catalog-empty">No items here yet. Use <strong>Add New</strong> to create the first one.</div>}</div>}
       </section>
-    </div> : <div className="catalog-simple-section"><h2>{tab === "packages" ? "Packages" : tab === "products" ? "Products / Elements" : tab === "service-categories" ? "Service Categories" : "Functions / Themes"}</h2><p>Use the category tree on the Catalog overview to organize this section. Add, edit, duplicate and delete records without leaving Catalog.</p><button className="btn btn-primary" onClick={() => openAdd(tab === "packages" ? "package" : tab === "service-categories" ? "service" : "product")}><Icon name="plus" /> Add New {tab === "packages" ? "Package" : tab === "service-categories" ? "Service" : "Item"}</button></div>}
+    </div> : tab === "packages" ? <div className="catalog-workspace">
+      <section className="catalog-items-panel" style={{ gridColumn: "1 / -1" }}>
+        <div className="catalog-items-head"><div><div className="catalog-path">Packages</div><h2>Event Packages</h2><p>Create packages by combining products and services from your live catalog.</p></div><div className="catalog-item-actions"><button type="button" className="btn btn-primary" onClick={() => openAdd("package")}><Icon name="plus" /> Add Package</button></div></div>
+        <div className="catalog-toolbar"><div className="catalog-search"><Icon name="search" /><input placeholder="Search packages…" value={search} onChange={(e) => setSearch(e.target.value)} /></div><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">Status: All</option><option value="active">Status: Active</option><option value="draft">Status: Draft</option><option value="archived">Status: Archived</option></select><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Sort By: Latest</option><option value="name">Name</option><option value="price">Price</option></select><button className={view === "grid" ? "view-active" : ""} onClick={() => setView("grid")}><Icon name="grid" /></button><button className={view === "list" ? "view-active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
+        {view === "grid" ? <div className="catalog-product-grid">{visibleProducts.filter((p) => { const q = search.trim().toLowerCase(); return (!q || String(p.name || "").toLowerCase().includes(q)) && (status === "all" || p.status === status); }).map((p) => <ProductCard key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</div> : <div className="catalog-product-table"><table><thead><tr><th></th><th>Image</th><th>Name</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleProducts.filter((p) => { const q = search.trim().toLowerCase(); return (!q || String(p.name || "").toLowerCase().includes(q)) && (status === "all" || p.status === status); }).map((p) => <ProductRow key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</tbody></table>{!visibleProducts.filter((p) => { const q = search.trim().toLowerCase(); return (!q || String(p.name || "").toLowerCase().includes(q)) && (status === "all" || p.status === status); }).length && <div className="catalog-empty">No packages yet. Use <strong>Add Package</strong> to create the first one.</div>}</div>}
+      </section>
+    </div> : <div className="catalog-simple-section"><h2>Products / Elements</h2><p>Use the Products &amp; Packages tab to manage your product catalog.</p><button className="btn btn-primary" onClick={() => openAdd("product")}><Icon name="plus" /> Add New Product</button></div>}
 
     {modal && <ItemModal modal={modal} setModal={setModal} occasions={occasions} categoryOptions={[...allCategoryOptions, ...getAddonCategoryOptions()]} onSave={saveItem} error={error} setError={setError} />}
     {categoryModal && <CategoryModal data={categoryModal} setData={setCategoryModal} onSave={saveCategoryForm} error={error} setError={setError} />}
@@ -441,21 +577,32 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
   const set = (key, value) => setItem((p) => ({ ...p, [key]: value }));
   const isPackage = modal.kind === "package";
   const isService = modal.kind === "service";
-  const options = isService ? categoryOptions.filter((x) => x.occasionSlug === "event-services" || String(x.value || "").startsWith("event-services/")) : categoryOptions;
+  // Service categories come only from the persisted Event Services branch.
+  // Add-on options use `path` rather than the normal occasion option shape.
+  // Normalize both shapes here so every saved service category is selectable.
+  const options = isService
+    ? categoryOptions.filter((x) => (
+        x.occasionSlug === "event-services"
+        || String(x.value || "").startsWith("event-services/")
+        || (Array.isArray(x.path) && x.path[0] === "event-services")
+      ))
+    : categoryOptions;
   function chooseImage(url) { set("image", url); }
   function addPackageItem(product) { if (!item.packageItems.some((x) => (x.productId || x.id) === product.id)) set("packageItems", [...item.packageItems, { productId: product.id, id: product.id, name: product.name, qty: 1, price: product.price, image: product.image || "" }]); }
   function updatePackageItem(id, key, value) { set("packageItems", item.packageItems.map((x) => x.id === id ? { ...x, [key]: key === "qty" ? Math.max(1, Number(value) || 1) : value } : x)); }
   function removePackageItem(id) { set("packageItems", item.packageItems.filter((x) => x.id !== id)); }
+  const packageItemsTotal = item.packageItems.reduce((sum, x) => sum + (Number(x.price) || 0) * (Number(x.qty) || 1), 0);
   return <div className="catalog-modal-backdrop" onMouseDown={() => setModal(null)}><div className="catalog-modal catalog-item-modal" onMouseDown={(e) => e.stopPropagation()}>
-    <div className="catalog-modal-head"><div><h2>Add New Item</h2><p>Create a new {KIND_LABELS[modal.kind].toLowerCase()} for your catalog</p></div><button onClick={() => setModal(null)}><Icon name="close" /></button></div>
+    <div className="catalog-modal-head"><div><h2>{modal.mode === "edit" ? `Edit ${KIND_LABELS[modal.kind]}` : `Add New ${KIND_LABELS[modal.kind]}`}</h2><p>{modal.mode === "edit" ? "Update this catalog item and its placement." : `Create a new ${KIND_LABELS[modal.kind].toLowerCase()} for your catalog.`}</p></div><button onClick={() => setModal(null)}><Icon name="close" /></button></div>
     <div className="catalog-kind-cards">{["product","package","service"].map((k) => <button type="button" key={k} className={modal.kind === k ? "selected" : ""} onClick={() => setModal({ ...modal, kind: k, item: { ...initialItem(k), ...item, catalogKind: k } })}><Icon name={k === "service" ? "settings" : k === "package" ? "layers" : "package"} /><span><strong>{KIND_LABELS[k]}{k === "product" ? " / Element" : ""}</strong><small>{k === "product" ? "Individual item like stage, sofa, backdrop, light" : k === "package" ? "Pre-defined package of multiple items" : "Non-tangible service such as photography or catering"}</small></span>{modal.kind === k && <b>✓</b>}</button>)}</div>
     {error && <div className="admin-alert admin-alert--error">{error}</div>}
     <form onSubmit={(e) => { e.preventDefault(); onSave(item); }}>
       <div className="catalog-form-tabs"><span className="active">Basic Details</span><span>{isPackage ? "Package Contents" : isService ? "Service Details" : "Pricing & Inventory"}</span><span>Media</span><span>SEO & Display</span><span>Additional Info</span></div>
       <section className="catalog-form-section"><h3>1. Basic Information</h3><div className="catalog-form-grid two"><Field label={`${KIND_LABELS[modal.kind]} Name`} required><input value={item.name} onChange={(e) => { const name = e.target.value; setItem((p) => ({ ...p, name, slug: !p.slug ? sanitizeSlug(name) : p.slug })); }} placeholder="e.g. Floral Stage Setup" /></Field><Field label="SKU"><input value={item.sku || ""} onChange={(e) => set("sku", e.target.value)} placeholder="e.g. NLE-DEC-001" /></Field></div><Field label="Short Description" required><textarea rows="2" maxLength={200} value={item.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="A short catchy description shown in list view" /></Field><Field label="Full Description"><textarea rows="4" value={item.description} onChange={(e) => set("description", e.target.value)} placeholder="Write detailed description, dimensions, materials, inclusions, deliverables, etc." /></Field></section>
-      <section className="catalog-form-section"><h3>2. Occasion, Function & Service Category</h3><div className="catalog-form-grid three"><Field label="Occasions" required><select value={item.occasionSlug || "wedding"} onChange={(e) => set("occasionSlug", e.target.value)}>{(isService ? occasions : occasions.filter((o) => !o.addonOnly)).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field><Field label="Category / Theme" required><select value={(item.categoryPath || []).join("/")} onChange={(e) => set("categoryPath", e.target.value.split("/").filter(Boolean))}><option value="">Select category</option>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Field><Field label="Service Category"><input value={item.serviceCategory || ""} onChange={(e) => set("serviceCategory", e.target.value)} placeholder="e.g. Decor" /></Field></div></section>
-      {isPackage && <section className="catalog-form-section"><h3>3. Package Contents</h3><div className="catalog-package-picker"><input placeholder="Search products to add…" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />{packageSearch && <div>{products.filter((p) => p.catalogKind !== "package" && p.status === "active" && p.name.toLowerCase().includes(packageSearch.toLowerCase())).slice(0, 8).map((p) => <button type="button" key={p.id} onClick={() => addPackageItem(p)}><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><span>{p.name}</span><strong>{fmtINR(p.price)}</strong></button>)}</div>}</div><div className="catalog-package-table">{item.packageItems.length ? item.packageItems.map((x) => <div key={x.id}><span>{x.name}</span><input type="number" min="1" value={x.qty} onChange={(e) => updatePackageItem(x.id, "qty", e.target.value)} /><span>{fmtINR(Number(x.price) * Number(x.qty))}</span><button type="button" onClick={() => removePackageItem(x.id)}>×</button></div>) : <p>No items added yet.</p>}</div></section>}
-      {isService && <section className="catalog-form-section"><h3>3. Service Details</h3><div className="catalog-form-grid three"><Field label="Service Type"><input value={item.serviceType} onChange={(e) => set("serviceType", e.target.value)} placeholder="Photography, Videography, Both" /></Field><Field label="Coverage Duration"><input value={item.coverageDuration} onChange={(e) => set("coverageDuration", e.target.value)} placeholder="e.g. 8 Hours / Full Day" /></Field><Field label="Team Size"><input value={item.teamSize} onChange={(e) => set("teamSize", e.target.value)} placeholder="e.g. 2 Photographers" /></Field></div><div className="catalog-form-grid two"><Field label="Deliverables"><textarea rows="3" value={item.deliverables} onChange={(e) => set("deliverables", e.target.value)} /></Field><Field label="Process / Workflow"><textarea rows="3" value={item.workflow} onChange={(e) => set("workflow", e.target.value)} /></Field></div></section>}
+      {!isPackage && <section className="catalog-form-section"><h3>2. {isService ? "Service Placement" : "Occasion, Function & Category"}</h3><div className={`catalog-form-grid ${isService ? "two" : "three"}`}>{!isService && <Field label="Occasions" required><select value={item.occasionSlug || "wedding"} onChange={(e) => set("occasionSlug", e.target.value)}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field>}<Field label={isService ? "Service Category" : "Category / Theme"} required><select value={(item.categoryPath || []).join("/")} onChange={(e) => { const path = e.target.value.split("/").filter(Boolean); const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === e.target.value); setItem((p) => ({ ...p, categoryPath: path, occasionSlug: isService ? "event-services" : (path[0] || p.occasionSlug), serviceCategory: isService ? (selected?.label || "") : p.serviceCategory })); }}><option value="">Select {isService ? "service category" : "category"}</option>{options.map((o) => { const value = o.value || (Array.isArray(o.path) ? o.path.join("/") : ""); return <option key={value} value={value}>{o.label}</option>; })}</select>{isService && <small className="catalog-field-help">This determines exactly where the service product appears on the Services catalog page.</small>}</Field>{!isService && <Field label="Service Category"><input value={item.serviceCategory || ""} onChange={(e) => set("serviceCategory", e.target.value)} placeholder="e.g. Decor" /></Field>}</div></section>}
+      {isPackage && <section className="catalog-form-section"><h3>2. Package Occasions</h3><Field label="Show this package for occasions"><div className="catalog-occasion-checks" role="group" aria-label="Package occasions">{occasions.filter((o) => !o.addonOnly).map((occasion) => { const selected = Array.isArray(item.packageOccasions) && item.packageOccasions.includes(occasion.slug); return <label className={`catalog-occasion-check ${selected ? "selected" : ""}`} key={occasion.slug}><input type="checkbox" checked={selected} onChange={(e) => { const current = Array.isArray(item.packageOccasions) ? item.packageOccasions : []; const next = e.target.checked ? Array.from(new Set([...current, occasion.slug])) : current.filter((slug) => slug !== occasion.slug); set("packageOccasions", next); }} /><span className="catalog-check-box" aria-hidden="true">{selected ? "✓" : ""}</span><span>{occasion.label}</span></label>; })}</div><small className="catalog-field-help">Select every occasion where this package should be available.</small></Field></section>}
+      {isPackage && <section className="catalog-form-section"><h3>3. Package Contents</h3><div className="catalog-package-picker"><input placeholder="Search products or services to add…" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />{packageSearch && <div>{products.filter((p) => p.catalogKind !== "package" && p.status === "active" && p.name.toLowerCase().includes(packageSearch.toLowerCase())).slice(0, 8).map((p) => { const isAdded = item.packageItems.some((x) => (x.productId || x.id) === p.id); return <button type="button" key={p.id} className={isAdded ? "added" : ""} onClick={() => addPackageItem(p)} disabled={isAdded}><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><span>{p.name}<small style={{ display: "block", opacity: 0.65 }}>{p.catalogKind === "service" || p.isAddon ? "Service" : "Product"}</small></span>{isAdded ? <strong className="catalog-package-added-label">Added</strong> : <strong>{fmtINR(p.price)}</strong>}</button>; })}</div>}</div><div className="catalog-package-table">{item.packageItems.length ? item.packageItems.map((x) => <div key={x.id}><span>{x.name}</span><input type="number" min="1" value={x.qty} onChange={(e) => updatePackageItem(x.id, "qty", e.target.value)} /><span>{fmtINR(Number(x.price) * Number(x.qty))}</span><button type="button" onClick={() => removePackageItem(x.id)}>×</button></div>) : <p>No items added yet.</p>}</div><div className="catalog-package-total"><span>Items Total</span><strong>{fmtINR(packageItemsTotal)}</strong></div></section>}
+      {isService && <section className="catalog-form-section"><h3>3. Service Details</h3><div className="catalog-form-grid three"><Field label="Service Type"><input value={item.serviceType} onChange={(e) => set("serviceType", e.target.value)} placeholder="Photography, Videography, Both" /></Field><Field label="Coverage Duration"><input value={item.coverageDuration} onChange={(e) => set("coverageDuration", e.target.value)} placeholder="e.g. 8 Hours / Full Day" /></Field><Field label="Team Size"><input value={item.teamSize} onChange={(e) => set("teamSize", e.target.value)} placeholder="e.g. 2 Photographers" /></Field></div><div className="catalog-form-grid two"><Field label="Deliverables"><textarea rows="3" value={item.deliverables} onChange={(e) => set("deliverables", e.target.value)} /></Field><Field label="Process / Workflow"><textarea rows="3" value={item.workflow} onChange={(e) => set("workflow", e.target.value)} /></Field></div><Field label="Show this service for occasions"><div className="catalog-occasion-checks" role="group" aria-label="Show this service for occasions">{occasions.filter((o) => !o.addonOnly).map((occasion) => { const selected = Array.isArray(item.serviceScopes) && item.serviceScopes.includes(occasion.slug); return <label className={`catalog-occasion-check ${selected ? "selected" : ""}`} key={occasion.slug}><input type="checkbox" checked={selected} onChange={(e) => { const current = Array.isArray(item.serviceScopes) ? item.serviceScopes : []; const next = e.target.checked ? Array.from(new Set([...current, occasion.slug])) : current.filter((slug) => slug !== occasion.slug); set("serviceScopes", next); }} /><span className="catalog-check-box" aria-hidden="true">{selected ? "✓" : ""}</span><span>{occasion.label}</span></label>; })}</div><small className="catalog-field-help">Select one or more occasions. For example, DSLR Photography can be shown for Wedding, Birthday, and Anniversary.</small></Field></section>}
       <section className="catalog-form-section"><h3>{isPackage || isService ? "4" : "3"}. Pricing & Media</h3><div className="catalog-form-grid four"><Field label="Price Type" required><select value={item.priceType} onChange={(e) => set("priceType", e.target.value)}><option value="starting">Starting From</option><option value="fixed">Fixed Price</option></select></Field><Field label="Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field><Field label="Unit"><select value={item.unit} onChange={(e) => set("unit", e.target.value)}><option>Per Event</option><option>Per Piece</option><option>Per Day</option><option>Per Hour</option></select></Field><Field label="Discount Price"><input type="number" value={item.discountPrice} onChange={(e) => set("discountPrice", e.target.value)} placeholder="e.g. 20000" /></Field></div><ImagePicker value={item.image} onChange={chooseImage} /></section>
       <section className="catalog-form-section"><h3>Status</h3><label className="catalog-switch"><input type="checkbox" checked={item.status === "active"} onChange={(e) => set("status", e.target.checked ? "active" : "draft")} /><span></span><strong>{item.status === "active" ? "Active" : "Draft"}</strong></label></section>
       <div className="catalog-modal-footer"><button type="button" className="btn btn-outline" onClick={() => setModal(null)}>Cancel</button><button className="btn btn-primary"><Icon name="plus" /> {modal.mode === "edit" ? `Save ${KIND_LABELS[modal.kind]}` : `Add ${KIND_LABELS[modal.kind]}`}</button></div>

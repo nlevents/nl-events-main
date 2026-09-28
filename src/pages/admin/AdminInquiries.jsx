@@ -354,7 +354,7 @@ export default function AdminInquiries() {
         : "";
       const resolvedSource = leadSourceCustom ? customLeadSource.trim() : String(leadForm.source || "").trim();
       if (!resolvedSource) throw new Error("Please enter a custom lead source.");
-      const payload = { ...leadForm, source: resolvedSource, status: leadStatus, nextFollowUp };
+      const payload = { ...leadForm, source: resolvedSource, leadSource: leadSourceCustom ? resolvedSource : leadForm.leadSource, status: leadStatus, nextFollowUp };
       if (editingLead) await updateAdminInquiry(editingLead.id, payload);
       else await createAdminInquiry(payload);
       await refresh(); setShowAddLead(false); setEditingLead(null); setLeadForm(EMPTY_LEAD); setLeadSourceCustom(false); setCustomLeadSource(""); showFeedback(editingLead ? "Lead updated." : "Lead added.");

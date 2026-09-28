@@ -61,7 +61,7 @@ const NAV_GROUPS = [
       { to: "/admin/birthday-age-categories", label: "Birthday Age Cards", icon: "star" },
       { to: "/admin/media", label: "Media & Pictures", icon: "image" },
       { to: "/admin/video-content", label: "YouTube Shorts & Reviews", icon: "sparkle" },
-      { to: "/admin/services", label: "Event Services", icon: "tag" },
+      { to: "/admin/products?tab=services", label: "Event Services", icon: "tag" },
     ],
   },
   {
@@ -71,7 +71,6 @@ const NAV_GROUPS = [
       { to: "/admin/availability", label: "Calendar & Blackout", icon: "calendar" },
       { to: "/admin/coupons", label: "Coupons & Promos", icon: "percent" },
       { to: "/admin/clients", label: "Clients", icon: "user" },
-      { to: "/admin/coupons", label: "Coupons & Promos", icon: "percent" },
     ],
   },
   {

@@ -52,7 +52,7 @@ export default function ProductCard({ product, href, variant = "default" }) {
           <>
             {product.rating ? (
               <div className="occ-prod-rating">
-                <span className="occ-prod-rating-badge">{product.rating.toFixed(1)} <Icon name="star" /></span>
+                <span className="occ-prod-rating-badge">{Number(product.rating).toFixed(1)} <Icon name="star" /></span>
                 {product.reviewCount ? <span className="occ-prod-reviews">{product.reviewCount} reviews</span> : null}
               </div>
             ) : null}
@@ -69,7 +69,7 @@ export default function ProductCard({ product, href, variant = "default" }) {
 
             {product.rating ? (
               <div className="occ-prod-rating">
-                <span className="occ-prod-rating-badge">{product.rating.toFixed(1)} <Icon name="star" /></span>
+                <span className="occ-prod-rating-badge">{Number(product.rating).toFixed(1)} <Icon name="star" /></span>
                 {product.reviewCount ? <span className="occ-prod-reviews">{product.reviewCount} reviews</span> : null}
               </div>
             ) : null}

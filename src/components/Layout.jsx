@@ -5,6 +5,7 @@ import Footer from "./Footer";
 import BottomNav from "./BottomNav";
 import Chatbot from "./Chatbot";
 import ErrorBoundary from "./ErrorBoundary";
+import { resolvePath } from "../data/occasions";
 
 // Shown only if a page itself throws. Header, footer and bottom navigation stay
 // mounted, and the error clears automatically as soon as the route changes.
@@ -41,15 +42,17 @@ export default function Layout() {
   // no global header or mobile bottom navigation. The booking controls remain
   // the primary navigation/action on these pages.
   const pathParts = location.pathname.split("/").filter(Boolean);
+  const occasionPath = pathParts[0] === "occasion" ? pathParts.slice(1) : [];
+  const resolvedOccasion = occasionPath.length ? resolvePath(occasionPath) : null;
   const isProductDetail =
     location.pathname === "/package-details" ||
-    (pathParts[0] === "occasion" && pathParts.length >= 3);
+    resolvedOccasion?.node?.type === "product";
 
   return (
     <>
       {!isProductDetail && <Header />}
       <main className={isProductDetail ? "product-detail-shell" : undefined}>
-        <ErrorBoundary resetKey={location.pathname} fallback={pageFallback}>
+        <ErrorBoundary resetKey={location.pathname} fallback={pageFallback} autoRetry={2}>
           <Outlet />
         </ErrorBoundary>
       </main>

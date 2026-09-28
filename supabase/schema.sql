@@ -177,7 +177,7 @@ update public.inquiries set lead_source = case
 end where lead_source is null or lead_source = '';
 update public.inquiries set source_type = 'AUTO' where source_type is null or source_type = '';
 alter table public.inquiries drop constraint if exists inquiries_lead_source_check;
-alter table public.inquiries add constraint inquiries_lead_source_check check (lead_source in ('Website','Meta Ads','Google Ads','Organic Social','Google Organic','WhatsApp','Referral','Venue','Vendor','Direct','Repeat Client','Other'));
+-- lead_source intentionally accepts arbitrary custom source text.
 alter table public.inquiries drop constraint if exists inquiries_source_type_check;
 alter table public.inquiries add constraint inquiries_source_type_check check (source_type in ('AUTO','MANUAL'));
 create index if not exists inquiries_lead_source_idx on public.inquiries(lead_source);

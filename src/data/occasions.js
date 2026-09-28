@@ -664,15 +664,30 @@ replaceChildren("festivals-culture", [
 ]);
 
 replaceChildren("event-services", [
-  makeRefNode("category", "sfx", "SFX", IMAGES.showcase7, "Special effects: cold pyro, fog and fireworks.", [
-    makeRefNode("category", "cold-pyro", "Cold Pyro", IMAGES.showcase7, "Cold spark effects for entries and stages."),
-    makeRefNode("category", "fog", "Fog", IMAGES.showcase7, "Fog and atmospheric effects."),
-    makeRefNode("category", "fireworks", "Fireworks", IMAGES.showcase7, "Fireworks and celebration effects."),
+  makeRefNode("category", "decor", "Décor", IMAGES.galDecor1, "Decoration packages, backdrops, stages and styling."),
+  makeRefNode("category", "entry", "Entry", IMAGES.showcase4, "Grand and unique event entries."),
+  makeRefNode("category", "entertainment", "Entertainment", IMAGES.galConcert2, "Artists, DJs, live bands and guest entertainment.", [
+    makeRefNode("category", "artists", "Artists", IMAGES.galConcert2, "Anchors, dancers and live performers."),
+    makeRefNode("category", "dj-live-bands", "DJ & Live Bands", IMAGES.galConcert3, "DJ, live band and music entertainment."),
+    makeRefNode("category", "wedding-activity", "Wedding Activity", IMAGES.showcase3, "Games and guest activities."),
   ]),
-  makeRefNode("category", "artists", "Artists", IMAGES.galConcert2, "Anchors, dancers and live performers."),
-  makeRefNode("category", "photography", "Photography", IMAGES.typePhotography, "Photography and video coverage."),
-  makeRefNode("category", "wedding-activity", "Wedding Activity", IMAGES.showcase3, "Games and guest activities for weddings."),
-  makeRefNode("category", "baraat-procession", "Baraat Procession", IMAGES.themeStageLights, "Dhol, band and baraat entry services."),
+  makeRefNode("category", "sound-technical", "Sound & Technical", IMAGES.themeStageLights, "Lighting, AV, sound and special effects.", [
+    makeRefNode("category", "sound", "Sound", IMAGES.themeStageLights, "Professional sound systems and operators."),
+    makeRefNode("category", "lighting", "Lighting", IMAGES.themeStageLights, "Decorative, stage and event lighting."),
+    makeRefNode("category", "av-technical", "AV & Technical", IMAGES.showcase1, "Screens, projectors, trussing and technical production."),
+    makeRefNode("category", "sfx", "SFX", IMAGES.showcase7, "Special effects including cold pyro, fog and fireworks.", [
+      makeRefNode("category", "cold-pyro", "Cold Pyro", IMAGES.showcase7),
+      makeRefNode("category", "fog", "Fog", IMAGES.showcase7),
+      makeRefNode("category", "fireworks", "Fireworks", IMAGES.showcase7),
+    ]),
+  ]),
+  makeRefNode("category", "tent-furniture", "Tent & Furniture", IMAGES.showcase6, "Tents, seating, tables and event furniture."),
+  makeRefNode("category", "photography-videography", "Photography & Videography", IMAGES.typePhotography, "Photography and video coverage.", [
+    makeRefNode("category", "photography", "Photography", IMAGES.typePhotography, "Professional event photography."),
+    makeRefNode("category", "videography", "Videography", IMAGES.typePhotography, "Professional event videography."),
+  ]),
+  makeRefNode("category", "catering", "Catering", IMAGES.showcase5, "Food and beverage experiences for events."),
+  makeRefNode("category", "baraat-procession", "Baraat / Procession", IMAGES.themeStageLights, "Dhol, band and baraat procession services."),
 ]);
 
 // Apply the uploaded local image library to the reference tree without
@@ -870,9 +885,27 @@ function reconcilePublicHierarchy(stored) {
     return merged;
   }
 
+  // Keep the hidden Event Services branch (addonOnly) alongside the public
+  // occasions. Dropping it made categoryByPath(["event-services", ...])
+  // return null for every service card, so each card resolved as a broken
+  // link with no products and the Event Services strip vanished on every page.
+  // The Event Services branch is fully admin-owned (admins add/rename/remove
+  // service categories), so use the stored branch as-is when it exists and
+  // fall back to the built-in reference only when nothing is stored.
   return OCCASIONS
-    .filter((o) => PUBLIC_TOP_LEVEL_SLUGS.has(o.slug))
-    .map((reference) => mergeNode(reference, bySlug.get(reference.slug)));
+    .filter((o) => o.addonOnly || PUBLIC_TOP_LEVEL_SLUGS.has(o.slug))
+    .map((reference) => {
+      const previous = bySlug.get(reference.slug);
+      if (reference.addonOnly) {
+        // Event Services is entirely admin-owned after its initial seed.
+        // Never merge reference children back into an existing saved branch.
+        if (previous && Array.isArray(previous.children)) {
+          return { ...previous, addonOnly: true, type: reference.type };
+        }
+        return mergeNode(reference, previous);
+      }
+      return mergeNode(reference, previous);
+    });
 }
 
 function normalizeLegacyProductPath(prod) {
@@ -981,6 +1014,25 @@ function getLiveOccasions() {
       // as a product. If the same slug/name is now a category/theme node,
       // never render that marker as a sellable package.
       if (isCategoryMarkerProduct(prod, clone)) return;
+
+      // Packages are occasion-scoped bundles. A package may be offered for
+      // several occasions, so expose a lightweight product copy at each
+      // selected occasion root. The package itself remains a single record
+      // in the admin catalog; these copies only provide the correct storefront
+      // route/context for each selected occasion.
+      if (prod.catalogKind === "package" && Array.isArray(prod.packageOccasions) && prod.packageOccasions.length) {
+        prod.packageOccasions.forEach((occasionSlug) => {
+          const targetOccasion = clone.find((occasion) => occasion?.slug === occasionSlug && !occasion?.addonOnly);
+          if (!targetOccasion) return;
+          targetOccasion.products = targetOccasion.products || [];
+          const scopedProd = { ...prod, categoryPath: [occasionSlug], occasionSlug };
+          const idx = targetOccasion.products.findIndex((p) => p.slug === scopedProd.slug || p.id === scopedProd.id);
+          if (idx !== -1) targetOccasion.products[idx] = { ...targetOccasion.products[idx], ...scopedProd };
+          else targetOccasion.products.push(scopedProd);
+        });
+        return;
+      }
+
       let placed = false;
       const targetByPath = findNodeByCategoryPath(clone, prod.categoryPath);
       if (targetByPath) {
@@ -1387,14 +1439,14 @@ export function sortProducts(list, sortKey) {
   const arr = Array.isArray(list) ? [...list] : [];
   switch (sortKey) {
     case "newest":
-      return arr.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+      return arr.sort((a, b) => (new Date(b.dateAdded).getTime() || 0) - (new Date(a.dateAdded).getTime() || 0));
     case "price-asc":
-      return arr.sort((a, b) => a.price - b.price);
+      return arr.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
     case "price-desc":
-      return arr.sort((a, b) => b.price - a.price);
+      return arr.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
     case "popular":
     default:
-      return arr.sort((a, b) => b.popularity - a.popularity);
+      return arr.sort((a, b) => (Number(b.popularity) || 0) - (Number(a.popularity) || 0));
   }
 }
 

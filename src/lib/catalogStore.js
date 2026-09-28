@@ -143,7 +143,7 @@ function uid(prefix = "item") {
 
 export async function hydrateCatalogFromCloud() {
   try {
-    return await hydratePublicState();
+    return await hydratePublicState({ versionsOnly: true });
   } catch (err) {
     // Cloud hydration is intentionally best-effort: the storefront should
     // still boot from its local/seed cache when Supabase is not configured
@@ -297,27 +297,6 @@ function normalizeReferenceStoredTree(existing) {
   return clone;
 }
 
-function mergeSeedOccasions(existing, seed) {
-  if (!Array.isArray(existing)) return seed;
-  const clone = JSON.parse(JSON.stringify(existing));
-  function mergeNode(target, source) {
-    if (!target || !source) return;
-    target.children = Array.isArray(target.children) ? target.children : [];
-    (source.children || []).forEach((seedChild) => {
-      const found = target.children.find((c) => c.slug === seedChild.slug);
-      if (found) mergeNode(found, seedChild);
-      else target.children.push(JSON.parse(JSON.stringify(seedChild)));
-    });
-  }
-  (seed || []).forEach((seedOccasion) => {
-    const found = clone.find((o) => o.slug === seedOccasion.slug);
-    if (found) mergeNode(found, seedOccasion);
-    else clone.push(JSON.parse(JSON.stringify(seedOccasion)));
-  });
-  return clone;
-}
-
-
 function initializeSeedsIfNeeded() {
   if (seedsInitialized) return;
   seedsInitialized = true;
@@ -339,6 +318,53 @@ function initializeSeedsIfNeeded() {
       writeStorage(KEYS.addons, migrated);
     }
     localStorage.setItem(KEYS.serviceOccasionSplitV1, "1");
+  }
+
+  // Event Services are now available across every event context by default.
+  // Older builds used a broad "wedding" scope, which unintentionally hid the
+  // same services on Mehndi, Reception, Engagement, Birthday, etc. Convert only
+  // that exact legacy top-level scope to the global (empty) scope. Specific
+  // child/theme scopes remain untouched so admins can still target services to
+  // Royal Mehndi, Cinematic Sangeet, etc.
+  const SERVICE_ALL_CONTEXTS_MIGRATION = "nle-service-all-contexts-v1";
+  if (!localStorage.getItem(SERVICE_ALL_CONTEXTS_MIGRATION)) {
+    const existingAddons = readStorage(KEYS.addons, []);
+    if (Array.isArray(existingAddons) && existingAddons.length) {
+      let changed = false;
+      const migratedAddons = existingAddons.map((addon) => {
+        const scopes = Array.isArray(addon?.scopes) ? addon.scopes.map(sanitizeScopePath).filter(Boolean) : [];
+        const legacyWeddingOnly = scopes.length === 1 && scopes[0] === "wedding";
+        if (!legacyWeddingOnly) return addon;
+        changed = true;
+        return { ...addon, scopes: [], scope: "" };
+      });
+      if (changed) {
+        writeStorage(KEYS.addons, migratedAddons);
+        queueCloudSync(KEYS.addons, migratedAddons);
+      }
+    }
+
+    const existingProducts = readStorage(KEYS.products, []);
+    if (Array.isArray(existingProducts) && existingProducts.length) {
+      let changed = false;
+      const migratedProducts = existingProducts.map((product) => {
+        const isService = product?.isAddon === true
+          || product?.occasionSlug === "event-services"
+          || (Array.isArray(product?.categoryPath) && product.categoryPath[0] === "event-services");
+        const scopes = Array.isArray(product?.serviceScopes)
+          ? product.serviceScopes.map(sanitizeScopePath).filter(Boolean)
+          : [];
+        const legacyWeddingOnly = isService && scopes.length === 1 && scopes[0] === "wedding";
+        if (!legacyWeddingOnly) return product;
+        changed = true;
+        return { ...product, serviceScopes: [] };
+      });
+      if (changed) {
+        writeStorage(KEYS.products, migratedProducts);
+        queueCloudSync(KEYS.products, migratedProducts);
+      }
+    }
+    localStorage.setItem(SERVICE_ALL_CONTEXTS_MIGRATION, "1");
   }
   // Backward-compatible rename: Event Add-ons -> Event Services.
   // Existing admin/catalog data is kept intact when users upgrade.
@@ -390,6 +416,21 @@ function initializeSeedsIfNeeded() {
   // V2 flag prevents the old purge logic from wiping these links on upgrade.
   seedRealShortsIfNeeded();
 
+  // Remove the old bundled Event Services branch when it is still untouched.
+  // A customized/admin-created branch is preserved and can continue to sync
+  // normally. This is a one-time cleanup of the old hardcoded catalog.
+  const SERVICE_HARDCODED_CLEANUP = "nle-service-hardcoded-cleanup-v1";
+  if (!localStorage.getItem(SERVICE_HARDCODED_CLEANUP)) {
+    const currentTree = readStorage(KEYS.occasions, []);
+    const currentService = currentTree.find((occasion) => occasion?.slug === "event-services");
+    const bundledService = (SEED_OCCASIONS || []).find((occasion) => occasion?.slug === "event-services");
+    if (currentService && bundledService && JSON.stringify(currentService) === JSON.stringify(bundledService)) {
+      const cleaned = currentTree.filter((occasion) => occasion?.slug !== "event-services");
+      writeStorage(KEYS.occasions, cleaned);
+    }
+    localStorage.setItem(SERVICE_HARDCODED_CLEANUP, "1");
+  }
+
   // Apply the supplied reference hierarchy exactly once. Once the migration
   // marker exists, the saved catalog is the source of truth. Never merge the
   // seed tree again because doing so would resurrect categories that an admin
@@ -398,7 +439,12 @@ function initializeSeedsIfNeeded() {
     // The business hierarchy is authoritative for this migration. Replace the
     // previous reference tree so the storefront and Admin Catalog use the same
     // six-category structure and nested nodes.
-    const exactHierarchy = JSON.parse(JSON.stringify(SEED_OCCASIONS));
+    // Service categories are no longer bundled into the runtime catalog. They
+    // are stored in Supabase and must be managed from Admin -> Services.
+    // Keep the normal occasion/category seed, but deliberately exclude the
+    // event-services branch so it can never reappear as hardcoded UI data.
+    const exactHierarchy = JSON.parse(JSON.stringify(SEED_OCCASIONS))
+      .filter((occasion) => occasion?.slug !== "event-services");
     writeStorage(KEYS.occasions, exactHierarchy);
     writeStorage(KEYS.birthdayAgeCategories, JSON.parse(JSON.stringify(DEFAULT_BIRTHDAY_AGE_CATEGORIES)));
     localStorage.setItem(KEYS.referenceHierarchyMigration, REFERENCE_HIERARCHY_MIGRATION);
@@ -661,7 +707,7 @@ export function saveProduct(product) {
 
   if (catalogKind === "package") {
     const items = Array.isArray(product?.packageItems) ? product.packageItems : [];
-    if (!items.length) throw new Error("A package must contain at least one product.");
+    if (!items.length) throw new Error("A package must contain at least one product or service.");
     const sourceIds = new Set(list.filter((p) => p.catalogKind !== "package").map((p) => String(p.id)));
     const invalid = items.some((item) => !sourceIds.has(String(item?.productId || item?.id || "")));
     if (invalid) throw new Error("One or more package products no longer exist. Refresh the catalog and select the products again.");
@@ -713,6 +759,9 @@ export function saveProduct(product) {
         }).filter(Boolean) : [])
       : [],
     cities: Array.isArray(product.cities) ? product.cities.map(sanitizeText) : [],
+    serviceScopes: Array.isArray(product.serviceScopes)
+      ? product.serviceScopes.map(sanitizeScopePath).filter(Boolean)
+      : [],
     categoryPath: Array.isArray(product.categoryPath) ? product.categoryPath.map(sanitizeSlug).filter(Boolean) : [],
     isAddon: Boolean(product.isAddon || product.occasionSlug === "event-services" || (Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services")),
     updatedAt: now,
@@ -909,12 +958,22 @@ export async function saveBirthdayAgeCategoriesToCloud(items) {
   return saved;
 }
 
+export function ensureEventServiceCategoryStructure() {
+  // Intentionally no-op. Event Services must come from the persisted admin
+  // catalog/Supabase. Never recreate the old bundled service tree at runtime.
+  initializeSeedsIfNeeded();
+  return Boolean(getOccasion("event-services"));
+}
+
 export function getOccasions() {
   initializeSeedsIfNeeded();
   const raw = localStorage.getItem(KEYS.occasions) || "";
   if (occasionsCacheValue && occasionsCacheRaw === raw) return occasionsCacheValue;
   occasionsCacheRaw = raw;
-  occasionsCacheValue = readStorage(KEYS.occasions, SEED_OCCASIONS).map(sanitizeCategoryNode);
+  const fallback = (SEED_OCCASIONS || []).filter((occasion) => occasion?.slug !== "event-services");
+  occasionsCacheValue = readStorage(KEYS.occasions, fallback)
+    .filter((occasion) => occasion?.slug !== "event-services" || Array.isArray(occasion?.children))
+    .map(sanitizeCategoryNode);
   return occasionsCacheValue;
 }
 
@@ -1651,13 +1710,96 @@ export function deleteCity(name) {
 // 9. EVENT SERVICES ("Popular Services" strip on Shop-by-Occasion pages)
 // =============================================================================
 
+function sanitizeScopePath(value) {
+  return String(value || "")
+    .split("/")
+    .map((part) => sanitizeSlug(part))
+    .filter(Boolean)
+    .join("/");
+}
+
+function normalizeAddonScopes(addon) {
+  const raw = Array.isArray(addon?.scopes) && addon.scopes.length
+    ? addon.scopes
+    : (addon?.scope && addon.scope !== "global" ? [addon.scope] : []);
+  return raw.map(sanitizeScopePath).filter(Boolean);
+}
+
+function pathIsAncestorOrSelf(scopePath, contextPath) {
+  const scope = sanitizeScopePath(scopePath).split("/").filter(Boolean);
+  const context = (Array.isArray(contextPath) ? contextPath : String(contextPath || "").split("/"))
+    .map((part) => sanitizeSlug(part))
+    .filter(Boolean);
+  if (!scope.length || !context.length || scope.length > context.length) return false;
+
+  // Service scopes may be stored as an absolute occasion path
+  // (wedding/wedding-events/haldi) or as a relative event path (haldi,
+  // wedding-events/haldi). Treat either representation as the same context.
+  // This is important for nested pages such as Traditional Haldi, Royal Mehndi
+  // and Cinematic Sangeet: a service assigned to the parent event must inherit
+  // down the entire branch regardless of how the admin originally saved it.
+  for (let start = 0; start + scope.length <= context.length; start += 1) {
+    const matches = scope.every((part, index) => part === context[start + index]);
+    if (matches) return true;
+  }
+  return false;
+}
+
+function serviceProductMatchesContext(product, contextPath) {
+  if (!Array.isArray(contextPath) || !contextPath.length) return true;
+  const scopes = Array.isArray(product?.serviceScopes)
+    ? product.serviceScopes.map(sanitizeScopePath).filter(Boolean)
+    : [];
+  // Empty serviceScopes means the service product is global and can be shown
+  // in every contextual service listing.
+  if (!scopes.length) return true;
+  return scopes.some((scope) => pathIsAncestorOrSelf(scope, contextPath));
+}
+
+export function getServiceScopeOptions() {
+  return flattenCategoryTree()
+    .filter((item) => !item.addonOnly && Array.isArray(item.path) && item.path.length > 0)
+    .map((item) => ({
+      path: item.path.join("/"),
+      label: item.label,
+      productCount: item.productCount,
+    }));
+}
+
+// Returns the actual admin-created service products that are available for a
+// particular occasion/category context. This is the single source used by
+// booking panels; there is deliberately no hardcoded fallback service list.
+export function getServiceProductsForContext(contextPath = []) {
+  const normalizedContext = Array.isArray(contextPath)
+    ? contextPath.map((part) => sanitizeSlug(part)).filter(Boolean)
+    : String(contextPath || "").split("/").map((part) => sanitizeSlug(part)).filter(Boolean);
+  return getProducts()
+    .filter((product) => product?.catalogKind === "service" || product?.isAddon === true)
+    .filter((product) => product?.status !== "archived" && product?.status !== "draft")
+    .filter((product) => {
+      const categoryPath = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
+      if (!categoryPath.length || categoryPath[0] !== "event-services") return false;
+      return serviceProductMatchesContext(product, normalizedContext);
+    })
+    .map((product) => ({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price) || 0,
+      image: product.image,
+      slug: product.slug,
+      serviceType: product.serviceType || "",
+      coverageDuration: product.coverageDuration || "",
+      categoryPath: product.categoryPath,
+    }));
+}
+
 export function getAddons() {
   initializeSeedsIfNeeded();
   const raw = localStorage.getItem(KEYS.addons) || "";
   if (addonsCacheValue && addonsCacheRaw === raw) return addonsCacheValue;
   addonsCacheRaw = raw;
   const list = raw ? readStorage(KEYS.addons, []) : [];
-  addonsCacheValue = list.map(enrichAddon);
+  addonsCacheValue = list.map((addon) => enrichAddon(addon));
   return addonsCacheValue;
 }
 
@@ -1665,14 +1807,17 @@ export function getAddons() {
 // cheapest product price, how many products it holds, the browse link,
 // and whether that category still exists (an admin may have renamed or
 // deleted it after this service was linked to it).
-function enrichAddon(addon) {
+function enrichAddon(addon, contextPath = null) {
   const path = Array.isArray(addon.categoryPath) ? addon.categoryPath : [];
   const category = path.length ? categoryByPath(path) : null;
+  const scopedProducts = category
+    ? allProductsOf(category).filter((product) => serviceProductMatchesContext(product, contextPath))
+    : [];
   return {
     ...addon,
-    scopes: Array.isArray(addon.scopes) && addon.scopes.length ? addon.scopes : (addon.scope && addon.scope !== "global" ? [addon.scope] : []),
-    price: category ? productPriceOf(category) : null,
-    productCount: category ? countProductsOf(category) : 0,
+    scopes: normalizeAddonScopes(addon),
+    price: category ? productPriceOf(category, contextPath) : null,
+    productCount: category ? countProductsOf(category, contextPath) : 0,
     href: category ? pathFor(buildTrailFor(path)) : "",
     categoryLabel: category ? path.join(" / ") : "",
     linkBroken: path.length > 0 && !category,
@@ -1687,14 +1832,16 @@ function buildTrailFor(path) {
   return path.map((slug) => ({ slug }));
 }
 
-function productPriceOf(node) {
-  const sellable = allProductsOf(node).filter((p) => p.status !== "archived" && p.status !== "draft");
+function productPriceOf(node, contextPath = null) {
+  const sellable = allProductsOf(node)
+    .filter((p) => p.status !== "archived" && p.status !== "draft")
+    .filter((p) => serviceProductMatchesContext(p, contextPath));
   if (!sellable.length) return null;
   return Math.min(...sellable.map((p) => Number(p.price) || Infinity));
 }
 
-function countProductsOf(node) {
-  return allProductsOf(node).length;
+function countProductsOf(node, contextPath = null) {
+  return allProductsOf(node).filter((p) => serviceProductMatchesContext(p, contextPath)).length;
 }
 
 // List of every existing occasion/category/theme a service can link to,
@@ -1747,13 +1894,67 @@ export function getAddonProducts() {
 // from the admin-editable store instead of the hardcoded data file. Cards
 // whose linked category no longer resolves, or has zero live products,
 // are dropped so the storefront never shows a dead "View Options" link.
-export function getAddonsForOccasion(topSlug) {
-  const all = getAddons().filter((a) => a.active !== false && !a.linkBroken && a.productCount > 0 && a.price != null);
+function normalizeServiceCategoryPath(value) {
+  const path = Array.isArray(value)
+    ? value.map((part) => sanitizeSlug(part)).filter(Boolean)
+    : String(value || "").split("/").map((part) => sanitizeSlug(part)).filter(Boolean);
+  // Older records linked services beneath an occasion, e.g.
+  // wedding/services/decor. Services now have one canonical catalog branch.
+  if (path.length >= 3 && path[1] === "services") {
+    return ["event-services", ...path.slice(2)];
+  }
+  return path;
+}
+
+export function getAddonsForOccasion(topSlug, contextPath = null) {
+  // Service categories/products are now the single source of truth. The old
+  // `addons` bucket only contained featured/legacy service cards and could
+  // therefore make the storefront section render its heading with no items
+  // even when Admin had valid service products. Build the cards directly from
+  // the persisted Event Services category tree and its service products.
   if (!topSlug) return [];
-  return all.filter((a) => {
-    const scopes = Array.isArray(a.scopes) && a.scopes.length ? a.scopes : (a.scope && a.scope !== "global" ? [a.scope] : []);
-    return scopes.includes(topSlug);
-  });
+
+  const eventServiceTree = getAddonCategoryTree();
+  if (!eventServiceTree || !Array.isArray(eventServiceTree.children)) return [];
+
+  const context = Array.isArray(contextPath) && contextPath.length
+    ? contextPath
+    : (topSlug === "event-services" ? ["event-services"] : [topSlug]);
+
+  const topCategories = getAddonCategories()
+    .map((category) => ({ ...category, path: normalizeServiceCategoryPath(category.path) }))
+    .filter((category) => Array.isArray(category.path) && category.path.length === 2 && category.path[0] === "event-services")
+    .filter((category) => category.active !== false);
+
+  return topCategories.map((category) => {
+    const node = categoryByPath(category.path);
+    if (!node) return null;
+
+    const products = allProductsOf(node)
+      .filter((product) => product?.status !== "archived" && product?.status !== "draft")
+      .filter((product) => serviceProductMatchesContext(product, context));
+
+    const prices = products
+      .map((product) => Number(product.price))
+      .filter((price) => Number.isFinite(price) && price >= 0);
+
+    const href = pathFor(buildTrailFor(category.path));
+    return {
+      id: `service-category-${category.path.join("-")}`,
+      slug: category.path[category.path.length - 1],
+      label: category.label?.split(" › ").slice(-1)[0] || node.label || "Service",
+      subLabel: node.description || category.description || "Event service",
+      description: node.description || category.description || "",
+      image: node.image || category.image || IMAGES.showcase7,
+      icon: "sparkle",
+      price: prices.length ? Math.min(...prices) : null,
+      productCount: products.length,
+      href,
+      categoryPath: category.path,
+      active: true,
+      scopes: products.flatMap((product) => Array.isArray(product.serviceScopes) ? product.serviceScopes : []),
+    };
+  }).filter(Boolean);
 }
 
 export function saveAddon(addon) {
@@ -1771,9 +1972,9 @@ export function saveAddon(addon) {
     icon: sanitizeText(addon.icon || "sparkle"),
     categoryPath,
     scopes: Array.isArray(addon.scopes) && addon.scopes.length
-      ? addon.scopes.map(sanitizeSlug).filter(Boolean)
-      : (addon.scope && addon.scope !== "global" ? [sanitizeSlug(addon.scope)] : []),
-    scope: Array.isArray(addon.scopes) && addon.scopes.length ? addon.scopes[0] : (sanitizeSlug(addon.scope || "") || ""),
+      ? addon.scopes.map(sanitizeScopePath).filter(Boolean)
+      : (addon.scope && addon.scope !== "global" ? [sanitizeScopePath(addon.scope)] : []),
+    scope: Array.isArray(addon.scopes) && addon.scopes.length ? sanitizeScopePath(addon.scopes[0]) : (sanitizeScopePath(addon.scope || "") || ""),
     active: addon.active !== false,
     updatedAt: now,
   };

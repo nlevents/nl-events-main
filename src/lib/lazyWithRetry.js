@@ -66,7 +66,14 @@ function reloadOncePerCooldown() {
 }
 
 export async function recoverIfNewBuild() {
-  return (await newerBuildExists()) && reloadOncePerCooldown();
+  if (await newerBuildExists()) return reloadOncePerCooldown();
+  return false;
+}
+
+export async function recoverFromChunkLoadError() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  if (await newerBuildExists()) return reloadOncePerCooldown();
+  return reloadOncePerCooldown();
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,7 +90,7 @@ export function lazyWithRetry(importer) {
         if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
       }
     }
-    if (await recoverIfNewBuild()) {
+    if (await recoverFromChunkLoadError()) {
       // The browser is navigating to the fresh document; keep React suspended.
       return new Promise(() => {});
     }
