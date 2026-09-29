@@ -4,7 +4,7 @@ import { rateLimit, isHoneypotTriggered } from "../shared/utils/security.js";
 
 function clean(value, max) { return String(value ?? "").trim().slice(0, max); }
 const EVENT_TYPES = new Set(["Wedding", "Birthday", "Corporate", "Festive Events", "Others", "Birthday Party", "Wedding Ceremony", "Reception", "Anniversary", "Baby Shower", "Naming Ceremony", "Corporate Event", "Custom Celebration", "Birthday / Kitty Party", "Haldi / Mehendi / Sangeet", "Private Party", "Other"]);
-const LANDING_EVENT_TYPES = new Set(["Wedding", "Birthday / Kitty Party", "Corporate Event", "Haldi / Mehendi / Sangeet", "Anniversary", "Private Party", "Other"]);
+const LANDING_EVENT_TYPES = new Set(["Wedding", "Birthday", "Birthday / Kitty Party", "Corporate Event", "Haldi / Mehendi / Sangeet", "Anniversary", "Private Party", "Other"]);
 const STAGE = "new_lead";
 const SOURCE_DETAILS = {
   landing: "Landing Page",
@@ -94,26 +94,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Invalid inquiry request. Please try again." });
     }
     if (requestId) {
-      const existing = await db.query(`inquiries?request_id=eq.${encodeURIComponent(requestId)}&select=*`, { method: "GET" });
-      if (existing?.[0]) return res.status(200).json({ ok: true, data: existing[0], duplicate: true });
+      try {
+        const existing = await db.query(`inquiries?request_id=eq.${encodeURIComponent(requestId)}&select=*`, { method: "GET" });
+        if (existing?.[0]) return res.status(200).json({ ok: true, data: existing[0], duplicate: true });
+      } catch (requestLookupError) {
+        // request_id is an optional migration column. A missing column must
+        // never prevent a valid public inquiry from being created.
+        console.warn("Inquiry request-id lookup skipped:", requestLookupError?.message || requestLookupError);
+      }
     }
 
-    // A single enquiry can arrive through more than one connected channel.
-    // Reuse the existing lead when the core enquiry identity matches.
-    const normalizedPhone = normalizePhone(phone);
-    const normalizedEmail = normalizeEmail(body.email);
-    if (normalizedPhone || normalizedEmail) {
-      const recent = await db.query("inquiries?select=*&order=created_at.desc&limit=500", { method: "GET" });
-      const duplicate = (recent || []).find((row) => {
-        if (row.source === "booking") return false;
-        if (eventType && row.event_type && row.event_type !== eventType) return false;
-        if (eventDate && row.event_date && row.event_date !== eventDate) return false;
-        const rowPhone = normalizePhone(row.phone);
-        const rowEmail = normalizeEmail(row.email);
-        return (normalizedPhone && rowPhone && normalizedPhone === rowPhone) || (normalizedEmail && rowEmail && normalizedEmail === rowEmail);
-      });
-      if (duplicate) return res.status(200).json({ ok: true, data: duplicate, duplicate: true });
-    }
+    // Duplicate protection is handled primarily by requestId. Avoid scanning
+    // hundreds of recent inquiries here because this endpoint must stay fast
+    // for a public form submission. A retry of the same browser submission
+    // keeps the same requestId and is caught by the lookup above.
 
     const inquiryPayload = {
       name,
@@ -198,14 +192,18 @@ export default async function handler(req, res) {
     const inquiry = rows?.[0];
     if (!inquiry?.id) throw new Error("Inquiry was not created.");
 
-    // Notification delivery is intentionally non-blocking. A missing/broken
-    // email or WhatsApp integration must never make a successfully saved lead
-    // appear as a failed inquiry to the customer.
-    try {
-      await notifyInquiry(inquiry, db);
-    } catch (notificationError) {
-      console.error("Inquiry notification error (lead was saved):", notificationError);
-    }
+    // The inquiry is already safely stored. Do not make the customer wait for
+    // email/WhatsApp notifications or notification logging. Those providers
+    // can take several seconds (or occasionally time out), which previously
+    // made the Submit Enquiry button feel slow.
+    const notifyTask = Promise.resolve()
+      .then(() => notifyInquiry(inquiry, db))
+      .catch((notificationError) => {
+        console.error("Inquiry notification error (lead was saved):", notificationError);
+      });
+
+    if (typeof req.waitUntil === "function") req.waitUntil(notifyTask);
+    else void notifyTask;
 
     return res.status(201).json({ ok: true, data: inquiry });
   } catch (err) {

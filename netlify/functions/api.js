@@ -109,7 +109,7 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-export async function handler(event) {
+export async function handler(event, context) {
   // Resolve HTTP method across all Netlify event shapes (v1, v2, Lambda compat)
   const method = (
     event?.httpMethod ||
@@ -144,6 +144,7 @@ export async function handler(event) {
     body: parseBody(event),
     query,
     url: event?.rawUrl || event?.path || `/api/${route}`,
+    waitUntil: typeof context?.waitUntil === "function" ? context.waitUntil.bind(context) : null,
   };
   const res = createResponse();
 

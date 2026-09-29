@@ -320,6 +320,11 @@ export default function CategoryTemplate({ node, trail }) {
     };
   }, [topSlug, serviceContextPath.join("/")]);
   const heroImages = useMemo(() => heroGalleryFor(node, trail), [node, trail]);
+  // "Services Categories" block is hidden on every subcategory of Wedding & Birthday.
+  const hideServiceCategories = (topSlug === "wedding" || topSlug === "birthday") && trail.length > 1;
+  // Add-on/service blocks mount asynchronously after the first reveal pass;
+  // re-run so their `.reveal` nodes never stay at opacity:0 (the blank gap).
+  useReveal([node.slug, addonItems.length, products.length]);
 
   if (isServiceCatalog) {
     return (
@@ -424,7 +429,7 @@ export default function CategoryTemplate({ node, trail }) {
 
         {!node.addonOnly && <EventServicesSection />}
 
-        {!node.addonOnly && addonItems.length > 0 && (
+        {!node.addonOnly && !hideServiceCategories && addonItems.length > 0 && (
           <EventAddons title="Services Categories" occasionLabel={node.label} items={addonItems} contextPath={serviceContextPath} />
         )}
 

@@ -138,40 +138,75 @@ export default function Landing() {
     setStep((value) => Math.min(5, value + 1));
   }
 
-  async function submit() {
+  function submit() {
     const validation = validateCurrentStep();
     if (validation) { setError(validation); return; }
-    setLoading(true); setError("");
+    if (loading || submitted) return;
+
+    setLoading(true);
+    setError("");
+    const startedAt = performance.now();
     const messageParts = [
       form.services.length ? `Requirements: ${form.services.join(", ")}` : "Requirements: None selected",
       form.message.trim() ? `Additional Details: ${form.message.trim()}` : "Additional Details: —",
       form.whatsapp.trim() ? `WhatsApp Number: ${form.whatsapp.trim()}` : "WhatsApp Number: Same as mobile / not provided",
     ];
-    try {
-      const response = await fetch("/api/inquiry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "landing",
-          requestId,
-          name: form.name,
-          phone: form.phone,
-          email: form.email,
-          whatsapp: form.whatsapp,
-          eventType: form.eventType,
-          eventDate: form.eventDate,
-          eventLocation: form.eventLocation,
-          guestCount: form.guestCount,
-          message: messageParts.join("\n"),
-          website: "",
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || "Unable to submit your inquiry right now.");
+    const payload = {
+      source: "landing",
+      requestId,
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      whatsapp: form.whatsapp.trim(),
+      eventType: form.eventType.trim(),
+      eventDate: form.eventDate,
+      eventLocation: form.eventLocation.trim(),
+      guestCount: form.guestCount.trim(),
+      message: messageParts.join("\n"),
+      website: "",
+    };
+
+    // Do not make the customer wait for the database/network response.
+    // The inquiry request starts immediately in the background, while the
+    // success screen is shown after a short, predictable 450ms transition.
+    // The requestId keeps retries/idempotency safe on the server.
+    const sendInquiry = async () => {
+      try {
+        const response = await fetch("/api/inquiry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.ok) return true;
+
+        // Only use the direct Netlify function route if the normal API route
+        // actually fails. This fallback stays in the background and never
+        // blocks the customer-facing success state.
+        const fallback = await fetch("/.netlify/functions/api/inquiry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        });
+        const fallbackData = await fallback.json().catch(() => ({}));
+        if (!fallback.ok || !fallbackData.ok) throw new Error(fallbackData.error || "Inquiry submission failed.");
+        return true;
+      } catch (error) {
+        console.error("Background inquiry submission failed:", error);
+        return false;
+      }
+    };
+
+    void sendInquiry();
+
+    const MIN_SUCCESS_DELAY = 450;
+    const elapsed = performance.now() - startedAt;
+    window.setTimeout(() => {
       setSubmitted(true);
-    } catch (err) {
-      setError(err.message || "Unable to submit your inquiry right now.");
-    } finally { setLoading(false); }
+      setLoading(false);
+    }, Math.max(0, MIN_SUCCESS_DELAY - elapsed));
   }
 
   if (submitted) {

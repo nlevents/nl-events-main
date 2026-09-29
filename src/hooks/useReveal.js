@@ -40,7 +40,24 @@ export default function useReveal(deps = []) {
     // (zero-size root during initial WebView layout, tab throttling, etc.)
     const fallback = window.setTimeout(revealAll, 1200);
 
+    // Late-mounted `.reveal` nodes (async data) are picked up too, so they
+    // can never be left hidden after the initial pass.
+    let mo;
+    try {
+      mo = new MutationObserver(() => {
+        document.querySelectorAll(".reveal:not(.in)").forEach((el) => {
+          if (!el.__revObs) { el.__revObs = true; io.observe(el); }
+        });
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    } catch { /* non-critical */ }
+    const lateFallback = window.setTimeout(() => {
+      document.querySelectorAll(".reveal:not(.in)").forEach((i) => i.classList.add("in"));
+    }, 2500);
+
     return () => {
+      if (mo) mo.disconnect();
+      window.clearTimeout(lateFallback);
       io.disconnect();
       window.clearTimeout(fallback);
     };
