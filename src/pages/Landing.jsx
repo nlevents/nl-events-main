@@ -11,18 +11,11 @@ const EVENT_TYPES = [
   { label: "Other", icon: "dots" },
 ];
 
-const GUEST_RANGES = [
-  { label: "Up to 50", description: "Small & intimate events", icon: "users3" },
-  { label: "51 – 100", description: "Family & close gatherings", icon: "users3" },
-  { label: "101 – 200", description: "Medium-sized celebrations", icon: "users3" },
-  { label: "200+", description: "Large celebrations", icon: "users5" },
-];
-
 const SERVICES = [
   ["Décor", "flower"],
-  ["Complete Event Management", "clipboard"],
+  ["Event Management", "clipboard"],
   ["Entry Concept", "arch"],
-  ["Photography & Videography", "camera"],
+  ["Photo & Video", "camera"],
   ["Catering", "dish"],
   ["Entertainment", "music"],
 ];
@@ -81,13 +74,13 @@ function Progress({ step, onBack }) {
   return (
     <div className="landing-progress-area">
       <div className="landing-progress-top">
-        <span>Step {step} of 5</span>
+        <span>Step {step} of 3</span>
         {step > 1 && (
           <button type="button" onClick={onBack} className="landing-back"><Icon name="back" size={22} /> Back</button>
         )}
       </div>
-      <div className="landing-progress" aria-label={`Step ${step} of 5`}>
-        {Array.from({ length: 5 }, (_, i) => {
+      <div className="landing-progress" aria-label={`Step ${step} of 3`}>
+        {Array.from({ length: 3 }, (_, i) => {
           const n = i + 1;
           return <div key={n} className={`landing-progress-node ${n < step ? "done" : n === step ? "current" : ""}`}><span /></div>;
         })}
@@ -110,7 +103,7 @@ export default function Landing() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const dateInputRef = useRef(null);
-  const [form, setForm] = useState({ eventType: "Wedding", guestCount: "Up to 50", eventDate: "", eventLocation: "", services: [], message: "", name: "", phone: "", whatsapp: "", email: "" });
+  const [form, setForm] = useState({ eventType: "Wedding", eventDate: "", eventLocation: "", services: [], message: "", name: "", phone: "", whatsapp: "", email: "" });
 
   const requestId = useMemo(() => {
     try { return crypto.randomUUID().replace(/-/g, ""); } catch { return `${Date.now()}${Math.random().toString(36).slice(2)}`; }
@@ -120,13 +113,14 @@ export default function Landing() {
   const toggleService = (service) => setForm((prev) => ({ ...prev, services: prev.services.includes(service) ? prev.services.filter((x) => x !== service) : [...prev.services, service] }));
 
   function validateCurrentStep() {
-    if (step === 1 && !form.eventType) return "Please select your event type.";
-    if (step === 2 && !form.guestCount) return "Please select the expected number of guests.";
-    if (step === 3 && !form.eventDate) return "Please select your event date.";
-    if (step === 4 && !form.eventLocation.trim()) return "Please enter your event location.";
-    if (step === 5) {
+    if (step === 1) {
       if (!form.name.trim()) return "Please enter your full name.";
       if (!/^\+?[0-9\s()\-.]{7,20}$/.test(form.phone.trim())) return "Please enter a valid mobile number.";
+    }
+    if (step === 2 && !form.eventType) return "Please select your event type.";
+    if (step === 3) {
+      if (!form.eventDate) return "Please select your event date.";
+      if (!form.eventLocation.trim()) return "Please enter your event location.";
     }
     return "";
   }
@@ -135,7 +129,7 @@ export default function Landing() {
     const validation = validateCurrentStep();
     if (validation) { setError(validation); return; }
     setError("");
-    setStep((value) => Math.min(5, value + 1));
+    setStep((value) => Math.min(3, value + 1));
   }
 
   function submit() {
@@ -161,8 +155,8 @@ export default function Landing() {
       eventType: form.eventType.trim(),
       eventDate: form.eventDate,
       eventLocation: form.eventLocation.trim(),
-      guestCount: form.guestCount.trim(),
       message: messageParts.join("\n"),
+      specificRequirements: form.message.trim(),
       website: "",
     };
 
@@ -240,67 +234,38 @@ export default function Landing() {
     <main className="landing-content">
       <Progress step={step} onBack={() => { setError(""); setStep((value) => Math.max(1, value - 1)); }} />
 
-      {step === 1 && <section className="landing-step landing-step-1">
+      {step === 1 && <section className="landing-step landing-step-1 landing-step-contact">
+        <h1>Tell us about yourself</h1>
+        <p className="landing-subtitle">Share your contact details so we can get in touch.</p>
+        <div className="landing-contact-grid landing-contact-grid-first">
+          <label className="landing-field"><Icon name="user" size={26} /><input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Full Name *" /></label>
+          <label className="landing-field"><Icon name="phone" size={26} /><input inputMode="tel" value={form.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="Mobile Number *" /></label>
+          <label className="landing-field"><Icon name="whatsapp" size={26} /><input inputMode="tel" value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} placeholder="WhatsApp Number" /></label>
+          <label className="landing-field"><Icon name="mail" size={26} /><input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} placeholder="Email Address" /></label>
+        </div>
+      </section>}
+
+      {step === 2 && <section className="landing-step landing-step-2 landing-step-event-selection">
         <h1>What type of event<br />are you planning?</h1>
-        <p className="landing-subtitle">Let us know so we can serve you better.</p>
         <div className="landing-event-grid">{EVENT_TYPES.map((item) => <button key={item.label} type="button" className={`landing-event-card ${form.eventType === item.label ? "selected" : ""}`} onClick={() => setField("eventType", item.label)}><Icon name={item.icon} size={38} /><span>{item.label}</span><i /></button>)}</div>
+        <div className="landing-section-label landing-services-first-label">What do you need?</div>
+        <div className="landing-service-grid landing-service-grid-first">{SERVICES.map(([label, icon]) => <button key={label} type="button" aria-pressed={form.services.includes(label)} className={`landing-service-card ${form.services.includes(label) ? "selected" : ""}`} onClick={() => toggleService(label)}><Icon name={icon} size={31} /><span>{label}</span></button>)}</div>
       </section>}
 
-      {step === 2 && <section className="landing-step landing-step-2">
-        <div className="landing-step-icon"><Icon name="users5" size={66} /></div>
-        <h1>How many guests<br />are you expecting?</h1>
-        <p className="landing-subtitle">This helps us suggest the best options for your event.</p>
-        <div className="landing-guest-grid">{GUEST_RANGES.map((item) => <button key={item.label} type="button" className={`landing-guest-card ${form.guestCount === item.label ? "selected" : ""}`} onClick={() => setField("guestCount", item.label)}><Icon name={item.icon} size={53} /><strong>{item.label}</strong><span>{item.description}</span><i /></button>)}</div>
-      </section>}
-
-      {step === 3 && <section className="landing-step landing-step-3">
+      {step === 3 && <section className="landing-step landing-step-3 landing-step-event-details">
         <div className="landing-step-icon"><Icon name="calendar" size={62} /></div>
-        <h1>When is your<br />event?</h1>
-        <p className="landing-subtitle">Select your preferred event date.</p>
+        <h1>When & where is<br />your event?</h1>
+        <p className="landing-subtitle">Tell us the date and location so we can plan better for you.</p>
         <div className={`landing-field landing-date-field ${form.eventDate ? "has-value" : ""}`} role="group" aria-label="Select event date" onClick={() => { const input = dateInputRef.current; if (!input) return; try { if (typeof input.showPicker === "function") input.showPicker(); else { input.focus(); input.click(); } } catch { input.focus(); input.click(); } }}><Icon name="calendar" size={27} /><input ref={dateInputRef} type="date" value={form.eventDate} min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)} onChange={(e) => setField("eventDate", e.target.value)} required aria-label="Event date" /><span>{form.eventDate ? new Date(`${form.eventDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Select Event Date *"}</span><b>⌄</b></div>
-        <div className="landing-info-box"><Icon name="info" size={29} /><div><strong>Not sure about the exact date?</strong><span>You can select an approximate date. We’ll help you<br className="desktop-break" /> with the best options.</span></div></div>
-      </section>}
-
-      {step === 4 && <section className="landing-step landing-step-4">
-        <h1>Where is your<br />event?</h1>
-        <p className="landing-subtitle">Let us know the event location so we can plan better<br className="desktop-break" /> for you.</p>
-        <label className="landing-field"><Icon name="pin" size={28} /><input value={form.eventLocation} onChange={(e) => setField("eventLocation", e.target.value)} placeholder="Enter City / Event Location *" /></label>
-        <div className="landing-section-label">What do you need? <span>(Select all that apply)</span></div>
-        <div className="landing-service-grid">{SERVICES.map(([label, icon]) => <button key={label} type="button" className={`landing-service-card ${form.services.includes(label) ? "selected" : ""}`} onClick={() => toggleService(label)}><Icon name={icon} size={31} /><span>{label}</span><i /></button>)}</div>
+        <label className="landing-field landing-location-field"><Icon name="pin" size={28} /><input value={form.eventLocation} onChange={(e) => setField("eventLocation", e.target.value)} placeholder="Enter City / Event Location *" /></label>
         <div className="landing-section-label landing-optional-label">Any specific requirements? <span>(Optional)</span></div>
         <label className="landing-textarea"><Icon name="edit" size={25} /><textarea value={form.message} onChange={(e) => setField("message", e.target.value)} placeholder="Tell us more about your event..." maxLength={2000} /></label>
       </section>}
 
-      {step === 5 && <section className="landing-step landing-step-5">
-        <div className="landing-step-icon"><Icon name="user" size={57} /></div>
-        <h1>Almost Done!</h1>
-        <p className="landing-subtitle">Tell us your details so we can get in touch.</p>
-        <div className="landing-contact-grid">
-          <label className="landing-field"><Icon name="user" size={26} /><input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Full Name *" /></label>
-          <label className="landing-field"><Icon name="phone" size={26} /><input inputMode="tel" value={form.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="Mobile Number *" /></label>
-          <label className="landing-field"><Icon name="whatsapp" size={26} /><input inputMode="tel" value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} placeholder="WhatsApp Number" /><small>(If different)</small></label>
-          <label className="landing-field"><Icon name="mail" size={26} /><input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} placeholder="Email Address" /><small>(Optional)</small></label>
-        </div>
-        <div className="landing-review"><div className="landing-review-head"><Icon name="clipboard" size={31} /><div><strong>Review Your Details</strong><span>Please check your information before submitting.</span></div><button type="button" onClick={() => setStep(1)}><Icon name="edit" size={18} /> Edit</button></div>
-          <ReviewRow label="Event Type" value={form.eventType} />
-          <ReviewRow label="Number of Guests" value={form.guestCount} />
-          <ReviewRow label="Event Date" value={form.eventDate ? new Date(`${form.eventDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"} />
-          <ReviewRow label="Event Location" value={form.eventLocation || "—"} />
-          <ReviewRow label="Requirements" value={form.services.length ? form.services.join(", ") : "None selected"} />
-          <ReviewRow label="Additional Details" value={form.message || "—"} />
-          <ReviewRow label="Full Name" value={form.name || "—"} />
-          <ReviewRow label="Mobile Number" value={form.phone || "—"} />
-          <ReviewRow label="Email Address" value={form.email || "—"} last />
-        </div>
-      </section>}
-
       {error && <div className="landing-error" role="alert">{error}</div>}
-      <div className="landing-action-wrap">{step < 5 ? <ContinueButton onClick={next} /> : <ContinueButton onClick={submit} disabled={loading}>{loading ? "Submitting…" : "Submit Enquiry"}</ContinueButton>}</div>
-      <SafeNote />
+      <div className="landing-action-wrap">{step < 3 ? <ContinueButton onClick={next} /> : <ContinueButton onClick={submit} disabled={loading}>{loading ? "Submitting…" : "Submit Enquiry"}</ContinueButton>}</div>
+      {step !== 2 && <SafeNote />}
     </main>
   </div>;
 }
 
-function ReviewRow({ label, value, last = false }) {
-  return <div className={`landing-review-row ${last ? "last" : ""}`}><span>{label}</span><strong>{value}</strong></div>;
-}

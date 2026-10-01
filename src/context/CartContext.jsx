@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { WHATSAPP_NUMBER } from "../data/images";
 import { fmtINR } from "../lib/pricing";
 import { genId, bookingLinesText, cartSubtotal, cartCount } from "../lib/cart";
+import { trackCartAction, trackWhatsAppClick } from "../lib/siteEvents";
 
 const CartContext = createContext(null);
 const CART_KEY = "nle-cart";
@@ -69,6 +70,7 @@ export function CartProvider({ children }) {
 
   const addBooking = useCallback((booking) => {
     const item = { id: genId(), quantity: 1, addons: [], ...booking };
+    trackCartAction("add_to_cart", { item, quantity: 1 });
     setItems((prev) => [...prev, item]);
     setPulse(true);
     setTimeout(() => setPulse(false), 650);
@@ -80,7 +82,11 @@ export function CartProvider({ children }) {
   }, []);
 
   const removeItem = useCallback((id) => {
-    setItems((prev) => prev.filter((it) => it.id !== id));
+    setItems((prev) => {
+      const item = prev.find((it) => it.id === id);
+      if (item) trackCartAction("remove_from_cart", { item, quantity: item.quantity || 1 });
+      return prev.filter((it) => it.id !== id);
+    });
   }, []);
 
   const clearCart = useCallback(() => {
@@ -127,6 +133,7 @@ export function CartProvider({ children }) {
       (discountAmount > 0 ? `\nDiscount (${appliedCoupon.code}): -${fmtINR(discountAmount)}` : "") +
       `\nTotal: ${fmtINR(total)}` +
       "\n\nPlease share availability and next steps.";
+    trackWhatsAppClick({ source: "cart" });
     window.open("https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(msg), "_blank", "noopener,noreferrer");
   }
 

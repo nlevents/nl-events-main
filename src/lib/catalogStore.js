@@ -6,9 +6,11 @@
 import { OCCASIONS as SEED_OCCASIONS, flattenCategoryTree, categoryByPath, pathFor, allProductsOf } from "../data/occasions";
 import { GALLERY_ITEMS as SEED_GALLERY } from "../data/categories";
 import { IMAGES, CATALOG_IMAGES } from "../data/images";
+import { EVENT_SERVICES } from "../data/eventServices";
 import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
 import { queueCloudSync, syncCloudState, hydratePublicState } from "./cloudStore";
+import { serviceMatchesContext, resolveScopeOnSave, getScopeMode, SCOPE_MODE } from "./serviceContext";
 import { uploadImageBlob, uploadImageUrl } from "./cloudinary";
 
 const STORE_KEY_PREFIX = "nle_catalog_v2_";
@@ -354,7 +356,8 @@ function initializeSeedsIfNeeded() {
         const scopes = Array.isArray(product?.serviceScopes)
           ? product.serviceScopes.map(sanitizeScopePath).filter(Boolean)
           : [];
-        const legacyWeddingOnly = isService && scopes.length === 1 && scopes[0] === "wedding";
+        // Only untouched legacy records: never rewrite explicit scoped/global products.
+        const legacyWeddingOnly = isService && getScopeMode(product) === SCOPE_MODE.LEGACY && scopes.length === 1 && scopes[0] === "wedding";
         if (!legacyWeddingOnly) return product;
         changed = true;
         return { ...product, serviceScopes: [] };
@@ -368,6 +371,124 @@ function initializeSeedsIfNeeded() {
   }
   // Backward-compatible rename: Event Add-ons -> Event Services.
   // Existing admin/catalog data is kept intact when users upgrade.
+  // Repair the Wedding branch in older admin catalog snapshots. Some legacy
+  // snapshots kept a standalone "Services" node under Wedding even though
+  // services now have their own Event Services catalog, and a migration could
+  // leave both `mehndi` and an older spelling such as `mehendi` while dropping
+  // `haldi`. The admin Catalog must show the canonical Wedding Events tree.
+  const WEDDING_HIERARCHY_REPAIR_V1 = "nle-wedding-hierarchy-repair-v1";
+  if (!localStorage.getItem(WEDDING_HIERARCHY_REPAIR_V1)) {
+    const storedTree = readStorage(KEYS.occasions, []);
+    if (Array.isArray(storedTree) && storedTree.length) {
+      const clone = JSON.parse(JSON.stringify(storedTree));
+      const wedding = clone.find((occasion) => sanitizeSlug(occasion?.slug) === "wedding");
+      const seedWedding = (SEED_OCCASIONS || []).find((occasion) => sanitizeSlug(occasion?.slug) === "wedding");
+      const seedEvents = seedWedding?.children?.find((node) => sanitizeSlug(node?.slug) === "wedding-events");
+      const events = wedding?.children?.find((node) => sanitizeSlug(node?.slug) === "wedding-events");
+      let changed = false;
+
+      const serviceSlugs = new Set(["services", "service", "event-services", "event-add-ons", "event-addon", "addons", "add-ons"]);
+      const isServiceNode = (node) => {
+        const slug = sanitizeSlug(node?.slug);
+        const label = String(node?.label || "").trim().toLowerCase();
+        return serviceSlugs.has(slug) || label === "services" || label === "event services" || label === "event add-ons";
+      };
+
+      if (wedding?.children?.length) {
+        const filtered = wedding.children.filter((node) => !isServiceNode(node));
+        if (filtered.length !== wedding.children.length) {
+          wedding.children = filtered;
+          changed = true;
+        }
+      }
+      if (events && Array.isArray(events.children)) {
+        const aliases = {
+          mehendi: "mehndi",
+          mehandi: "mehndi",
+          "mehndi-decor": "mehndi",
+          "haldi-ceremony": "haldi",
+        };
+        const mergeNodes = (target, source) => {
+          if (!target || !source || target === source) return;
+          if (!target.image && source.image) target.image = source.image;
+          if (!target.description && source.description) target.description = source.description;
+          if (!target.tagline && source.tagline) target.tagline = source.tagline;
+          const targetChildren = Array.isArray(target.children) ? target.children : (target.children = []);
+          const targetProducts = Array.isArray(target.products) ? target.products : (target.products = []);
+          const childKeys = new Set(targetChildren.map((child) => sanitizeSlug(child?.slug)));
+          (source.children || []).forEach((child) => {
+            const key = sanitizeSlug(child?.slug);
+            if (key && !childKeys.has(key)) {
+              targetChildren.push(child);
+              childKeys.add(key);
+            }
+          });
+          const productKeys = new Set(targetProducts.map((product) => product?.id || product?.slug));
+          (source.products || []).forEach((product) => {
+            const key = product?.id || product?.slug;
+            if (key && !productKeys.has(key)) {
+              targetProducts.push(product);
+              productKeys.add(key);
+            }
+          });
+        };
+
+        const canonicalBySlug = new Map();
+        const repairedChildren = [];
+        events.children.forEach((node) => {
+          if (isServiceNode(node)) {
+            changed = true;
+            return;
+          }
+          const rawSlug = sanitizeSlug(node?.slug);
+          const canonicalSlug = aliases[rawSlug] || rawSlug;
+          if (!canonicalSlug) return;
+          const existing = canonicalBySlug.get(canonicalSlug);
+          if (existing) {
+            mergeNodes(existing, node);
+            changed = true;
+            return;
+          }
+          if (node.slug !== canonicalSlug) {
+            node.slug = canonicalSlug;
+            if (canonicalSlug === "mehndi") node.label = "Mehndi";
+            if (canonicalSlug === "haldi") node.label = "Haldi";
+            changed = true;
+          }
+          canonicalBySlug.set(canonicalSlug, node);
+          repairedChildren.push(node);
+        });
+
+        // Restore only missing canonical Wedding Events categories from the
+        // existing seed hierarchy; never replace an admin-managed node.
+        (seedEvents?.children || []).forEach((seedNode) => {
+          const slug = sanitizeSlug(seedNode?.slug);
+          if (!slug || canonicalBySlug.has(slug)) return;
+          repairedChildren.push(JSON.parse(JSON.stringify(seedNode)));
+          canonicalBySlug.set(slug, repairedChildren[repairedChildren.length - 1]);
+          changed = true;
+        });
+
+        const canonicalOrder = (seedEvents?.children || []).map((node) => sanitizeSlug(node?.slug)).filter(Boolean);
+        repairedChildren.sort((a, b) => {
+          const ai = canonicalOrder.indexOf(sanitizeSlug(a?.slug));
+          const bi = canonicalOrder.indexOf(sanitizeSlug(b?.slug));
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        });
+        if (JSON.stringify(events.children) !== JSON.stringify(repairedChildren)) {
+          events.children = repairedChildren;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        writeStorage(KEYS.occasions, clone);
+        queueCloudSync(KEYS.occasions, clone);
+      }
+    }
+    localStorage.setItem(WEDDING_HIERARCHY_REPAIR_V1, "1");
+  }
+
   const serviceRenameKeys = [KEYS.occasions, KEYS.products, KEYS.addons];
   serviceRenameKeys.forEach((key) => {
     const raw = localStorage.getItem(key);
@@ -380,6 +501,278 @@ function initializeSeedsIfNeeded() {
       // Leave malformed/unknown storage untouched; normal validation handles it later.
     }
   });
+
+
+  // Mayra & Rituals are one wedding-function category. Older catalog versions
+  // accidentally stored the same branch twice under separate slugs (maira/mayra
+  // and rituals), which made the admin context picker show duplicate functions.
+  // Merge those legacy branches into the single canonical `mayra-and-rituals`
+  // branch while preserving products, children, and existing service scopes.
+  const MAYRA_RITUALS_MERGE_MIGRATION = "nle-mayra-rituals-merge-v1";
+  if (!localStorage.getItem(MAYRA_RITUALS_MERGE_MIGRATION)) {
+    const MAYRA_ALIASES = new Set(["maira", "mayra", "rituals", "mayra-and-rituals"]);
+    const CHILD_ALIASES = {
+      "traditional-rituals": "traditional-mayra",
+      "colorful-rituals": "colorful-mayra",
+      "floral-rituals": "floral-mayra",
+      "rajasthani-rituals": "rajasthani-mayra",
+      "theme-based-rituals": "theme-based-mayra",
+      "traditional-maira": "traditional-mayra",
+      "colorful-maira": "colorful-mayra",
+      "floral-maira": "floral-mayra",
+      "rajasthani-maira": "rajasthani-mayra",
+      "theme-based-maira": "theme-based-mayra",
+    };
+
+    const mergeNode = (target, source) => {
+      if (!source || source === target) return target;
+      if (!target.label && source.label) target.label = source.label;
+      if (!target.image && source.image) target.image = source.image;
+      if (!target.description && source.description) target.description = source.description;
+      const targetChildren = Array.isArray(target.children) ? target.children : (target.children = []);
+      const targetProducts = Array.isArray(target.products) ? target.products : (target.products = []);
+      const productIds = new Set(targetProducts.map((product) => product?.id || product?.slug || JSON.stringify(product)));
+      (source.products || []).forEach((product) => {
+        const id = product?.id || product?.slug || JSON.stringify(product);
+        if (!productIds.has(id)) { targetProducts.push(product); productIds.add(id); }
+      });
+      (source.children || []).forEach((child) => {
+        const canonicalSlug = CHILD_ALIASES[sanitizeSlug(child?.slug)] || sanitizeSlug(child?.slug);
+        if (!canonicalSlug) return;
+        child.slug = canonicalSlug;
+        const existing = targetChildren.find((candidate) => sanitizeSlug(candidate?.slug) === canonicalSlug);
+        if (existing) mergeNode(existing, child);
+        else targetChildren.push(child);
+      });
+      if (!targetProducts.length) delete target.products;
+      return target;
+    };
+
+    const mergeMayraRituals = (tree) => {
+      if (!Array.isArray(tree)) return { tree, changed: false };
+      const clone = JSON.parse(JSON.stringify(tree));
+      let changed = false;
+      const wedding = clone.find((occasion) => sanitizeSlug(occasion?.slug) === "wedding");
+      const weddingEvents = wedding?.children?.find((node) => sanitizeSlug(node?.slug) === "wedding-events");
+      if (weddingEvents && Array.isArray(weddingEvents.children)) {
+        const legacyNodes = weddingEvents.children.filter((node) => MAYRA_ALIASES.has(sanitizeSlug(node?.slug)));
+        if (legacyNodes.length > 0) {
+          const needsMerge = legacyNodes.length > 1 || legacyNodes.some((node) => sanitizeSlug(node?.slug) !== "mayra-and-rituals");
+          const canonical = legacyNodes.find((node) => sanitizeSlug(node?.slug) === "mayra-and-rituals") || legacyNodes[0];
+          canonical.slug = "mayra-and-rituals";
+          canonical.label = "Mayra and Rituals";
+          legacyNodes.forEach((node) => { if (node !== canonical) mergeNode(canonical, node); });
+          weddingEvents.children = weddingEvents.children.filter((node) => !MAYRA_ALIASES.has(sanitizeSlug(node?.slug)) || node === canonical);
+          const canonicalIndex = weddingEvents.children.indexOf(canonical);
+          if (canonicalIndex > -1) {
+            weddingEvents.children.splice(canonicalIndex, 1);
+            weddingEvents.children.push(canonical);
+          }
+          changed = needsMerge;
+        }
+      }
+      return { tree: clone, changed };
+    };
+
+    const currentTree = readStorage(KEYS.occasions, []);
+    const merged = mergeMayraRituals(currentTree);
+    if (merged.changed) {
+      writeStorage(KEYS.occasions, merged.tree);
+      queueCloudSync(KEYS.occasions, merged.tree);
+    }
+
+    const normalizeMayraPath = (value) => {
+      const parts = sanitizeScopePath(value).split("/").filter(Boolean);
+      return parts.map((part) => {
+        if (MAYRA_ALIASES.has(part)) return "mayra-and-rituals";
+        return CHILD_ALIASES[part] || part;
+      }).join("/");
+    };
+
+    const existingProducts = readStorage(KEYS.products, []);
+    if (Array.isArray(existingProducts) && existingProducts.length) {
+      let changed = false;
+      const migratedProducts = existingProducts.map((product) => {
+        let next = product;
+        if (Array.isArray(product?.serviceScopes)) {
+          const scopes = Array.from(new Set(product.serviceScopes.map(normalizeMayraPath).filter(Boolean)));
+          if (JSON.stringify(scopes) !== JSON.stringify(product.serviceScopes)) { next = { ...next, serviceScopes: scopes }; changed = true; }
+        }
+        if (Array.isArray(product?.categoryPath)) {
+          const path = product.categoryPath.map((part) => CHILD_ALIASES[sanitizeSlug(part)] || (MAYRA_ALIASES.has(sanitizeSlug(part)) ? "mayra-and-rituals" : part));
+          if (JSON.stringify(path) !== JSON.stringify(product.categoryPath)) { next = { ...next, categoryPath: path }; changed = true; }
+        }
+        return next;
+      });
+      if (changed) { writeStorage(KEYS.products, migratedProducts); queueCloudSync(KEYS.products, migratedProducts); }
+    }
+
+    const existingAddons = readStorage(KEYS.addons, []);
+    if (Array.isArray(existingAddons) && existingAddons.length) {
+      let changed = false;
+      const migratedAddons = existingAddons.map((addon) => {
+        const scopes = Array.isArray(addon?.scopes) ? Array.from(new Set(addon.scopes.map(normalizeMayraPath).filter(Boolean))) : [];
+        const scope = addon?.scope ? normalizeMayraPath(addon.scope) : addon?.scope;
+        const categoryPath = Array.isArray(addon?.categoryPath)
+          ? addon.categoryPath.map((part) => CHILD_ALIASES[sanitizeSlug(part)] || (MAYRA_ALIASES.has(sanitizeSlug(part)) ? "mayra-and-rituals" : part))
+          : addon?.categoryPath;
+        const next = { ...addon };
+        if (JSON.stringify(scopes) !== JSON.stringify(addon.scopes || [])) { next.scopes = scopes; changed = true; }
+        if (scope !== addon?.scope) { next.scope = scope; changed = true; }
+        if (JSON.stringify(categoryPath) !== JSON.stringify(addon?.categoryPath)) { next.categoryPath = categoryPath; changed = true; }
+        return next;
+      });
+      if (changed) { writeStorage(KEYS.addons, migratedAddons); queueCloudSync(KEYS.addons, migratedAddons); }
+    }
+
+    localStorage.setItem(MAYRA_RITUALS_MERGE_MIGRATION, "1");
+  }
+
+  // Canonical Event Services structure (data-only migration; no UI changes).
+  // There is one Event Services page with exactly ten top-level service
+  // categories. Older builds stored some of these as nested categories or
+  // used temporary names such as "Entry", "Brass", or "Baraat Procession".
+  const SERVICE_STRUCTURE_MIGRATION = "nle-service-structure-v4";
+  if (localStorage.getItem(SERVICE_STRUCTURE_MIGRATION) !== "1") {
+    const canonical = [
+      ["decor", "Décor"],
+      ["entry-concept", "Entry Concept"],
+      ["entertainment", "Entertainment"],
+      ["sound-technical", "Sound & Technical"],
+      ["tent-furniture", "Tent & Furniture"],
+      ["photography-videography", "Photography & Videography"],
+      ["catering", "Catering"],
+      ["baraat-procession", "Baraat / Procession"],
+      ["wedding-activity", "Wedding Activity"],
+      ["other-services", "Other Services"],
+    ];
+    const canonicalSlugs = new Set(canonical.map(([slug]) => slug));
+    const aliases = {
+      entry: "entry-concept",
+      "entry-concept": "entry-concept",
+      brass: "baraat-procession",
+      baraat: "baraat-procession",
+      "baraat-procession": "baraat-procession",
+      artists: "entertainment",
+      "dj-live-bands": "entertainment",
+      "wedding-activity": "wedding-activity",
+      "other": "other-services",
+      "other-services": "other-services",
+      "other-service": "other-services",
+      sfx: "sound-technical",
+      sound: "sound-technical",
+      lighting: "sound-technical",
+      "av-technical": "sound-technical",
+      photography: "photography-videography",
+      videography: "photography-videography",
+      "tent-and-furniture": "tent-furniture",
+      "tent-furnitures": "tent-furniture",
+    };
+    const descriptions = {
+      decor: "Decoration packages, backdrops, stages and styling.",
+      "entry-concept": "Grand and unique event entries.",
+      entertainment: "Artists, DJs, live bands and guest entertainment.",
+      "sound-technical": "Lighting, AV, sound and technical production.",
+      "tent-furniture": "Tents, seating, tables and event furniture.",
+      "photography-videography": "Photography and video coverage.",
+      catering: "Food and beverage experiences for events.",
+      "baraat-procession": "Dhol, band and baraat procession services.",
+      "wedding-activity": "Games, rituals and guest-engagement experiences.",
+      "other-services": "Additional event services that do not fit the main service categories.",
+    };
+
+    const migrateServiceTree = (tree) => {
+      if (!tree || typeof tree !== "object" || tree.slug !== "event-services") return tree;
+      const buckets = new Map(canonical.map(([slug]) => [slug, []]));
+      const productSeen = new Set();
+
+      const collectProducts = (node, target) => {
+        if (!node || typeof node !== "object" || !target || !buckets.has(target)) return;
+        const products = Array.isArray(node.products) ? node.products : [];
+        products.forEach((product) => {
+          const id = product?.id || `${target}:${product?.slug || product?.name || JSON.stringify(product)}`;
+          if (!productSeen.has(id)) {
+            productSeen.add(id);
+            buckets.get(target).push(product);
+          }
+        });
+      };
+
+      const walk = (node, inheritedTarget = null) => {
+        if (!node || typeof node !== "object") return;
+        const rawSlug = sanitizeSlug(node.slug);
+        // "Services" was only a legacy container. Do not turn the container
+        // itself into Other Services; map its real children individually.
+        const isLegacyContainer = rawSlug === "services";
+        const target = isLegacyContainer
+          ? inheritedTarget
+          : (aliases[rawSlug] || (canonicalSlugs.has(rawSlug) ? rawSlug : (inheritedTarget || "other-services")));
+        collectProducts(node, target);
+        (node.children || []).forEach((child) => walk(child, target));
+      };
+      (tree.children || []).forEach((child) => walk(child));
+
+      tree.children = canonical.map(([slug, label]) => ({
+        id: `svc-${slug}`,
+        slug,
+        label,
+        type: "category",
+        description: descriptions[slug],
+        image: (tree.children || []).find((node) => aliases[sanitizeSlug(node?.slug)] === slug || sanitizeSlug(node?.slug) === slug)?.image || "",
+        children: [],
+        ...(buckets.get(slug)?.length ? { products: buckets.get(slug) } : {}),
+      }));
+      tree.label = "Event Services";
+      return tree;
+    };
+
+    const currentTree = readStorage(KEYS.occasions, []);
+    const serviceTree = currentTree.find((item) => item?.slug === "event-services");
+    if (serviceTree) {
+      const migratedTree = JSON.parse(JSON.stringify(currentTree));
+      const migratedService = migratedTree.find((item) => item?.slug === "event-services");
+      migrateServiceTree(migratedService);
+      writeStorage(KEYS.occasions, migratedTree);
+      queueCloudSync(KEYS.occasions, migratedTree);
+    }
+
+    const existingProducts = readStorage(KEYS.products, []);
+    if (Array.isArray(existingProducts) && existingProducts.length) {
+      const pathMap = {
+        entry: "entry-concept",
+        "entry-concept": "entry-concept",
+        brass: "baraat-procession",
+        baraat: "baraat-procession",
+        "baraat-procession": "baraat-procession",
+        artists: "entertainment",
+        "dj-live-bands": "entertainment",
+        "wedding-activity": "wedding-activity",
+        sfx: "sound-technical",
+        sound: "sound-technical",
+        lighting: "sound-technical",
+        "av-technical": "sound-technical",
+        photography: "photography-videography",
+        videography: "photography-videography",
+      };
+      let changed = false;
+      const migratedProducts = existingProducts.map((product) => {
+        const path = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
+        if (path[0] !== "event-services" || path.length < 2) return product;
+        const raw = path.slice(1).map((part) => sanitizeSlug(part)).filter(Boolean);
+        const mapped = pathMap[raw[0]] || raw[0];
+        if (!canonicalSlugs.has(mapped)) return product;
+        const nextPath = ["event-services", mapped];
+        if (JSON.stringify(nextPath) === JSON.stringify(path)) return product;
+        changed = true;
+        return { ...product, categoryPath: nextPath, categorySlug: mapped, occasionSlug: "event-services", isAddon: true };
+      });
+      if (changed) {
+        writeStorage(KEYS.products, migratedProducts);
+        queueCloudSync(KEYS.products, migratedProducts);
+      }
+    }
+    localStorage.setItem(SERVICE_STRUCTURE_MIGRATION, "1");
+  }
 
   if (!localStorage.getItem(KEYS.birthdayAgeCategories)) {
     writeStorage(KEYS.birthdayAgeCategories, JSON.parse(JSON.stringify(DEFAULT_BIRTHDAY_AGE_CATEGORIES)));
@@ -759,9 +1152,6 @@ export function saveProduct(product) {
         }).filter(Boolean) : [])
       : [],
     cities: Array.isArray(product.cities) ? product.cities.map(sanitizeText) : [],
-    serviceScopes: Array.isArray(product.serviceScopes)
-      ? product.serviceScopes.map(sanitizeScopePath).filter(Boolean)
-      : [],
     categoryPath: Array.isArray(product.categoryPath) ? product.categoryPath.map(sanitizeSlug).filter(Boolean) : [],
     isAddon: Boolean(product.isAddon || product.occasionSlug === "event-services" || (Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services")),
     updatedAt: now,
@@ -772,6 +1162,17 @@ export function saveProduct(product) {
   delete safeProduct.isDemo;
 
   const existingIdx = list.findIndex((p) => p.id === safeProduct.id || (safeProduct.slug && p.slug === safeProduct.slug));
+  // Services must carry an explicit context decision. A missing/empty
+  // selection on a NEW service is rejected instead of silently going global.
+  if (safeProduct.isAddon || catalogKind === "service") {
+    const resolved = resolveScopeOnSave(product, existingIdx !== -1 ? list[existingIdx] : null);
+    safeProduct.serviceScopes = resolved.serviceScopes;
+    if (resolved.serviceScopeMode) safeProduct.serviceScopeMode = resolved.serviceScopeMode;
+    else delete safeProduct.serviceScopeMode;
+  } else {
+    safeProduct.serviceScopes = [];
+    delete safeProduct.serviceScopeMode;
+  }
   if (existingIdx !== -1) {
     list[existingIdx] = { ...list[existingIdx], ...safeProduct };
   } else {
@@ -958,11 +1359,66 @@ export async function saveBirthdayAgeCategoriesToCloud(items) {
   return saved;
 }
 
+function repairEventServiceCategoryTree() {
+  const current = getOccasion("event-services");
+  const baseChildren = Array.isArray(current?.children) ? current.children : [];
+  const bySlug = new Map(baseChildren.map((node) => [sanitizeSlug(node?.slug), node]));
+  let changed = !current;
+
+  const children = EVENT_SERVICES.map((service) => {
+    const slug = sanitizeSlug(service.slug);
+    const existing = bySlug.get(slug);
+    if (existing) {
+      return {
+        ...existing,
+        slug,
+        label: existing.label || service.label,
+        type: existing.type || "category",
+        description: existing.description || service.sub || "",
+        image: existing.image || service.image || "",
+        children: Array.isArray(existing.children) ? existing.children : [],
+      };
+    }
+    changed = true;
+    return {
+      id: `svc-${slug}`,
+      slug,
+      label: service.label,
+      type: "category",
+      description: service.sub || "",
+      image: service.image || "",
+      children: [],
+    };
+  });
+
+  // Event Services is intentionally a fixed ten-category catalog. Preserve
+  // existing category data/products, but do not expose legacy/unknown
+  // top-level service buckets alongside the canonical ten.
+  if (baseChildren.length !== children.length || baseChildren.some((node, index) => sanitizeSlug(node?.slug) !== children[index]?.slug)) {
+    changed = true;
+  }
+
+  const repaired = {
+    ...(current || {}),
+    id: current?.id || "event-services",
+    slug: "event-services",
+    label: current?.label || "Event Services",
+    addonOnly: true,
+    children,
+  };
+
+  if (changed || JSON.stringify(current?.children || []) !== JSON.stringify(children)) {
+    const list = getOccasions().filter((occasion) => occasion?.slug !== "event-services");
+    const next = [...list, sanitizeCategoryNode(repaired)];
+    persist(KEYS.occasions, next);
+    dispatchCatalogUpdate();
+  }
+  return repaired;
+}
+
 export function ensureEventServiceCategoryStructure() {
-  // Intentionally no-op. Event Services must come from the persisted admin
-  // catalog/Supabase. Never recreate the old bundled service tree at runtime.
   initializeSeedsIfNeeded();
-  return Boolean(getOccasion("event-services"));
+  return Boolean(repairEventServiceCategoryTree());
 }
 
 export function getOccasions() {
@@ -971,9 +1427,136 @@ export function getOccasions() {
   if (occasionsCacheValue && occasionsCacheRaw === raw) return occasionsCacheValue;
   occasionsCacheRaw = raw;
   const fallback = (SEED_OCCASIONS || []).filter((occasion) => occasion?.slug !== "event-services");
-  occasionsCacheValue = readStorage(KEYS.occasions, fallback)
+  let loadedOccasions = readStorage(KEYS.occasions, fallback)
     .filter((occasion) => occasion?.slug !== "event-services" || Array.isArray(occasion?.children))
     .map(sanitizeCategoryNode);
+
+  // Always repair the Wedding product hierarchy before returning catalog data.
+  // Older one-time migrations could leave duplicate Mehndi nodes or omit Haldi.
+  // The repair is intentionally idempotent and only touches the known Wedding
+  // Events structure; admin-created products and custom child nodes are kept.
+  {
+    const wedding = loadedOccasions.find((occasion) => sanitizeSlug(occasion?.slug) === "wedding");
+    const seedWedding = (SEED_OCCASIONS || []).find((occasion) => sanitizeSlug(occasion?.slug) === "wedding");
+    const seedEvents = seedWedding?.children?.find((node) => sanitizeSlug(node?.slug) === "wedding-events");
+    if (wedding && seedEvents) {
+      const clone = JSON.parse(JSON.stringify(loadedOccasions));
+      const currentWedding = clone.find((occasion) => sanitizeSlug(occasion?.slug) === "wedding");
+      const isServiceNode = (node) => {
+        const slug = sanitizeSlug(node?.slug);
+        const label = String(node?.label || "").trim().toLowerCase();
+        return new Set(["services", "service", "event-services", "event-add-ons", "event-addon", "addons", "add-ons"]).has(slug)
+          || label === "services" || label === "event services" || label === "event add-ons";
+      };
+      let changed = false;
+      if (Array.isArray(currentWedding?.children)) {
+        const cleanTop = currentWedding.children.filter((node) => !isServiceNode(node));
+        if (cleanTop.length !== currentWedding.children.length) { currentWedding.children = cleanTop; changed = true; }
+      }
+      let events = currentWedding?.children?.find((node) => sanitizeSlug(node?.slug) === "wedding-events");
+      if (!events) {
+        events = JSON.parse(JSON.stringify(seedEvents));
+        currentWedding.children = [events, ...(currentWedding.children || [])];
+        changed = true;
+      }
+      const aliases = { mehendi: "mehndi", mehandi: "mehndi", "mehndi-decor": "mehndi", "haldi-ceremony": "haldi" };
+      const mergeNodes = (target, source) => {
+        if (!target || !source || target === source) return;
+        if (!target.image && source.image) target.image = source.image;
+        if (!target.description && source.description) target.description = source.description;
+        if (!target.tagline && source.tagline) target.tagline = source.tagline;
+        const children = Array.isArray(target.children) ? target.children : (target.children = []);
+        const childKeys = new Set(children.map((child) => sanitizeSlug(child?.slug)));
+        (source.children || []).forEach((child) => { const key = sanitizeSlug(child?.slug); if (key && !childKeys.has(key)) { children.push(child); childKeys.add(key); } });
+        const targetProducts = Array.isArray(target.products) ? target.products : (target.products = []);
+        const productKeys = new Set(targetProducts.map((product) => product?.id || product?.slug));
+        (source.products || []).forEach((product) => { const key = product?.id || product?.slug; if (key && !productKeys.has(key)) { targetProducts.push(product); productKeys.add(key); } });
+      };
+      const bySlug = new Map();
+      const repaired = [];
+      (events.children || []).forEach((node) => {
+        if (isServiceNode(node)) { changed = true; return; }
+        const raw = sanitizeSlug(node?.slug);
+        const canonical = aliases[raw] || raw;
+        if (!canonical) return;
+        const existing = bySlug.get(canonical);
+        if (existing) { mergeNodes(existing, node); changed = true; return; }
+        if (node.slug !== canonical) { node.slug = canonical; changed = true; }
+        if (canonical === "mehndi") node.label = "Mehndi";
+        if (canonical === "haldi") node.label = "Haldi";
+        bySlug.set(canonical, node);
+        repaired.push(node);
+      });
+      (seedEvents.children || []).forEach((seedNode) => {
+        const slug = sanitizeSlug(seedNode?.slug);
+        if (!slug || bySlug.has(slug)) return;
+        repaired.push(JSON.parse(JSON.stringify(seedNode)));
+        bySlug.set(slug, repaired[repaired.length - 1]);
+        changed = true;
+      });
+      const order = (seedEvents.children || []).map((node) => sanitizeSlug(node?.slug)).filter(Boolean);
+      repaired.sort((a, b) => (order.indexOf(sanitizeSlug(a?.slug)) < 0 ? 999 : order.indexOf(sanitizeSlug(a?.slug))) - (order.indexOf(sanitizeSlug(b?.slug)) < 0 ? 999 : order.indexOf(sanitizeSlug(b?.slug))));
+      if (JSON.stringify(events.children || []) !== JSON.stringify(repaired)) { events.children = repaired; changed = true; }
+      if (changed) {
+        loadedOccasions = clone;
+        writeStorage(KEYS.occasions, loadedOccasions);
+        queueCloudSync(KEYS.occasions, loadedOccasions);
+      }
+    }
+  }
+
+  // The public catalog has six canonical top-level occasions. Older cloud/local
+  // catalog snapshots can contain only five (for example, a snapshot created
+  // before Kids & Family was added). The reference hierarchy migration is
+  // intentionally one-time, so those older snapshots were never repaired.
+  // Restore only a missing canonical top-level occasion from the seed without
+  // replacing or changing any existing admin-created data.
+  const requiredPublicSlugs = [
+    "wedding",
+    "birthday",
+    "corporate",
+    "kids-family",
+    "anniversary",
+    "festivals-culture",
+  ];
+  const loadedSlugs = new Set(loadedOccasions.map((occasion) => String(occasion?.slug || "").trim()));
+  let repairedOccasions = false;
+  requiredPublicSlugs.forEach((slug) => {
+    if (loadedSlugs.has(slug)) return;
+    const seedOccasion = (SEED_OCCASIONS || []).find((occasion) => occasion?.slug === slug);
+    if (!seedOccasion) return;
+    loadedOccasions.push(sanitizeCategoryNode(JSON.parse(JSON.stringify(seedOccasion))));
+    loadedSlugs.add(slug);
+    repairedOccasions = true;
+  });
+
+  if (repairedOccasions) {
+    writeStorage(KEYS.occasions, loadedOccasions);
+    // If this is the admin session, make the repaired canonical occasion
+    // durable in the cloud as well. Without an admin token this is a no-op.
+    queueCloudSync(KEYS.occasions, loadedOccasions);
+    occasionsCacheRaw = JSON.stringify(loadedOccasions);
+  }
+
+  // Top-level occasion slugs are identity keys throughout the admin UI and
+  // storefront. Older/imported catalog state can contain the same occasion
+  // more than once (for example two `wedding` records), which causes React
+  // duplicate-key warnings and inconsistent selection state. Keep the first
+  // canonical record for each slug and persist the cleaned list.
+  const seenSlugs = new Set();
+  const dedupedOccasions = loadedOccasions.filter((occasion) => {
+    const slug = String(occasion?.slug || "").trim();
+    if (!slug || seenSlugs.has(slug)) return false;
+    seenSlugs.add(slug);
+    return true;
+  });
+
+  if (dedupedOccasions.length !== loadedOccasions.length) {
+    writeStorage(KEYS.occasions, dedupedOccasions);
+    occasionsCacheRaw = JSON.stringify(dedupedOccasions);
+  }
+
+  occasionsCacheValue = dedupedOccasions;
   return occasionsCacheValue;
 }
 
@@ -1745,15 +2328,10 @@ function pathIsAncestorOrSelf(scopePath, contextPath) {
   return false;
 }
 
-function serviceProductMatchesContext(product, contextPath) {
-  if (!Array.isArray(contextPath) || !contextPath.length) return true;
-  const scopes = Array.isArray(product?.serviceScopes)
-    ? product.serviceScopes.map(sanitizeScopePath).filter(Boolean)
-    : [];
-  // Empty serviceScopes means the service product is global and can be shown
-  // in every contextual service listing.
-  if (!scopes.length) return true;
-  return scopes.some((scope) => pathIsAncestorOrSelf(scope, contextPath));
+export function serviceProductMatchesContext(product, contextPath) {
+  // Strict matching lives in ./serviceContext (explicit scoped/global/legacy
+  // modes, prefix-only path match, no silent global fallback).
+  return serviceMatchesContext(product, contextPath);
 }
 
 export function getServiceScopeOptions() {
@@ -1849,7 +2427,8 @@ function countProductsOf(node, contextPath = null) {
 // Category" picker in Admin → Event Services so a service can never point
 // at a category that doesn't actually exist or has no products.
 export function getAddonCategoryTree() {
-  return getOccasion("event-services") || { children: [] };
+  initializeSeedsIfNeeded();
+  return repairEventServiceCategoryTree() || { children: [] };
 }
 
 export function getAddonCategories() {
@@ -1954,7 +2533,7 @@ export function getAddonsForOccasion(topSlug, contextPath = null) {
       active: true,
       scopes: products.flatMap((product) => Array.isArray(product.serviceScopes) ? product.serviceScopes : []),
     };
-  }).filter(Boolean);
+  }).filter((item) => item && item.productCount > 0);
 }
 
 export function saveAddon(addon) {

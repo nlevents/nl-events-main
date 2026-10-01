@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PLACEHOLDER_IMAGE } from "../../lib/imageFallback";
 import usePageMeta from "../../hooks/usePageMeta";
 import useReveal from "../../hooks/useReveal";
@@ -12,11 +12,15 @@ import EventServicesSection from "./EventServicesSection";
 import HeroImageCarousel from "../HeroImageCarousel";
 import ListingControls from "./ListingControls";
 import ProductRail from "../ProductRail";
+import { serviceProductMatchesContext } from "../../lib/catalogStore";
+import { filterServiceProducts } from "../../lib/serviceContext";
+import { EVENT_SERVICES } from "../../data/eventServices";
 import { useCity } from "../../context/CityContext";
+import { trackEvent } from "../../lib/siteEvents";
 import {
   childrenOf, pathFor, countProducts,
   sortProducts, isAvailableInCity, PRICE_BUCKETS, toRailItem, collectProductEntries,
-  quickLinksFor, heroGalleryFor,
+  quickLinksFor, heroGalleryFor, OCCASIONS,
 } from "../../data/occasions";
 
 const SHOP_REVIEWS = {
@@ -50,33 +54,80 @@ function OccasionReview({ topSlug, label }) {
 // what it shows (child cards vs. product grid vs. both) is driven purely
 // by whether `node.children` / `node.products` exist.
 
-function ServiceCatalogContent({ node, trail }) {
+function flattenServiceCategories(nodes = [], trail = []) {
+  const out = [];
+  (nodes || []).forEach((child) => {
+    const next = [...trail, child];
+    out.push({ path: next.map((item) => item.slug).join("/"), label: next.map((item) => item.label).join(" › ") });
+    out.push(...flattenServiceCategories(child.children || [], next));
+  });
+  return out;
+}
+
+function flattenOccasionContexts(nodes = [], occasionSlug, trail = []) {
+  const out = [];
+  (nodes || []).forEach((child) => {
+    const next = [...trail, child];
+    out.push({
+      path: [occasionSlug, ...next.map((item) => item.slug)].join("/"),
+      label: next.map((item) => item.label).join(" › "),
+    });
+    out.push(...flattenOccasionContexts(child.children || [], occasionSlug, next));
+  });
+  return out;
+}
+
+function ServiceCatalogContent({ node, serviceContextPath = [] }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [liveTree, setLiveTree] = useState(null);
   const [liveProducts, setLiveProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [serviceFilter, setServiceFilter] = useState("");
+  const [occasionFilter, setOccasionFilter] = useState("");
+  const [functionFilter, setFunctionFilter] = useState("");
+  const [priceFilter, setPriceFilter] = useState("all");
+  const [sortKey, setSortKey] = useState("popular");
 
-  const servicePath = useMemo(
-    () => (Array.isArray(trail) ? trail.map((item) => item.slug).filter(Boolean) : []),
-    [trail],
-  );
+  useReveal([liveTree, liveProducts, loading, serviceFilter, occasionFilter, functionFilter, priceFilter, sortKey]);
 
-  // Service content is hydrated asynchronously. The parent category page's
-  // reveal observer runs before these nodes exist, which can leave dynamically
-  // inserted `.reveal` elements at opacity:0 forever. Re-run the same existing
-  // reveal behavior whenever the live service tree/products arrive.
-  useReveal([servicePath.join("/"), liveTree, liveProducts, loading]);
+  const syncFromUrl = () => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const context = (params.get("context") || "").split("/").map((part) => part.trim()).filter(Boolean);
+      setServiceFilter(params.get("service") || "");
+      setOccasionFilter(context[0] || "");
+      setFunctionFilter(context.slice(1).join("/") || "");
+    } catch {
+      setServiceFilter("");
+      setOccasionFilter("");
+      setFunctionFilter("");
+    }
+  };
+
+  useEffect(() => {
+    syncFromUrl();
+    // Keep the page in sync when a user follows a filter link with the browser.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
+  const updateFilters = (next = {}) => {
+    const nextService = next.service !== undefined ? next.service : serviceFilter;
+    const nextOccasion = next.occasion !== undefined ? next.occasion : occasionFilter;
+    const nextFunction = next.functionPath !== undefined ? next.functionPath : functionFilter;
+    const params = new URLSearchParams();
+    if (nextService) params.set("service", nextService);
+    const context = [nextOccasion, nextFunction].filter(Boolean).join("/");
+    if (context) params.set("context", context);
+    navigate({ pathname: "/occasion/event-services", search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
+  };
 
   const refreshServiceCatalog = async () => {
     try {
-      // Force a fresh public-catalog read on service pages. This prevents a
-      // hard refresh from rendering a cached category before the latest
-      // Supabase service products have reached localStorage.
       const { hydrateCatalogFromCloud, getAddonCategoryTree, getAddonProducts } = await import("../../lib/catalogStore");
       await hydrateCatalogFromCloud();
-      const tree = getAddonCategoryTree();
-      const products = getAddonProducts();
-      setLiveTree(tree || null);
-      setLiveProducts(Array.isArray(products) ? products : []);
+      setLiveTree(getAddonCategoryTree() || null);
+      setLiveProducts(Array.isArray(getAddonProducts()) ? getAddonProducts() : []);
     } catch {
       try {
         const { getAddonCategoryTree, getAddonProducts } = await import("../../lib/catalogStore");
@@ -96,7 +147,6 @@ function ServiceCatalogContent({ node, trail }) {
     const refresh = async () => {
       try {
         const { getAddonCategoryTree, getAddonProducts, hydrateCatalogFromCloud } = await import("../../lib/catalogStore");
-        // Read the cache immediately so the page is never an empty white area.
         if (!cancelled) {
           setLiveTree(getAddonCategoryTree() || null);
           setLiveProducts(getAddonProducts() || []);
@@ -111,92 +161,135 @@ function ServiceCatalogContent({ node, trail }) {
         if (!cancelled) setLoading(false);
       }
     };
-
     refresh();
     window.addEventListener("nle-catalog-updated", refreshServiceCatalog);
     return () => {
       cancelled = true;
       window.removeEventListener("nle-catalog-updated", refreshServiceCatalog);
     };
-  }, [servicePath.join("/")]);
+  }, []);
 
-  const activeNode = useMemo(() => {
-    if (!liveTree || !servicePath.length) return node;
-    let current = liveTree;
-    for (const slug of servicePath.slice(1)) {
-      current = (current?.children || []).find((child) => child.slug === slug);
-      if (!current) return node;
-    }
-    return current;
-  }, [liveTree, servicePath, node]);
+  const occasionOptions = useMemo(
+    () => OCCASIONS.filter((occasion) => !occasion.addonOnly && occasion.slug !== "dummy-event"),
+    [],
+  );
 
-  const children = Array.isArray(activeNode?.children) ? activeNode.children : [];
-  const orderedProducts = useMemo(() => {
-    if (!servicePath.length) return [];
-    const prefix = servicePath.join("/");
-    const seen = new Set();
-    return liveProducts.filter((product) => {
-      if (!product || product.status === "archived" || product.status === "draft") return false;
-      const path = Array.isArray(product.categoryPath)
-        ? product.categoryPath.filter(Boolean)
-        : [];
-      const pathKey = path.join("/");
-      const matches = pathKey === prefix || pathKey.startsWith(`${prefix}/`);
-      if (!matches) return false;
-      const key = String(product.id || product.slug || product.name || "");
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).map((product) => {
-      // Rebuild the real category trail from the persisted categoryPath so a
-      // product nested under a service sub-category keeps the correct URL.
-      let categoryTrail = [...trail];
-      if (liveTree && Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services") {
-        let current = liveTree;
-        const rebuilt = [liveTree];
-        for (const slug of product.categoryPath.slice(1)) {
-          const child = (current?.children || []).find((item) => item.slug === slug);
-          if (!child) break;
-          rebuilt.push(child);
-          current = child;
-        }
-        if (rebuilt.length === product.categoryPath.length) categoryTrail = rebuilt;
-      }
-      return { ...product, __trail: [...categoryTrail, product] };
+  const functionOptions = useMemo(() => {
+    const occasion = occasionOptions.find((item) => item.slug === occasionFilter);
+    return occasion ? flattenOccasionContexts(occasion.children || [], occasion.slug) : [];
+  }, [occasionFilter, occasionOptions]);
+
+  const contextPath = useMemo(() => {
+    if (occasionFilter && functionFilter) return [occasionFilter, ...functionFilter.split("/").filter(Boolean)];
+    if (occasionFilter) return [occasionFilter];
+    return [];
+  }, [occasionFilter, functionFilter]);
+
+  // The service filter is intentionally limited to the same ten canonical
+  // top-level services used by every storefront service rail.
+  const serviceCategories = useMemo(() => {
+    // When an occasion/function is selected, only expose service categories
+    // that have at least one live product matching that exact context. This
+    // keeps the filter controls aligned with the same scoped product list.
+    const available = new Set();
+    filterServiceProducts(liveProducts, { contextPath }).forEach((product) => {
+      const path = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
+      if (path[0] === "event-services" && path[1]) available.add(path[1]);
     });
-  }, [liveProducts, liveTree, servicePath, trail]);
+    return EVENT_SERVICES
+      .filter((service) => available.has(service.slug))
+      .map((service) => ({ path: service.slug, label: service.label }));
+  }, [liveProducts, contextPath]);
 
-  const isRoot = activeNode?.slug === "event-services";
-  const childCards = children.filter((child) => child && child.active !== false);
+  useEffect(() => {
+    // If a deep link or a previously selected filter points to a service
+    // category that has no live service in the current context, clear that
+    // stale category selection instead of leaving the catalog in an empty
+    // state. During initial loading, keep the URL untouched until products
+    // have been hydrated.
+    if (!loading && serviceFilter && !serviceCategories.some((item) => item.path === serviceFilter)) {
+      const params = new URLSearchParams(location.search);
+      params.delete("service");
+      navigate({ pathname: "/occasion/event-services", search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
+    }
+  }, [loading, serviceFilter, serviceCategories, location.search, navigate]);
+
+  const orderedProducts = useMemo(() => {
+    let list = filterServiceProducts(liveProducts, {
+      service: serviceFilter,
+      contextPath,
+    });
+
+    if (priceFilter !== "all") {
+      const bucket = PRICE_BUCKETS.find((bucketItem) => bucketItem.key === priceFilter);
+      if (bucket) list = list.filter((product) => Number(product.price) >= bucket.min && Number(product.price) < bucket.max);
+    }
+
+    return sortProducts(list, sortKey).map((product) => ({
+      ...product,
+      __contextPath: contextPath,
+      __trail: [node, ...(Array.isArray(product.categoryPath) ? product.categoryPath.slice(1).map((slug) => ({ slug, label: slug })) : []), product],
+    }));
+  }, [liveProducts, serviceFilter, contextPath, priceFilter, sortKey, node]);
+
+  const filterDescriptors = useMemo(() => [
+    {
+      key: "service",
+      label: "Service",
+      kind: "select",
+      value: serviceFilter,
+      onChange: (value) => updateFilters({ service: value }),
+      options: [{ key: "", label: "All Services" }, ...serviceCategories.map((item) => ({ key: item.path, label: item.label }))],
+    },
+    {
+      key: "occasion",
+      label: "Occasion",
+      kind: "select",
+      value: occasionFilter,
+      onChange: (value) => updateFilters({ occasion: value, functionPath: "" }),
+      options: [{ key: "", label: "All Occasions" }, ...occasionOptions.map((item) => ({ key: item.slug, label: item.label }))],
+    },
+    {
+      key: "function",
+      label: "Function",
+      kind: "select",
+      value: functionFilter,
+      onChange: (value) => updateFilters({ functionPath: value }),
+      options: [{ key: "", label: occasionFilter ? "All Functions" : "Choose an occasion" }, ...functionOptions.map((item) => ({ key: item.path.slice(occasionFilter.length + 1), label: item.label }))],
+    },
+    {
+      key: "price",
+      label: "Price",
+      kind: "chips",
+      value: priceFilter,
+      onChange: setPriceFilter,
+      options: PRICE_BUCKETS.map((bucket) => ({ key: bucket.key, label: bucket.label })),
+    },
+  ], [serviceFilter, occasionFilter, functionFilter, priceFilter, serviceCategories, occasionOptions, functionOptions]);
+
+  function resetFilters() {
+    setPriceFilter("all");
+    updateFilters({ service: "", occasion: "", functionPath: "" });
+  }
 
   return (
     <>
-      {childCards.length > 0 && (
-        <div className="occ-block" style={{ paddingTop: 0, marginTop: 0, borderTop: 0 }}>
-          <div className="section-head reveal">
-            <h2>{isRoot ? "Services Categories" : "More in " + activeNode.label}</h2>
-            <p>{isRoot ? "Browse the services available for your event." : "Choose a service category to explore."}</p>
-          </div>
-          <div className="occ-cat-grid reveal">
-            {childCards.map((child) => (
-              <CategoryCard
-                key={child.slug}
-                node={{ ...child, image: child.image || child.heroImg || PLACEHOLDER_IMAGE }}
-                href={pathFor([...trail, child])}
-              />
-            ))}
-          </div>
+      <div className="occ-block" style={{ paddingTop: 0, marginTop: 0, borderTop: 0 }}>
+        <div className="section-head reveal">
+          <h2>All Services</h2>
+          <p>Choose a service, occasion and function to see exactly what is available.</p>
         </div>
-      )}
+        <ListingControls
+          resultCount={orderedProducts.length}
+          sortKey={sortKey}
+          onSortChange={setSortKey}
+          filters={filterDescriptors}
+          onReset={resetFilters}
+        />
+      </div>
 
       {orderedProducts.length > 0 && (
         <div className="occ-block">
-          <div className="section-head reveal">
-            <div>
-              <h2>{isRoot ? "All Services" : activeNode.label + " Services"}</h2>
-              <p>{orderedProducts.length} service{orderedProducts.length === 1 ? "" : "s"} available.</p>
-            </div>
-          </div>
           <div className="occ-prod-grid reveal">
             {orderedProducts.map((product, index) => (
               <ProductCard
@@ -210,18 +303,18 @@ function ServiceCatalogContent({ node, trail }) {
         </div>
       )}
 
-      {!loading && !childCards.length && !orderedProducts.length && (
+      {!loading && !orderedProducts.length && (
         <div className="occ-block">
           <div className="occ-empty reveal">
-            <strong>No services are available here yet.</strong>
-            <p>This service category is ready for products from Admin → Catalog → Services.</p>
+            <strong>No services match these filters.</strong>
+            <p>Try another service, occasion, function or price range.</p>
           </div>
         </div>
       )}
 
-      {loading && !childCards.length && !orderedProducts.length && (
+      {loading && !orderedProducts.length && (
         <div className="occ-block">
-          <div className="occ-empty reveal" aria-live="polite">
+          <div className="occ-empty reveal">
             <strong>Loading services…</strong>
             <p>Getting the latest services from the catalog.</p>
           </div>
@@ -258,6 +351,16 @@ export default function CategoryTemplate({ node, trail }) {
   const children = childrenOf(node);
   const parent = trail.length > 1 ? trail[trail.length - 2] : null;
 
+  useEffect(() => {
+    if (topSlug && topSlug !== "event-services") {
+      trackEvent("occasion_view", {
+        occasion: topSlug,
+        function_path: trail.slice(1).map((item) => item.slug).join("/"),
+        page_name: node.label,
+      });
+    }
+  }, [topSlug, node.label, trail]);
+
   // Services are admin-editable (Admin → Event Services), so they're read
   // from the catalog store rather than the static data file, and kept in
   // sync with "nle-catalog-updated" so admin edits show without a reload.
@@ -272,29 +375,47 @@ export default function CategoryTemplate({ node, trail }) {
       return [];
     }
   }, [topSlug, trail, location.search]);
-  // Mixed/aggregated product grid: every product nested under this node
-  // (own + every descendant category/theme), not just ones attached
-  // directly to it. A top-level listing (e.g. Birthday) shows every theme's
-  // products together; a leaf theme page naturally reduces to just its own
-  // products since it has no descendants. Each product keeps its real
-  // trail (__trail) so its card links to the correct nested URL.
-  const productEntries = useMemo(() => collectProductEntries(node, trail), [node, trail]);
+  // Listing scope is based on the selected node. Parent/category pages with
+  // children can intentionally aggregate products from their descendants, but
+  // a selected leaf/theme (for example Traditional Haldi, a Birthday theme,
+  // a Reception theme, an Anniversary type, or a Corporate event type) must
+  // show only products assigned to that exact node. This keeps the same strict
+  // filtering rule across every occasion instead of special-casing Wedding.
+  const productEntries = useMemo(() => {
+    const hasChildren = Array.isArray(node?.children) && node.children.length > 0;
+    const isExactListing = node?.type === "theme" || !hasChildren;
+
+    if (isExactListing) {
+      const currentPath = trail.map((item) => item.slug);
+      const directProducts = Array.isArray(node.products) ? node.products : [];
+      return directProducts
+        .filter((product) => {
+          const productPath = Array.isArray(product?.categoryPath)
+            ? product.categoryPath.filter(Boolean)
+            : [];
+          if (productPath.length) {
+            return productPath.length === currentPath.length &&
+              productPath.every((part, index) => part === currentPath[index]);
+          }
+
+          // Older records may only have categorySlug. If that field points
+          // to the parent category (e.g. `haldi`), do not show it on a
+          // child theme (e.g. `traditional-haldi`).
+          const categorySlug = String(product?.categorySlug || "").trim();
+          return !categorySlug || categorySlug === node.slug;
+        })
+        .map((product) => ({ product, trail: [...trail, product] }));
+    }
+
+    return collectProductEntries(node, trail);
+  }, [node, trail]);
   const products = useMemo(
     () => productEntries.map((e) => ({ ...e.product, __trail: e.trail })),
     [productEntries],
   );
   const contextProducts = useMemo(() => {
     if (!isServiceCatalog || !serviceContextPath.length) return products;
-    const isPrefix = (scope, context) => {
-      const a = String(scope || "").split("/").filter(Boolean);
-      const b = context;
-      if (!a.length || a.length > b.length) return false;
-      return a.every((part, index) => part === b[index]);
-    };
-    return products.filter((product) => {
-      const scopes = Array.isArray(product.serviceScopes) ? product.serviceScopes : [];
-      return !scopes.length || scopes.some((scope) => isPrefix(scope, serviceContextPath));
-    });
+    return products.filter((product) => serviceProductMatchesContext(product, serviceContextPath));
   }, [products, isServiceCatalog, serviceContextPath]);
   const quickLinks = useMemo(() => quickLinksFor(node, trail), [node, trail]);
 
@@ -340,7 +461,7 @@ export default function CategoryTemplate({ node, trail }) {
         <section className="section-tight container occ-category-content">
           <Breadcrumb items={crumbs} />
           {node.description && <p className="occ-lead reveal">{node.description}</p>}
-          <ServiceCatalogContent node={node} trail={trail} />
+          <ServiceCatalogContent node={node} serviceContextPath={serviceContextPath} />
         </section>
       </div>
     );
@@ -427,7 +548,7 @@ export default function CategoryTemplate({ node, trail }) {
 
         <OccasionQuickLinks title={node.label + " Decoration Themes"} items={quickLinks} node={node} trail={trail} />
 
-        {!node.addonOnly && <EventServicesSection />}
+        {!node.addonOnly && <EventServicesSection contextPath={serviceContextPath} />}
 
         {!node.addonOnly && !hideServiceCategories && addonItems.length > 0 && (
           <EventAddons title="Services Categories" occasionLabel={node.label} items={addonItems} contextPath={serviceContextPath} />

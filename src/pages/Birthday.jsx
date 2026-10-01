@@ -5,18 +5,8 @@ import usePageMeta from "../hooks/usePageMeta";
 import { BIRTHDAY_AGE_CATEGORIES } from "../data/birthdayAgeCategories";
 import { birthdayThemeLinks } from "../data/occasions";
 import AutoScrollRail from "../components/AutoScrollRail";
+import EventServicesSection from "../components/occasion/EventServicesSection";
 
-
-const SERVICES = [
-  ["Decor", "Themes & Setups", "✧", IMAGES.typeDecor],
-  ["Entry", "Grand & Unique", "♢", IMAGES.showcase4],
-  ["Entertainment", "Artists, DJs, Games", "♫", IMAGES.galConcert2],
-  ["Photography", "Capture Every Moment", "◉", IMAGES.typePhotography],
-  ["Catering", "Delicious Food", "⌂", IMAGES.typeCatering],
-  ["Return Gifts", "Customized Gifts", "✦", IMAGES.themeBalloonCelebration],
-  ["Venue Setup", "Indoor / Outdoor", "⌖", IMAGES.showcase1],
-  ["Planning & Coordination", "Hassle Free", "◷", IMAGES.showcase2],
-];
 
 const THEMES = [
   ["Cocomelon Theme", IMAGES.themeBalloonCelebration],
@@ -135,41 +125,9 @@ function BirthdayCategories() {
 }
 
 function BirthdayServices() {
-  const [services, setServices] = useState([]);
-  useEffect(() => {
-    let cancelled = false;
-    const refresh = () =>
-      import("../lib/catalogStore")
-        .then(({ getAddonsForOccasion }) => {
-          if (!cancelled) setServices(getAddonsForOccasion("birthday"));
-        })
-        .catch(() => {});
-    refresh();
-    window.addEventListener("nle-catalog-updated", refresh);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("nle-catalog-updated", refresh);
-    };
-  }, []);
-  const items = services.map((service, i) => [service.label, service.subLabel, service.image || SERVICES[i % SERVICES.length]?.[3]]);
-  return (
-    <section className="birthday-light-section">
-      <div className="birthday-container">
-        <SectionHead eyebrow="OUR BIRTHDAY SERVICES" title="Everything You Need for a Perfect Birthday" link={{ label: "View All Services", href: "/occasion/event-services" }} />
-        <p className="birthday-intro">From first idea to the final photo, our team takes care of the details.</p>
-        <div className="birthday-services-grid">
-          {items.map(([title, sub, image]) => (
-            <Link to="/occasion/event-services" className="birthday-service-card" key={title}>
-              <div className="birthday-service-icon">✦</div>
-              <strong>{title}</strong>
-              <span>{sub}</span>
-              <img src={image} alt={title} loading="lazy" decoding="async" />
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+  // Birthday uses the same shared service rail as every other storefront page.
+  // Service categories, labels and artwork come from the single EventServicesSection source of truth.
+  return <EventServicesSection contextPath={["birthday"]} />;
 }
 
 function PopularThemes() {

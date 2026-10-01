@@ -10,6 +10,7 @@ import { useCity } from "../context/CityContext";
 import useActiveCities from "../hooks/useActiveCities";
 import { useCart } from "../context/CartContext";
 import CategoryNav from "./CategoryNav";
+import { trackSiteSearch } from "../lib/siteEvents";
 
 export default function Header() {
   const location = useLocation();
@@ -64,6 +65,7 @@ export default function Header() {
     : [];
 
   function goSearch(href) {
+    trackSiteSearch({ searchTerm: query.trim() });
     setSuggestOpen(false);
     setQuery("");
     navigate(href);

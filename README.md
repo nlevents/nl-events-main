@@ -34,9 +34,7 @@ Production website and administration application for Next Level Events.
 - `src/` — React application, pages, components, state, catalog and styling
 - `api/` — serverless API handlers
 - `shared/` — authentication, Supabase and shared utilities
-- `supabase/` — database schema and migrations
 - `public/` — static web assets and routing files
-- `scripts/` — asset and Cloudinary migration utilities
 
 ## Catalog
 

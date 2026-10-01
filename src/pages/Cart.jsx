@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import usePageMeta from "../hooks/usePageMeta";
 import { useCart } from "../context/CartContext";
@@ -15,6 +16,7 @@ import {
   cartDiscount,
 } from "../lib/cart";
 import { onImgError } from "../lib/imageFallback";
+import { trackEvent } from "../lib/siteEvents";
 
 function safeCartPath(value) {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -34,6 +36,16 @@ export default function Cart() {
   const navigate = useNavigate();
 
   const items = cart ? cart.items : [];
+
+  useEffect(() => {
+    trackEvent("view_cart", {
+      currency: "INR",
+      value: cartSubtotal(items),
+      items: items.map((item) => ({ item_id: item.id || item.name, item_name: item.name, quantity: item.quantity || 1 })),
+    });
+    // Only when the cart page is entered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const subtotal = cartSubtotal(items);
   const originalSubtotal = cartOriginalSubtotal(items);
   const discount = cartDiscount(items);
@@ -81,7 +93,7 @@ export default function Cart() {
                 <div className="summary-row total"><span>Estimated Total</span><span className="amt">{fmtINR(subtotal)}</span></div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
-                  <button type="button" className="btn btn-primary btn-block" onClick={goCheckout}>Proceed to Checkout</button>
+                  <button type="button" className="btn btn-primary btn-block" onClick={() => { trackEvent("begin_checkout", { currency: "INR", value: subtotal, items: items.map((item) => ({ item_id: item.id || item.name, item_name: item.name, quantity: item.quantity || 1 })) }); goCheckout(); }}>Proceed to Checkout</button>
                   <Link to="/shop-by-occasion" className="btn btn-ghost btn-block">Continue Browsing</Link>
                 </div>
 

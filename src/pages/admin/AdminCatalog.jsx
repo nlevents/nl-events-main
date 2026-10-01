@@ -3,6 +3,8 @@ import { CATALOG_IMAGES } from "../../data/images";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Icon from "../../components/Icon";
+import ServiceContextPicker from "../../components/admin/ServiceContextPicker";
+import ServiceCategoryPicker from "../../components/admin/ServiceCategoryPicker";
 import usePageMeta from "../../hooks/usePageMeta";
 import {
   getOccasions,
@@ -91,9 +93,10 @@ function Field({ label, children, required }) {
 
 function ImagePicker({ value, onChange }) {
   const [busy, setBusy] = useState(false);
-  async function upload(e) {
-    const file = e.target.files?.[0];
+  const [dragging, setDragging] = useState(false);
+  async function uploadFile(file) {
     if (!file) return;
+    if (!file.type?.startsWith("image/")) return window.alert("Please choose an image file.");
     setBusy(true);
     try {
       const saved = await uploadMediaFile(file, file.name);
@@ -102,17 +105,28 @@ function ImagePicker({ value, onChange }) {
       window.alert(err.message || "Unable to upload image.");
     } finally {
       setBusy(false);
-      e.target.value = "";
     }
   }
+  function onFileChange(e) {
+    const file = e.target.files?.[0];
+    if (file) uploadFile(file);
+    e.target.value = "";
+  }
   return (
-    <div className="catalog-image-picker">
-      <div className="catalog-image-preview">
-        {value ? <img src={value} alt="Preview" /> : <Icon name="image" />}
-      </div>
-      <div className="catalog-image-controls">
-        <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder="Image URL" />
-        <label className="btn btn-outline btn-sm"><Icon name="upload" /> {busy ? "Uploading…" : "Upload"}<input hidden type="file" accept="image/*" onChange={upload} disabled={busy} /></label>
+    <div className={`catalog-image-uploader ${dragging ? "is-dragging" : ""}`}>
+      <label
+        className="catalog-image-dropzone"
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); uploadFile(e.dataTransfer.files?.[0]); }}
+      >
+        {value ? <img src={value} alt="Selected" /> : <span className="catalog-image-upload-icon"><Icon name="upload" /></span>}
+        <span className="catalog-image-drop-copy"><strong>{busy ? "Uploading image…" : value ? "Change image" : "Upload product image"}</strong><small>{value ? "Click to choose a different image" : "Drag & drop or click to browse"}</small></span>
+        <input hidden type="file" accept="image/*" onChange={onFileChange} disabled={busy} />
+      </label>
+      <div className="catalog-image-url-row">
+        <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder="Or paste an image URL" aria-label="Image URL" />
+        {value && <button type="button" className="catalog-image-clear" onClick={() => onChange("")} title="Remove image"><Icon name="close" /></button>}
       </div>
     </div>
   );
@@ -143,7 +157,7 @@ export default function AdminCatalog() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("active");
   const [type, setType] = useState("all");
-  const [view, setView] = useState("list");
+  const [view, setView] = useState("grid");
   const [sort, setSort] = useState("latest");
   const [addMenu, setAddMenu] = useState(false);
   const [modal, setModal] = useState(null);
@@ -192,8 +206,11 @@ export default function AdminCatalog() {
     }
     const isServiceTab = tab === "services";
     const catalogProducts = products.filter((p) => {
-      const isService = p.catalogKind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
-      return isServiceTab ? isService : !isService;
+      const kind = p.catalogKind || (p.isAddon ? "service" : "product");
+      const isService = kind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
+      if (isServiceTab) return isService;
+      if (tab === "products") return !isService && kind === "product";
+      return !isService;
     });
     if (showAllCatalog) return catalogProducts;
     const path = [activeOccasion, ...activeCategoryPath].join("/");
@@ -394,6 +411,9 @@ export default function AdminCatalog() {
     return products.filter((p) => {
       const isService = p.catalogKind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
       if (isService !== isServiceTab) return false;
+      const kind = p.catalogKind || (p.isAddon ? "service" : "product");
+      if (tab === "products" && kind !== "product") return false;
+      if (tab === "packages" && kind !== "package") return false;
       const path = Array.isArray(p.categoryPath) ? p.categoryPath : [];
       if (path[0] !== occasionSlug) return false;
       return categoryPath.every((slug, index) => path[index + 1] === slug);
@@ -485,79 +505,112 @@ export default function AdminCatalog() {
     active: products.filter((p) => p.status === "active").length,
   };
 
-  return <div className="admin-page catalog-ref-page">
-    <div className="catalog-ref-head">
-      <div><div className="catalog-breadcrumb">Dashboard <span>›</span> Catalog</div><h1>Catalog</h1><p>Manage all your occasions, functions, services, packages and products in one place.</p></div>
-      <div className="catalog-add-wrap">
-        <button className="btn btn-primary" type="button" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> Add New <span className="catalog-chevron">⌄</span></button>
-        {addMenu && <div className="catalog-add-menu"><button onClick={() => openAdd("product")}><Icon name="package" /><span><strong>Product / Element</strong><small>Individual item like stage, sofa, light, tent</small></span></button><button onClick={() => openAdd("package")}><Icon name="layers" /><span><strong>Package</strong><small>Pre-defined bundle of products/services</small></span></button><button onClick={() => openAdd("service")}><Icon name="settings" /><span><strong>Service</strong><small>Photography, catering, artist, etc.</small></span></button></div>}
+  const productCount = products.filter((p) => (p.catalogKind || (p.isAddon ? "service" : "product")) === "product" && !p.isAddon).length;
+  const packageCount = products.filter((p) => (p.catalogKind || "product") === "package").length;
+  const serviceCount = products.filter((p) => (p.catalogKind || (p.isAddon ? "service" : "product")) === "service" || p.isAddon).length;
+  const activeCount = products.filter((p) => p.status === "active").length;
+  const categoryLabel = activeCategoryPath.length
+    ? activeCategoryPath.map((slug) => flattenTree(currentOccasion?.children || []).find((x) => x.node.slug === slug)?.node.label || slug).join(" / ")
+    : "All categories";
+
+  return <div className="admin-page catalog-modern-page">
+    <div className="catalog-modern-head">
+      <div>
+        <div className="catalog-breadcrumb">Dashboard <span>›</span> Catalog</div>
+        <div className="catalog-title-row">
+          <div>
+            <h1>{tab === "products" ? "Products" : tab === "packages" ? "Packages" : "Event Services"}</h1>
+            <p>{tab === "products" ? "Add and manage every physical decor item, setup and product shown on your website." : tab === "packages" ? "Build reusable event packages from your products and services." : "Manage customer-facing event services in their dedicated catalog."}</p>
+          </div>
+          <div className="catalog-head-actions">
+            <button type="button" className="btn btn-outline catalog-head-secondary" onClick={() => { setShowAllCatalog(true); setActiveCategoryPath([]); setSearch(""); }}><Icon name="search" /> Browse all</button>
+            <div className="catalog-inline-add-wrap">
+              <button type="button" className="btn btn-primary catalog-main-add" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> {tab === "products" ? "Add Product" : tab === "packages" ? "Add Package" : "Add Service"} <span>⌄</span></button>
+              {addMenu && <div className="catalog-add-menu catalog-add-menu--header">
+                <button type="button" onClick={() => openAdd("product")}><Icon name="package" /><span><strong>Add Product</strong><small>Stage, sofa, backdrop, lighting, decor…</small></span></button>
+                <button type="button" onClick={() => openAdd("package")}><Icon name="layers" /><span><strong>Add Package</strong><small>Bundle products and services</small></span></button>
+                <button type="button" onClick={() => openAdd("service")}><Icon name="settings" /><span><strong>Add Event Service</strong><small>Photography, catering, artists…</small></span></button>
+              </div>}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     {feedback && <div className="admin-alert admin-alert--success">{feedback}</div>}
     {error && !modal && !categoryModal && <div className="admin-alert admin-alert--error">{error}</div>}
 
-    <div className="catalog-ref-tabs catalog-ref-tabs--simple">
-      {[["products","Products & Packages","package"],["services","Services","settings"],["packages","Packages","layers"]].map(([key,label,icon]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => {
-        setTab(key);
-        setSearchParams({ tab: key });
-        setShowAllCatalog(false);
-        setSearch("");
-        setActiveCategoryPath([]);
-        setType(key === "products" ? "all" : key === "services" ? "service" : "package");
+    <div className="catalog-modern-tabs" role="tablist" aria-label="Catalog type">
+      {[['products','Products',productCount],['packages','Packages',packageCount],['services','Event Services',serviceCount]].map(([key,label,count]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => {
+        setTab(key); setSearchParams({ tab: key }); setShowAllCatalog(false); setSearch(""); setActiveCategoryPath([]); setStatFilter("all");
+        setType(key === "products" ? "product" : key === "services" ? "service" : "package");
         setActiveOccasion(key === "services" ? "event-services" : (getOccasions().find((o) => !o.addonOnly)?.slug || "wedding"));
-      }}><Icon name={icon} />{label}</button>)}
+      }}><span>{label}</span><b>{count}</b></button>)}
     </div>
 
-    <div className="catalog-stat-grid">
-      <div className={`catalog-stat-card-clickable ${statFilter === "all" ? "active" : ""}`} role="button" tabIndex={0} onClick={selectAllCatalog} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectAllCatalog(); } }} title="Show all products and packages"><span className="catalog-stat-icon"><Icon name="package" /></span><strong>{stats.total}</strong><small>Total Items</small><em>Packages + Products</em></div>
-      <div className={statFilter === "occasions" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("occasions")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("occasions"); } }} title="Show all occasions"><span className="catalog-stat-icon"><Icon name="calendar" /></span><strong>{stats.occasions}</strong><small>Occasions</small><em>Wedding, Birthday, Corporate…</em></div>
-      <div className={statFilter === "functions" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("functions")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("functions"); } }} title="Show all functions and themes"><span className="catalog-stat-icon"><Icon name="layers" /></span><strong>{stats.categories}</strong><small>Functions / Themes</small><em>Nested catalog nodes</em></div>
-      <div className={statFilter === "services" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("services")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("services"); } }} title="Show all services"><span className="catalog-stat-icon"><Icon name="settings" /></span><strong>{stats.services}</strong><small>Services</small><em>Service products</em></div>
-      <div className={statFilter === "packages" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("packages")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("packages"); } }} title="Show all packages"><span className="catalog-stat-icon"><Icon name="layers" /></span><strong>{stats.packages}</strong><small>Packages</small><em>Pre-defined bundles</em></div>
-      <div className={statFilter === "active" ? "catalog-stat-card-clickable active" : "catalog-stat-card-clickable"} role="button" tabIndex={0} onClick={() => selectStatFilter("active")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStatFilter("active"); } }} title="Show all active catalog entries"><span className="catalog-stat-ring">{stats.total ? Math.round((stats.active / Math.max(stats.total + stats.services, 1)) * 100) : 0}%</span><strong>{stats.active}</strong><small>Active Items</small><em>Visible on website</em></div>
+    <div className="catalog-modern-stats">
+      <div><span className="catalog-stat-icon"><Icon name="package" /></span><div><strong>{productCount}</strong><small>Products</small></div></div>
+      <div><span className="catalog-stat-icon"><Icon name="layers" /></span><div><strong>{packageCount}</strong><small>Packages</small></div></div>
+      <div><span className="catalog-stat-icon"><Icon name="settings" /></span><div><strong>{serviceCount}</strong><small>Services</small></div></div>
+      <div><span className="catalog-stat-icon catalog-stat-icon--success">✓</span><div><strong>{activeCount}</strong><small>Active listings</small></div></div>
     </div>
 
-    {(statFilter === "occasions" || statFilter === "functions" || statFilter === "active") ? <div className="catalog-workspace">
-      <section className="catalog-items-panel" style={{ gridColumn: "1 / -1" }}>
-        <div className="catalog-items-head"><div><div className="catalog-path">Catalog Overview</div><h2>{statFilter === "occasions" ? "All Occasions" : statFilter === "functions" ? "All Functions & Themes" : "All Active Catalog Items"}</h2><p>{`Showing ${statEntities.length} ${statFilter === "occasions" ? "occasions" : statFilter === "functions" ? "functions / themes" : "active catalog entries"}`}</p></div></div>
-        <div className="catalog-toolbar"><div className="catalog-search"><Icon name="search" /><input placeholder={`Search ${statFilter === "occasions" ? "occasions" : statFilter === "functions" ? "functions and themes" : "active items"}…`} value={search} onChange={(e) => setSearch(e.target.value)} /></div><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Sort By: Latest</option><option value="name">Name</option><option value="price">Price</option></select><button className={view === "list" ? "view-active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
-        <div className="catalog-product-table"><table><thead><tr><th></th><th>Image</th><th>Name</th><th>Type</th><th>Context / Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{statEntities.map((entry) => {
-          if (entry.entityType === "item") {
-            const p = entry.product;
-            return <ProductRow key={entry.id} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />;
-          }
-          return <tr key={entry.id}><td><input type="checkbox" /></td><td><img className="catalog-thumb" src={entry.image || DEFAULT_IMAGE} alt="" /></td><td><strong>{entry.name}</strong></td><td>{entry.typeLabel}</td><td>{entry.occasionLabel}</td><td><span className="catalog-status active">Active</span></td><td><div className="catalog-actions">{entry.entityType === "occasion" ? <><button type="button" onClick={() => openOccasionEditor(occasions.find((o) => o.slug === entry.occasionSlug))} title="Edit"><Icon name="edit" /></button><button type="button" onClick={() => removeOccasion(occasions.find((o) => o.slug === entry.occasionSlug))} title="Delete"><Icon name="trash" /></button></> : <><button type="button" onClick={() => openCategoryEditor(entry.occasionSlug, entry.trail, "edit")} title="Edit"><Icon name="edit" /></button><button type="button" onClick={() => removeCategory(entry.occasionSlug, entry.trail)} title="Delete"><Icon name="trash" /></button></>}</div></td></tr>;
-        })}</tbody></table>{!statEntities.length && <div className="catalog-empty">No matching items found.</div>}</div>
-      </section>
-    </div> : (tab === "products" || tab === "services") ? <div className="catalog-workspace">
-      <aside className="catalog-category-panel">
-        <div className="catalog-panel-title"><div><h2>{tab === "services" ? "Service Categories" : "Catalog Categories"}</h2><p>{tab === "services" ? "Choose where each service belongs" : "Occasion → function → category"}</p></div><button className="btn btn-primary btn-sm" onClick={() => openCategoryEditor(activeOccasion, [])}><Icon name="plus" /> Add</button></div>
-        <div className="catalog-occasion-list">
-          {displayOccasions.map((o) => <div key={o.slug}>
-            <div className={`catalog-occasion-row-wrap ${o.slug === activeOccasion ? "active" : ""}`}>
-              <button type="button" className={`catalog-occasion-row ${o.slug === activeOccasion ? "active" : ""}`} onClick={() => selectOccasion(o.slug)}><span>{o.slug === "wedding" ? "◇" : "○"}</span>{o.label}<em>{countProductsForPath(o.slug, [])}</em></button>
+    <div className="catalog-modern-workspace">
+      <aside className="catalog-modern-sidebar">
+        <div className="catalog-modern-sidebar-head">
+          <div><span>CATALOG STRUCTURE</span><h2>{tab === "services" ? "Service categories" : "Shop categories"}</h2></div>
+          <button type="button" className="catalog-sidebar-add" title="Add category" onClick={() => openCategoryEditor(activeOccasion, [])}><Icon name="plus" /></button>
+        </div>
+        <div className="catalog-occasion-stack">
+          {displayOccasions.map((o) => <div key={o.slug} className={`catalog-occasion-block ${o.slug === activeOccasion ? "active" : ""}`}>
+            <div className="catalog-modern-occasion-row">
+              <button type="button" onClick={() => selectOccasion(o.slug)} className="catalog-modern-occasion-select">
+                <CatalogTreeThumb node={o} /><span>{o.label}</span><b>{countProductsForPath(o.slug, [])}</b>
+              </button>
               <div className="catalog-occasion-actions">
                 <button type="button" title="Edit occasion" onClick={() => openOccasionEditor(o)}><Icon name="edit" /></button>
-                <button type="button" title="Delete occasion" className="danger" onClick={() => removeOccasion(o)}><Icon name="trash" /></button>
               </div>
             </div>
-            {o.slug === activeOccasion && renderTree(o.children || [])}
+            {o.slug === activeOccasion && <div className="catalog-modern-tree">{renderTree(o.children || [])}</div>}
           </div>)}
         </div>
+        {tab !== "services" && <div className="catalog-sidebar-tip"><strong>Tip</strong><p>Select a function such as <b>Haldi</b> or <b>Mehndi</b> to see only the products assigned to it.</p></div>}
       </aside>
-      <section className="catalog-items-panel">
-        <div className="catalog-items-head"><div><div className="catalog-path">{showAllCatalog ? "All Categories" : <>{currentOccasion?.label}{activeCategoryPath.map((slug) => <span key={slug}> › {flattenTree(currentOccasion?.children || []).find((x) => x.node.slug === slug)?.node.label || slug}</span>)}</>}</div><h2>{showAllCatalog ? "All Products & Packages" : tab === "services" ? `Services in ${activeCategory?.label || "Event Services"}` : `Products & Packages in ${activeCategory?.label || currentOccasion?.label}`}</h2><p>{`Showing ${visibleProducts.length} items`}</p></div><div className="catalog-item-actions">{tab !== "services" && <><button className={type === "package" ? "active" : ""} onClick={() => setType("package")}>Packages</button><button className={type === "product" ? "active" : ""} onClick={() => setType("product")}>Products</button></>}<button className={type === "all" || (tab === "services" && type === "service") ? "active" : ""} onClick={() => setType(tab === "services" ? "service" : "all")}>{tab === "services" ? "All Services" : "All Items"}</button><div className="catalog-inline-add-wrap"><button type="button" className="btn btn-primary" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> Add Item <span>⌄</span></button>{addMenu && <div className="catalog-add-menu catalog-add-menu--inline"><button type="button" onClick={() => openAdd("product")}><Icon name="package" /><span><strong>Product / Element</strong><small>Individual catalog item</small></span></button><button type="button" onClick={() => openAdd("package")}><Icon name="layers" /><span><strong>Package</strong><small>Bundle products and services</small></span></button><button type="button" onClick={() => openAdd("service")}><Icon name="settings" /><span><strong>Service</strong><small>Photography, catering, artists, etc.</small></span></button></div>}</div></div></div>
-        <div className="catalog-toolbar"><div className="catalog-search"><Icon name="search" /><input placeholder="Search items…" value={search} onChange={(e) => setSearch(e.target.value)} /></div><select value={type} onChange={(e) => setType(e.target.value)}><option value="all">Type: All</option><option value="product">Product</option><option value="package">Package</option><option value="service">Service</option></select><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">Status: All</option><option value="active">Status: Active</option><option value="draft">Status: Draft</option><option value="archived">Status: Archived</option></select><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Sort By: Latest</option><option value="name">Name</option><option value="price">Price</option></select><button className={view === "grid" ? "view-active" : ""} onClick={() => setView("grid")}><Icon name="grid" /></button><button className={view === "list" ? "view-active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
-        {view === "grid" ? <div className="catalog-product-grid">{visibleProducts.map((p) => <ProductCard key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</div> : <div className="catalog-product-table"><table><thead><tr><th></th><th>Image</th><th>Name</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleProducts.map((p) => <ProductRow key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</tbody></table>{!visibleProducts.length && <div className="catalog-empty">No items here yet. Use <strong>Add New</strong> to create the first one.</div>}</div>}
+
+      <section className="catalog-modern-main">
+        <div className="catalog-modern-main-head">
+          <div>
+            <div className="catalog-path">{currentOccasion?.label || "Catalog"} <span>›</span> {categoryLabel}</div>
+            <h2>{showAllCatalog ? "All products" : tab === "services" ? (activeCategory?.label || "Event Services") : activeCategory?.label || currentOccasion?.label}</h2>
+            <p>{visibleProducts.length} {tab === "products" ? "product" : tab === "packages" ? "package" : "service"}{visibleProducts.length === 1 ? "" : "s"} in this view</p>
+          </div>
+          <div className="catalog-main-quick-actions">
+            {tab === "products" && <button type="button" className="catalog-quick-add" onClick={() => openAdd("product")}><Icon name="plus" /> Add product</button>}
+            {tab === "packages" && <button type="button" className="catalog-quick-add" onClick={() => openAdd("package")}><Icon name="plus" /> Add package</button>}
+            {tab === "services" && <button type="button" className="catalog-quick-add" onClick={() => openAdd("service")}><Icon name="plus" /> Add service</button>}
+          </div>
+        </div>
+
+        <div className="catalog-modern-toolbar">
+          <div className="catalog-modern-search"><Icon name="search" /><input aria-label="Search catalog" placeholder={tab === "products" ? "Search products by name or SKU…" : tab === "packages" ? "Search packages…" : "Search services…"} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+          <div className="catalog-modern-filters">
+            {tab !== "services" && <select value={type} onChange={(e) => setType(e.target.value)}><option value={tab === "packages" ? "package" : "product"}>{tab === "packages" ? "Packages" : "Products"}</option><option value="all">All types</option></select>}
+            <select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">All statuses</option><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option></select>
+            <select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Recently updated</option><option value="name">Name</option><option value="price">Price</option></select>
+            <div className="catalog-view-toggle"><button type="button" className={view === "grid" ? "active" : ""} onClick={() => setView("grid")}><Icon name="grid" /></button><button type="button" className={view === "list" ? "active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
+          </div>
+        </div>
+
+        {view === "grid" ? <div className="catalog-modern-grid">{visibleProducts.map((p) => <ProductCard key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</div> : <div className="catalog-product-table catalog-modern-table"><table><thead><tr><th>Product</th><th>Category</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleProducts.map((p) => <ProductRow key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</tbody></table></div>}
+
+        {!visibleProducts.length && <div className="catalog-modern-empty">
+          <div className="catalog-empty-icon"><Icon name="package" /></div>
+          <h3>{search ? "No matching products" : "This category is empty"}</h3>
+          <p>{search ? "Try a different search term or clear the filters." : "Add the first product here. You can upload its image, choose its category and set the price in one simple form."}</p>
+          {!search && tab === "products" && <button type="button" className="btn btn-primary" onClick={() => openAdd("product")}><Icon name="plus" /> Add your first product</button>}
+        </div>}
       </section>
-    </div> : tab === "packages" ? <div className="catalog-workspace">
-      <section className="catalog-items-panel" style={{ gridColumn: "1 / -1" }}>
-        <div className="catalog-items-head"><div><div className="catalog-path">Packages</div><h2>Event Packages</h2><p>Create packages by combining products and services from your live catalog.</p></div><div className="catalog-item-actions"><button type="button" className="btn btn-primary" onClick={() => openAdd("package")}><Icon name="plus" /> Add Package</button></div></div>
-        <div className="catalog-toolbar"><div className="catalog-search"><Icon name="search" /><input placeholder="Search packages…" value={search} onChange={(e) => setSearch(e.target.value)} /></div><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">Status: All</option><option value="active">Status: Active</option><option value="draft">Status: Draft</option><option value="archived">Status: Archived</option></select><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="latest">Sort By: Latest</option><option value="name">Name</option><option value="price">Price</option></select><button className={view === "grid" ? "view-active" : ""} onClick={() => setView("grid")}><Icon name="grid" /></button><button className={view === "list" ? "view-active" : ""} onClick={() => setView("list")}><Icon name="list" /></button></div>
-        {view === "grid" ? <div className="catalog-product-grid">{visibleProducts.filter((p) => { const q = search.trim().toLowerCase(); return (!q || String(p.name || "").toLowerCase().includes(q)) && (status === "all" || p.status === status); }).map((p) => <ProductCard key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</div> : <div className="catalog-product-table"><table><thead><tr><th></th><th>Image</th><th>Name</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleProducts.filter((p) => { const q = search.trim().toLowerCase(); return (!q || String(p.name || "").toLowerCase().includes(q)) && (status === "all" || p.status === status); }).map((p) => <ProductRow key={p.id || p.slug} p={p} onEdit={openEdit} onDelete={removeItem} onDuplicate={duplicateItem} />)}</tbody></table>{!visibleProducts.filter((p) => { const q = search.trim().toLowerCase(); return (!q || String(p.name || "").toLowerCase().includes(q)) && (status === "all" || p.status === status); }).length && <div className="catalog-empty">No packages yet. Use <strong>Add Package</strong> to create the first one.</div>}</div>}
-      </section>
-    </div> : <div className="catalog-simple-section"><h2>Products / Elements</h2><p>Use the Products &amp; Packages tab to manage your product catalog.</p><button className="btn btn-primary" onClick={() => openAdd("product")}><Icon name="plus" /> Add New Product</button></div>}
+    </div>
 
     {modal && <ItemModal modal={modal} setModal={setModal} occasions={occasions} categoryOptions={[...allCategoryOptions, ...getAddonCategoryOptions()]} onSave={saveItem} error={error} setError={setError} />}
     {categoryModal && <CategoryModal data={categoryModal} setData={setCategoryModal} onSave={saveCategoryForm} error={error} setError={setError} />}
@@ -566,7 +619,16 @@ export default function AdminCatalog() {
 
 function ProductRow({ p, onEdit, onDelete, onDuplicate }) {
   const kind = p.catalogKind || (p.isAddon ? "service" : "product");
-  return <tr><td><input type="checkbox" /></td><td><img className="catalog-thumb" src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /></td><td><strong>{p.name}</strong><small>{p.shortDescription || p.description || ""}</small></td><td><span className={`catalog-type-badge ${kind}`}>{KIND_LABELS[kind]}</span></td><td><strong>{fmtINR(p.price)}</strong><small>{p.unit || "Per Event"}</small></td><td><span className={`catalog-status ${p.status}`}>{p.status === "active" ? "Active" : p.status}</span></td><td><div className="catalog-actions"><button title="Edit" onClick={() => onEdit(p)}><Icon name="edit" /></button><button title="Duplicate" onClick={() => onDuplicate(p)}><Icon name="copy" /></button><button className="danger" title="Delete" onClick={() => onDelete(p)}><Icon name="trash" /></button></div></td></tr>;
+  const rawCategory = p.categorySlug || (Array.isArray(p.categoryPath) ? p.categoryPath[p.categoryPath.length - 1] : "");
+  const category = String(rawCategory || "Uncategorised").replace(/[-_]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  return <tr>
+    <td><div className="catalog-table-product"><img className="catalog-thumb" src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><div><strong>{p.name}</strong><small>{p.shortDescription || p.description || "No description added"}</small></div></div></td>
+    <td><span className="catalog-table-category">{category}</span></td>
+    <td><span className={`catalog-type-badge ${kind}`}>{KIND_LABELS[kind]}</span></td>
+    <td><strong>{fmtINR(p.price)}</strong><small>{p.unit || "Per Event"}</small></td>
+    <td><span className={`catalog-status ${p.status}`}>{p.status === "active" ? "Active" : p.status}</span></td>
+    <td><div className="catalog-actions"><button title="Edit" onClick={() => onEdit(p)}><Icon name="edit" /></button><button title="Duplicate" onClick={() => onDuplicate(p)}><Icon name="copy" /></button><button className="danger" title="Delete" onClick={() => onDelete(p)}><Icon name="trash" /></button></div></td>
+  </tr>;
 }
 function ProductCard({ p, onEdit, onDelete, onDuplicate }) { const kind = p.catalogKind || (p.isAddon ? "service" : "product"); return <article className="catalog-card"><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><div><span className={`catalog-type-badge ${kind}`}>{KIND_LABELS[kind]}</span><h3>{p.name}</h3><p>{p.shortDescription || p.description}</p><strong>{fmtINR(p.price)}</strong><div><button onClick={() => onEdit(p)}>Edit</button><button onClick={() => onDuplicate(p)}>Duplicate</button><button onClick={() => onDelete(p)}>Delete</button></div></div></article>; }
 
@@ -599,11 +661,12 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
     <form onSubmit={(e) => { e.preventDefault(); onSave(item); }}>
       <div className="catalog-form-tabs"><span className="active">Basic Details</span><span>{isPackage ? "Package Contents" : isService ? "Service Details" : "Pricing & Inventory"}</span><span>Media</span><span>SEO & Display</span><span>Additional Info</span></div>
       <section className="catalog-form-section"><h3>1. Basic Information</h3><div className="catalog-form-grid two"><Field label={`${KIND_LABELS[modal.kind]} Name`} required><input value={item.name} onChange={(e) => { const name = e.target.value; setItem((p) => ({ ...p, name, slug: !p.slug ? sanitizeSlug(name) : p.slug })); }} placeholder="e.g. Floral Stage Setup" /></Field><Field label="SKU"><input value={item.sku || ""} onChange={(e) => set("sku", e.target.value)} placeholder="e.g. NLE-DEC-001" /></Field></div><Field label="Short Description" required><textarea rows="2" maxLength={200} value={item.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="A short catchy description shown in list view" /></Field><Field label="Full Description"><textarea rows="4" value={item.description} onChange={(e) => set("description", e.target.value)} placeholder="Write detailed description, dimensions, materials, inclusions, deliverables, etc." /></Field></section>
-      {!isPackage && <section className="catalog-form-section"><h3>2. {isService ? "Service Placement" : "Occasion, Function & Category"}</h3><div className={`catalog-form-grid ${isService ? "two" : "three"}`}>{!isService && <Field label="Occasions" required><select value={item.occasionSlug || "wedding"} onChange={(e) => set("occasionSlug", e.target.value)}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field>}<Field label={isService ? "Service Category" : "Category / Theme"} required><select value={(item.categoryPath || []).join("/")} onChange={(e) => { const path = e.target.value.split("/").filter(Boolean); const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === e.target.value); setItem((p) => ({ ...p, categoryPath: path, occasionSlug: isService ? "event-services" : (path[0] || p.occasionSlug), serviceCategory: isService ? (selected?.label || "") : p.serviceCategory })); }}><option value="">Select {isService ? "service category" : "category"}</option>{options.map((o) => { const value = o.value || (Array.isArray(o.path) ? o.path.join("/") : ""); return <option key={value} value={value}>{o.label}</option>; })}</select>{isService && <small className="catalog-field-help">This determines exactly where the service product appears on the Services catalog page.</small>}</Field>{!isService && <Field label="Service Category"><input value={item.serviceCategory || ""} onChange={(e) => set("serviceCategory", e.target.value)} placeholder="e.g. Decor" /></Field>}</div></section>}
+      {!isPackage && <section className="catalog-form-section"><h3>2. {isService ? "Service category" : "Occasion, Function & Category"}</h3><div className={`catalog-form-grid ${isService ? "two" : "three"}`}>{!isService && <Field label="Occasions" required><select value={item.occasionSlug || "wedding"} onChange={(e) => set("occasionSlug", e.target.value)}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field>}<Field label={isService ? "What service is this?" : "Category / Theme"} required>{isService ? <ServiceCategoryPicker options={options} value={item.categoryPath} onChange={(path) => { const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === path.join("/")); setItem((p) => ({ ...p, categoryPath: path, occasionSlug: "event-services", serviceCategory: selected?.label || selected?.displayLabel || "" })); }} /> : <select value={(item.categoryPath || []).join("/")} onChange={(e) => { const path = e.target.value.split("/").filter(Boolean); const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === e.target.value); setItem((p) => ({ ...p, categoryPath: path, occasionSlug: path[0] || p.occasionSlug, serviceCategory: selected?.label || p.serviceCategory })); }}><option value="">Select category</option>{options.map((o) => { const value = o.value || (Array.isArray(o.path) ? o.path.join("/") : ""); return <option key={value} value={value}>{o.label}</option>; })}</select>}{isService && <small className="catalog-field-help">Pick the category that describes this service. This is where the service belongs in the catalog.</small>}</Field>{!isService && <Field label="Service Category"><input value={item.serviceCategory || ""} onChange={(e) => set("serviceCategory", e.target.value)} placeholder="e.g. Decor" /></Field>}</div></section>}
       {isPackage && <section className="catalog-form-section"><h3>2. Package Occasions</h3><Field label="Show this package for occasions"><div className="catalog-occasion-checks" role="group" aria-label="Package occasions">{occasions.filter((o) => !o.addonOnly).map((occasion) => { const selected = Array.isArray(item.packageOccasions) && item.packageOccasions.includes(occasion.slug); return <label className={`catalog-occasion-check ${selected ? "selected" : ""}`} key={occasion.slug}><input type="checkbox" checked={selected} onChange={(e) => { const current = Array.isArray(item.packageOccasions) ? item.packageOccasions : []; const next = e.target.checked ? Array.from(new Set([...current, occasion.slug])) : current.filter((slug) => slug !== occasion.slug); set("packageOccasions", next); }} /><span className="catalog-check-box" aria-hidden="true">{selected ? "✓" : ""}</span><span>{occasion.label}</span></label>; })}</div><small className="catalog-field-help">Select every occasion where this package should be available.</small></Field></section>}
       {isPackage && <section className="catalog-form-section"><h3>3. Package Contents</h3><div className="catalog-package-picker"><input placeholder="Search products or services to add…" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />{packageSearch && <div>{products.filter((p) => p.catalogKind !== "package" && p.status === "active" && p.name.toLowerCase().includes(packageSearch.toLowerCase())).slice(0, 8).map((p) => { const isAdded = item.packageItems.some((x) => (x.productId || x.id) === p.id); return <button type="button" key={p.id} className={isAdded ? "added" : ""} onClick={() => addPackageItem(p)} disabled={isAdded}><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><span>{p.name}<small style={{ display: "block", opacity: 0.65 }}>{p.catalogKind === "service" || p.isAddon ? "Service" : "Product"}</small></span>{isAdded ? <strong className="catalog-package-added-label">Added</strong> : <strong>{fmtINR(p.price)}</strong>}</button>; })}</div>}</div><div className="catalog-package-table">{item.packageItems.length ? item.packageItems.map((x) => <div key={x.id}><span>{x.name}</span><input type="number" min="1" value={x.qty} onChange={(e) => updatePackageItem(x.id, "qty", e.target.value)} /><span>{fmtINR(Number(x.price) * Number(x.qty))}</span><button type="button" onClick={() => removePackageItem(x.id)}>×</button></div>) : <p>No items added yet.</p>}</div><div className="catalog-package-total"><span>Items Total</span><strong>{fmtINR(packageItemsTotal)}</strong></div></section>}
-      {isService && <section className="catalog-form-section"><h3>3. Service Details</h3><div className="catalog-form-grid three"><Field label="Service Type"><input value={item.serviceType} onChange={(e) => set("serviceType", e.target.value)} placeholder="Photography, Videography, Both" /></Field><Field label="Coverage Duration"><input value={item.coverageDuration} onChange={(e) => set("coverageDuration", e.target.value)} placeholder="e.g. 8 Hours / Full Day" /></Field><Field label="Team Size"><input value={item.teamSize} onChange={(e) => set("teamSize", e.target.value)} placeholder="e.g. 2 Photographers" /></Field></div><div className="catalog-form-grid two"><Field label="Deliverables"><textarea rows="3" value={item.deliverables} onChange={(e) => set("deliverables", e.target.value)} /></Field><Field label="Process / Workflow"><textarea rows="3" value={item.workflow} onChange={(e) => set("workflow", e.target.value)} /></Field></div><Field label="Show this service for occasions"><div className="catalog-occasion-checks" role="group" aria-label="Show this service for occasions">{occasions.filter((o) => !o.addonOnly).map((occasion) => { const selected = Array.isArray(item.serviceScopes) && item.serviceScopes.includes(occasion.slug); return <label className={`catalog-occasion-check ${selected ? "selected" : ""}`} key={occasion.slug}><input type="checkbox" checked={selected} onChange={(e) => { const current = Array.isArray(item.serviceScopes) ? item.serviceScopes : []; const next = e.target.checked ? Array.from(new Set([...current, occasion.slug])) : current.filter((slug) => slug !== occasion.slug); set("serviceScopes", next); }} /><span className="catalog-check-box" aria-hidden="true">{selected ? "✓" : ""}</span><span>{occasion.label}</span></label>; })}</div><small className="catalog-field-help">Select one or more occasions. For example, DSLR Photography can be shown for Wedding, Birthday, and Anniversary.</small></Field></section>}
-      <section className="catalog-form-section"><h3>{isPackage || isService ? "4" : "3"}. Pricing & Media</h3><div className="catalog-form-grid four"><Field label="Price Type" required><select value={item.priceType} onChange={(e) => set("priceType", e.target.value)}><option value="starting">Starting From</option><option value="fixed">Fixed Price</option></select></Field><Field label="Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field><Field label="Unit"><select value={item.unit} onChange={(e) => set("unit", e.target.value)}><option>Per Event</option><option>Per Piece</option><option>Per Day</option><option>Per Hour</option></select></Field><Field label="Discount Price"><input type="number" value={item.discountPrice} onChange={(e) => set("discountPrice", e.target.value)} placeholder="e.g. 20000" /></Field></div><ImagePicker value={item.image} onChange={chooseImage} /></section>
+      {isService && <section className="catalog-form-section"><div className="service-visibility-heading"><div><h3>3. Customer visibility</h3><p className="service-simple-intro">Choose where customers will find this service. Select a whole occasion to include every function, or pick specific functions.</p></div><span className="service-visibility-badge">Shown on customer pages</span></div><ServiceContextPicker occasions={occasions} value={item.serviceScopes} onChange={(value) => set("serviceScopes", value)} /></section>}
+      {isService && <section className="catalog-form-section"><h3>4. Optional service details</h3><div className="catalog-form-grid three"><Field label="Service Type"><input value={item.serviceType} onChange={(e) => set("serviceType", e.target.value)} placeholder="e.g. Photography" /></Field><Field label="Coverage Duration"><input value={item.coverageDuration} onChange={(e) => set("coverageDuration", e.target.value)} placeholder="e.g. 8 Hours / Full Day" /></Field><Field label="Team Size"><input value={item.teamSize} onChange={(e) => set("teamSize", e.target.value)} placeholder="e.g. 2 People" /></Field></div><div className="catalog-form-grid two"><Field label="Deliverables"><textarea rows="3" value={item.deliverables} onChange={(e) => set("deliverables", e.target.value)} /></Field><Field label="Process / Workflow"><textarea rows="3" value={item.workflow} onChange={(e) => set("workflow", e.target.value)} /></Field></div></section>}
+      <section className="catalog-form-section"><h3>{isPackage ? "4" : isService ? "5" : "3"}. Pricing & Media</h3><div className="catalog-form-grid four"><Field label="Price Type" required><select value={item.priceType} onChange={(e) => set("priceType", e.target.value)}><option value="starting">Starting From</option><option value="fixed">Fixed Price</option></select></Field><Field label="Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field><Field label="Unit"><select value={item.unit} onChange={(e) => set("unit", e.target.value)}><option>Per Event</option><option>Per Piece</option><option>Per Day</option><option>Per Hour</option></select></Field><Field label="Discount Price"><input type="number" value={item.discountPrice} onChange={(e) => set("discountPrice", e.target.value)} placeholder="e.g. 20000" /></Field></div><ImagePicker value={item.image} onChange={chooseImage} /></section>
       <section className="catalog-form-section"><h3>Status</h3><label className="catalog-switch"><input type="checkbox" checked={item.status === "active"} onChange={(e) => set("status", e.target.checked ? "active" : "draft")} /><span></span><strong>{item.status === "active" ? "Active" : "Draft"}</strong></label></section>
       <div className="catalog-modal-footer"><button type="button" className="btn btn-outline" onClick={() => setModal(null)}>Cancel</button><button className="btn btn-primary"><Icon name="plus" /> {modal.mode === "edit" ? `Save ${KIND_LABELS[modal.kind]}` : `Add ${KIND_LABELS[modal.kind]}`}</button></div>
     </form>

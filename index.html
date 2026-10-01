@@ -13,6 +13,16 @@
 <link rel="dns-prefetch" href="//images.unsplash.com">
 <link rel="canonical" href="https://nextlevelevents.in/">
 
+<!-- Google Analytics 4 / Google tag -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-Z4VP460R9J"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  // React Router sends page_view events so SPA navigation is tracked once per route.
+  gtag('config', 'G-Z4VP460R9J', { send_page_view: false });
+</script>
+
 <!-- Open Graph (Facebook, WhatsApp, LinkedIn link previews) -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Next Level Events">
@@ -71,12 +81,6 @@
 <link rel="icon" type="image/png" sizes="32x32" href="https://res.cloudinary.com/jh0tqpsv/image/upload/f_auto,q_auto,w_32/nle-assets/brand/favicon-32">
 <link rel="icon" type="image/png" sizes="192x192" href="https://res.cloudinary.com/jh0tqpsv/image/upload/f_auto,q_auto,w_192/nle-assets/brand/favicon-192">
 <link rel="apple-touch-icon" href="https://res.cloudinary.com/jh0tqpsv/image/upload/f_auto,q_auto,w_180/nle-assets/brand/favicon-180">
-
-<!-- Preload the homepage's first hero image so it starts downloading in
-     parallel with the JS bundle, instead of only being requested after React
-     mounts and renders it. Keep this in sync with IMAGES.heroHome in
-     src/data/images.js if that image ever changes. -->
-<link rel="preload" as="image" fetchpriority="high" href="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1600&q=75">
 
 <style>
   #nle-loader{

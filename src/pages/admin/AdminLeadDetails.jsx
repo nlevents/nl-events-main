@@ -51,6 +51,7 @@ function mapRecord(row) {
     guestCount: row.guest_count || "",
     budget: row.budget || "",
     message: row.message || "",
+    specificRequirements: row.specific_requirements || "",
     status: row.status || "new_lead",
     adminNotes: row.admin_notes || "",
     source: row.source || "inquiry",
@@ -233,7 +234,7 @@ export default function AdminLeadDetails() {
                     <div><span>Full Name</span><b>{record.name}</b></div><div><span>Phone</span><b>{phone}</b></div><div><span>Email</span><b>{email}</b></div><div><span>Alternate Phone</span><b>{record.whatsapp || "—"}</b></div><div><span>Location</span><b>{location}</b></div><div><span>Address</span><b>{record.eventVenue || "—"}</b></div><div><span>Client Since</span><b>{fmtDate(record.createdAt)}</b></div><div><span>Source</span><b>{source}</b></div><div><span>Lead Owner</span><b>{record.assignedTo}</b></div>
                   </div></section>
                   <section className="crm-lead-card"><div className="crm-lead-card-head"><h2>Event Preferences</h2></div><div className="crm-detail-rows">
-                    <div><span>Preferred Event Types</span><b className="pill-row"><i>{record.eventType || "Event"}</i></b></div><div><span>Average Guest Count</span><b>{record.guestCount || "—"}</b></div><div><span>Preferred Venues</span><b>{location}</b></div><div><span>Budget Range</span><b>{budget}</b></div><div><span>Style / Theme Preference</span><b>—</b></div><div><span>Special Requirements</span><b>{record.message || "—"}</b></div><div><span>Notes</span><b>{noteText}</b></div>
+                    <div><span>Preferred Event Types</span><b className="pill-row"><i>{record.eventType || "Event"}</i></b></div><div><span>Average Guest Count</span><b>{record.guestCount || "—"}</b></div><div><span>Preferred Venues</span><b>{location}</b></div><div><span>Budget Range</span><b>{budget}</b></div><div><span>Style / Theme Preference</span><b>—</b></div><div><span>Specific Requirements</span><b>{record.specificRequirements || "—"}</b></div><div><span>Notes</span><b>{noteText}</b></div>
                   </div></section>
                 </div>
                 <div className="crm-lead-bottom-grid">

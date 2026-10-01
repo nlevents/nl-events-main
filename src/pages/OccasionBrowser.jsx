@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
 import { resolvePath } from "../data/occasions";
 import CategoryTemplate from "../components/occasion/CategoryTemplate";
 import ProductTemplate from "../components/occasion/ProductTemplate";
@@ -13,6 +13,10 @@ import NotFound from "./NotFound";
 // automatically, with zero new routes or page files.
 export default function OccasionBrowser() {
   const params = useParams();
+  const location = useLocation();
+  // Keep the selected occasion/function when redirecting to the single service page.
+  const keptContext = new URLSearchParams(location.search).get("context") || "";
+  const contextQs = keptContext ? `&context=${encodeURIComponent(keptContext)}` : "";
   const slugs = (params["*"] || "").split("/").filter(Boolean);
 
   // Re-resolve the path whenever the admin catalog changes so deletions/additions
@@ -34,6 +38,7 @@ export default function OccasionBrowser() {
   // resolving the page. This prevents a hard refresh from resolving a stale
   // wedding service node with no products and showing an apparently blank page.
   const isLegacyServiceUrl = slugs.length >= 3 && slugs[1] === "services";
+  const isServiceCategoryUrl = slugs[0] === "event-services" && slugs.length > 1;
   const canonicalServiceSlugs = isLegacyServiceUrl
     ? ["event-services", ...slugs.slice(2)]
     : slugs;
@@ -44,8 +49,14 @@ export default function OccasionBrowser() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const resolved = useMemo(() => resolvePath(canonicalServiceSlugs), [slugKey, catalogVersion]);
 
-  if (isLegacyServiceUrl && resolved) {
-    return <Navigate to={canonicalServicePath} replace />;
+  if (isLegacyServiceUrl && resolved && resolved.node?.type !== "product") {
+    const service = canonicalServiceSlugs.slice(1).join("/");
+    return <Navigate to={`/occasion/event-services?service=${encodeURIComponent(service)}${contextQs}`} replace />;
+  }
+
+  if (isServiceCategoryUrl && resolved && resolved.node?.type !== "product") {
+    const service = slugs.slice(1).join("/");
+    return <Navigate to={`/occasion/event-services?service=${encodeURIComponent(service)}${contextQs}`} replace />;
   }
 
   if (!resolved) return <NotFound />;

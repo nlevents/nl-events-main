@@ -4,6 +4,7 @@ import usePageMeta from "../hooks/usePageMeta";
 import useReveal from "../hooks/useReveal";
 import { useToast } from "../context/ToastContext";
 import { submitInquiry } from "../services/customersService";
+import { trackGenerateLead } from "../lib/siteEvents";
 
 const CARDS = [
   { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 5h4l2 5-2.5 1.5a11 11 0 0 0 5 5L14 14l5 2v4a2 2 0 0 1-2 2C9.5 22 2 14.5 2 7a2 2 0 0 1 2-2z" /></svg>, title: "Phone", value: "+91 7903 133 317", href: "tel:+917903133317" },
@@ -47,6 +48,7 @@ export default function Contact() {
     setSending(true);
     submitInquiry({ name, phone, eventType, message, source: "contact" })
       .then(() => {
+        trackGenerateLead({ source: "contact", eventType });
         setValues({ cName: "", cPhone: "", cEventType: "", cMessage: "" });
         showToast("Message sent — we will reach out within one business day.");
       })

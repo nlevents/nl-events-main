@@ -4,6 +4,7 @@ import { useCity } from "../../context/CityContext";
 import { cityPrice, fmtINR } from "../../lib/pricing";
 import { discountPercent, isAvailableInCity } from "../../data/occasions";
 import { onImgError } from "../../lib/imageFallback";
+import { trackServiceView } from "../../lib/siteEvents";
 
 // Premium, conversion-focused listing card — image + quick-add, rating
 // badge, price with strike-through + discount, city availability, and a
@@ -23,20 +24,37 @@ export default function ProductCard({ product, href, variant = "default" }) {
   // Every cart line needs full booking details (city, date, time slot,
   // etc.), so quick-add and Book Now both take the shopper to the product's
   // own booking panel to configure those — nothing is ever added blind.
+  const serviceCategory = Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services"
+    ? product.categoryPath[1]
+    : undefined;
+  const contextPath = Array.isArray(product.__contextPath) ? product.__contextPath : [];
+
+  function trackProductInteraction() {
+    trackServiceView({
+      serviceName: product.name,
+      serviceCategory,
+      occasion: contextPath[0],
+      functionPath: contextPath.slice(1).join("/"),
+      itemId: product.id || product.slug,
+    });
+  }
+
   function quickAdd(e) {
     e.preventDefault();
     e.stopPropagation();
+    trackProductInteraction();
     navigate(isQuoteOnly ? href : href + "#booking-panel");
   }
 
   function bookNow() {
+    trackProductInteraction();
     navigate(isQuoteOnly ? href : href + "#booking-panel");
   }
 
   return (
     <article className={"occ-prod-card reveal" + (variant === "occasion-market" ? " occ-prod-card--market" : "")}>
       <div className="occ-prod-media">
-        <Link to={href} className="occ-prod-media-link" aria-label={"View " + product.name}>
+        <Link to={href} className="occ-prod-media-link" aria-label={"View " + product.name} onClick={trackProductInteraction}>
           {discount > 0 && <span className="occ-prod-discount">{discount}% OFF</span>}
           <img src={product.image} alt={product.name} loading="lazy" decoding="async"  onError={onImgError}/>
         </Link>
@@ -46,7 +64,7 @@ export default function ProductCard({ product, href, variant = "default" }) {
       </div>
 
       <div className="occ-prod-body">
-        <Link to={href} className="occ-prod-title-link"><h4>{product.name}</h4></Link>
+        <Link to={href} className="occ-prod-title-link" onClick={trackProductInteraction}><h4>{product.name}</h4></Link>
 
         {variant === "occasion-market" ? (
           <>
@@ -85,7 +103,7 @@ export default function ProductCard({ product, href, variant = "default" }) {
             </div>
 
             <div className="occ-prod-actions">
-              <Link to={href} className="btn btn-ghost occ-btn-sm">View Details</Link>
+              <Link to={href} className="btn btn-ghost occ-btn-sm" onClick={trackProductInteraction}>View Details</Link>
               <button type="button" className="btn btn-primary occ-btn-sm" onClick={bookNow}>{isQuoteOnly ? "Request Quote" : "Book Now"}</button>
             </div>
           </>

@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
@@ -9,6 +9,7 @@ import { ToastProvider } from "./context/ToastContext";
 import { ChatbotProvider } from "./context/ChatbotContext";
 import { AdminAuthProvider } from "./context/AdminAuthContext";
 import { lazyWithRetry } from "./lib/lazyWithRetry";
+import { isAnalyticsPublicPath, trackEvent, trackPageView } from "./lib/siteEvents";
 
 // Route-level code splitting: each page is fetched only when visited,
 // keeping the initial JS payload small.
@@ -59,6 +60,46 @@ const AdminInvoiceView = lazyWithRetry(() => import("./pages/admin/AdminInvoiceV
 const AdminSettings = lazyWithRetry(() => import("./pages/admin/AdminSettings"));
 const AdminPlaceholder = lazyWithRetry(() => import("./pages/admin/AdminPlaceholder"));
 
+function AnalyticsTracker() {
+  const location = useLocation();
+
+  React.useEffect(() => {
+    if (!isAnalyticsPublicPath(location.pathname)) return;
+    trackPageView(location);
+  }, [location]);
+
+  React.useEffect(() => {
+    if (!isAnalyticsPublicPath(location.pathname)) return undefined;
+
+    const onClick = (event) => {
+      const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!target) return;
+      const href = target.getAttribute("href") || "";
+      const text = (target.textContent || "").replace(/\s+/g, " ").trim().slice(0, 100);
+      const lowerHref = href.toLowerCase();
+      const lowerText = text.toLowerCase();
+
+      if (lowerHref.startsWith("tel:")) {
+        trackEvent("phone_click", { source: "link", link_text: text || "phone" });
+      } else if (lowerHref.includes("wa.me/") || lowerHref.includes("whatsapp.com/")) {
+        trackEvent("whatsapp_click", { source: "link", link_text: text || "whatsapp" });
+      } else if (href === "/book-event" || href.startsWith("/book-event?") || lowerText === "book event") {
+        trackEvent("book_event_click", { source: "link", link_text: text || "Book Event" });
+      }
+
+      const isExternal = /^https?:\/\//i.test(href) && !href.startsWith(window.location.origin);
+      if (isExternal && !lowerHref.includes("wa.me/") && !lowerHref.includes("whatsapp.com/")) {
+        trackEvent("outbound_click", { link_url: href, link_text: text || undefined });
+      }
+    };
+
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [location.pathname]);
+
+  return null;
+}
+
 function RouteFallback() {
   return (
     <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} aria-busy="true" aria-live="polite">
@@ -99,6 +140,7 @@ export default function App() {
           <CartProvider>
             <ChatbotProvider>
             <BrowserRouter>
+              <AnalyticsTracker />
               <RouteBoundary>
               <Suspense fallback={<RouteFallback />}>
                 <Routes>

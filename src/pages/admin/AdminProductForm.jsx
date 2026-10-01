@@ -1,12 +1,13 @@
 import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
-import { getProduct, saveProductToCloud, getOccasions, getAddonCategoryOptions, getServiceScopeOptions } from "../../lib/catalogStore";
+import { getProduct, saveProductToCloud, getOccasions, getAddonCategoryOptions } from "../../lib/catalogStore";
 import { sanitizeSlug } from "../../lib/sanitize";
 import { fmtINR } from "../../lib/pricing";
 import { CITIES } from "../../data/cities";
 import MediaPickerModal from "../../components/admin/MediaPickerModal";
 import Icon from "../../components/Icon";
+import ServiceContextPicker from "../../components/admin/ServiceContextPicker";
 import usePageMeta from "../../hooks/usePageMeta";
 
 const BADGES = ["", "Bestseller", "Premium", "Popular", "Trending", "New", "Limited"];
@@ -25,7 +26,6 @@ export default function AdminProductForm() {
 
   const occasions = getOccasions();
   const addonCategoryOptions = getAddonCategoryOptions();
-  const serviceScopeOptions = getServiceScopeOptions();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -54,6 +54,7 @@ export default function AdminProductForm() {
     addons: [],
     cities: [],
     serviceScopes: [],
+    serviceScopeMode: undefined,
   });
 
   const [newInclusion, setNewInclusion] = useState("");
@@ -97,6 +98,7 @@ export default function AdminProductForm() {
           cities: Array.isArray(p.cities) ? p.cities : ["Ranchi", "Jamshedpur"],
           categoryPath: Array.isArray(p.categoryPath) ? p.categoryPath : (p.categorySlug ? [p.occasionSlug, p.categorySlug] : []),
           serviceScopes: Array.isArray(p.serviceScopes) ? p.serviceScopes : [],
+          serviceScopeMode: p.serviceScopeMode,
         });
       } else {
         setError(`Product with ID/slug "${id}" not found.`);
@@ -685,7 +687,7 @@ export default function AdminProductForm() {
                 <div className="admin-calc-box"><strong>Event Services</strong><span className="admin-table-sub">This product will appear only in the Service catalog.</span></div>
                 {availableCategories.length > 0 && (
                   <div className="admin-form-group">
-                    <label className="admin-form-label">Service Category *</label>
+                    <label className="admin-form-label">Service category *</label>
                     <select className="admin-select" value={(formData.categoryPath || []).join("/")} onChange={(e) => { const selected = availableCategories.find((c) => c.path.join("/") === e.target.value); setFormData({ ...formData, occasionSlug: "event-services", categorySlug: selected ? selected.slug : "", categoryPath: selected ? selected.path : [], isAddon: true }); }} required>
                       <option value="">Select Service Category</option>
                       {availableCategories.map((c) => <option key={c.path.join("/")} value={c.path.join("/")}>{c.displayLabel}</option>)}
@@ -693,19 +695,12 @@ export default function AdminProductForm() {
                   </div>
                 )}
                 <div className="admin-form-group">
-                  <label className="admin-form-label">Available for Event Context</label>
-                  <select
-                    className="admin-select"
-                    multiple
-                    size={Math.min(8, Math.max(4, serviceScopeOptions.length))}
-                    value={Array.isArray(formData.serviceScopes) ? formData.serviceScopes : []}
-                    onChange={(e) => setFormData({ ...formData, serviceScopes: Array.from(e.target.selectedOptions).map((option) => option.value) })}
-                  >
-                    {serviceScopeOptions.map((option) => (
-                      <option key={option.path} value={option.path}>{option.label}</option>
-                    ))}
-                  </select>
-                  <p className="admin-hint" style={{ marginTop: 6 }}>Leave empty to show this service in every event context. Selecting a category also includes its child themes.</p>
+                  <label className="admin-form-label">Customer visibility</label>
+                  <ServiceContextPicker
+                    occasions={occasions}
+                    value={formData.serviceScopes}
+                    onChange={(serviceScopes) => setFormData({ ...formData, serviceScopes, serviceScopeMode: serviceScopes.length ? "scoped" : formData.serviceScopeMode })}
+                  />
                 </div>
               </>
             ) : (

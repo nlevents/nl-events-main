@@ -603,7 +603,9 @@ replaceChildren("wedding", [
     makeRefNode("category", "tent-furniture", "Tent & Furniture", IMAGES.showcase6),
     makeRefNode("category", "photography-videography", "Photography & Videography", IMAGES.typePhotography),
     makeRefNode("category", "catering", "Catering", IMAGES.showcase5),
-    makeRefNode("category", "baraat-procession", "Baraat Procession", IMAGES.themeStageLights),
+    makeRefNode("category", "baraat-procession", "Baraat / Procession", IMAGES.themeStageLights),
+    makeRefNode("category", "wedding-activity", "Wedding Activity", IMAGES.showcase3),
+    makeRefNode("category", "other-services", "Other Services", IMAGES.showcase8),
   ]),
 ]);
 
@@ -665,29 +667,15 @@ replaceChildren("festivals-culture", [
 
 replaceChildren("event-services", [
   makeRefNode("category", "decor", "Décor", IMAGES.galDecor1, "Decoration packages, backdrops, stages and styling."),
-  makeRefNode("category", "entry", "Entry", IMAGES.showcase4, "Grand and unique event entries."),
-  makeRefNode("category", "entertainment", "Entertainment", IMAGES.galConcert2, "Artists, DJs, live bands and guest entertainment.", [
-    makeRefNode("category", "artists", "Artists", IMAGES.galConcert2, "Anchors, dancers and live performers."),
-    makeRefNode("category", "dj-live-bands", "DJ & Live Bands", IMAGES.galConcert3, "DJ, live band and music entertainment."),
-    makeRefNode("category", "wedding-activity", "Wedding Activity", IMAGES.showcase3, "Games and guest activities."),
-  ]),
-  makeRefNode("category", "sound-technical", "Sound & Technical", IMAGES.themeStageLights, "Lighting, AV, sound and special effects.", [
-    makeRefNode("category", "sound", "Sound", IMAGES.themeStageLights, "Professional sound systems and operators."),
-    makeRefNode("category", "lighting", "Lighting", IMAGES.themeStageLights, "Decorative, stage and event lighting."),
-    makeRefNode("category", "av-technical", "AV & Technical", IMAGES.showcase1, "Screens, projectors, trussing and technical production."),
-    makeRefNode("category", "sfx", "SFX", IMAGES.showcase7, "Special effects including cold pyro, fog and fireworks.", [
-      makeRefNode("category", "cold-pyro", "Cold Pyro", IMAGES.showcase7),
-      makeRefNode("category", "fog", "Fog", IMAGES.showcase7),
-      makeRefNode("category", "fireworks", "Fireworks", IMAGES.showcase7),
-    ]),
-  ]),
+  makeRefNode("category", "entry-concept", "Entry Concept", IMAGES.showcase4, "Grand and unique event entries."),
+  makeRefNode("category", "entertainment", "Entertainment", IMAGES.galConcert2, "Artists, DJs, live bands and guest entertainment."),
+  makeRefNode("category", "sound-technical", "Sound & Technical", IMAGES.themeStageLights, "Lighting, AV, sound and technical production."),
   makeRefNode("category", "tent-furniture", "Tent & Furniture", IMAGES.showcase6, "Tents, seating, tables and event furniture."),
-  makeRefNode("category", "photography-videography", "Photography & Videography", IMAGES.typePhotography, "Photography and video coverage.", [
-    makeRefNode("category", "photography", "Photography", IMAGES.typePhotography, "Professional event photography."),
-    makeRefNode("category", "videography", "Videography", IMAGES.typePhotography, "Professional event videography."),
-  ]),
+  makeRefNode("category", "photography-videography", "Photography & Videography", IMAGES.typePhotography, "Photography and video coverage."),
   makeRefNode("category", "catering", "Catering", IMAGES.showcase5, "Food and beverage experiences for events."),
   makeRefNode("category", "baraat-procession", "Baraat / Procession", IMAGES.themeStageLights, "Dhol, band and baraat procession services."),
+  makeRefNode("category", "wedding-activity", "Wedding Activity", IMAGES.showcase3, "Games, rituals and guest-engagement experiences."),
+  makeRefNode("category", "other-services", "Other Services", IMAGES.showcase8, "Additional event services that do not fit the main service categories."),
 ]);
 
 // Apply the uploaded local image library to the reference tree without
@@ -707,10 +695,13 @@ const CLIENT_NODE_IMAGE_SET = {
   rituals: "maira",
   services: "decor",
   decor: "decor",
+  "entry-concept": "entry-concept",
   "sound-technical": "sound-technical",
   "tent-furniture": "tent-furniture",
   catering: "catering",
   "baraat-procession": "baraat-procession",
+  "wedding-activity": "wedding-activity",
+  "other-services": "other-services",
   "kids-family": "kids-family",
   "family-celebrations": "family-celebrations",
   "baby-shower": "baby-shower",
@@ -870,10 +861,10 @@ function reconcilePublicHierarchy(stored) {
       ["heroImg", "description", "tagline", "active", "sortOrder", "addonOnly"].forEach((key) => {
         if (previous[key] !== undefined) merged[key] = previous[key];
       });
-      // Category artwork is intentionally hard-coded to the supplied local
-      // assets for now. This keeps the public website independent of stale
-      // admin/cloud image records while the hierarchy is being finalized.
-      if (!CATALOG_IMAGES[reference.slug] && previous.image !== undefined) {
+      // Preserve admin-managed images for every existing node. The built-in
+      // catalog image is only the initial/default value; once an admin uploads
+      // a new image, the storefront must use that saved image instead.
+      if (previous.image !== undefined) {
         merged.image = previous.image;
       }
       if (Array.isArray(previous.products)) merged.products = previous.products;
@@ -896,14 +887,9 @@ function reconcilePublicHierarchy(stored) {
     .filter((o) => o.addonOnly || PUBLIC_TOP_LEVEL_SLUGS.has(o.slug))
     .map((reference) => {
       const previous = bySlug.get(reference.slug);
-      if (reference.addonOnly) {
-        // Event Services is entirely admin-owned after its initial seed.
-        // Never merge reference children back into an existing saved branch.
-        if (previous && Array.isArray(previous.children)) {
-          return { ...previous, addonOnly: true, type: reference.type };
-        }
-        return mergeNode(reference, previous);
-      }
+      // Event Services has one canonical top-level structure. Merge only
+      // matching canonical categories from stored data so legacy/duplicate
+      // service nodes cannot leak back into the storefront.
       return mergeNode(reference, previous);
     });
 }
@@ -1139,6 +1125,16 @@ const PATH_ALIASES = {
   "maira": "mayra-and-rituals",
   "mayra": "mayra-and-rituals",
   "rituals": "mayra-and-rituals",
+  "traditional-rituals": "traditional-mayra",
+  "colorful-rituals": "colorful-mayra",
+  "floral-rituals": "floral-mayra",
+  "rajasthani-rituals": "rajasthani-mayra",
+  "theme-based-rituals": "theme-based-mayra",
+  "traditional-maira": "traditional-mayra",
+  "colorful-maira": "colorful-mayra",
+  "floral-maira": "floral-mayra",
+  "rajasthani-maira": "rajasthani-mayra",
+  "theme-based-maira": "theme-based-mayra",
 };
 
 function tryResolveSegments(slugs) {
@@ -1525,7 +1521,29 @@ export function allQuickLinksFor(node, trail) {
   if (Array.isArray(node.quickLinks) && node.quickLinks.length > 0) {
     return node.quickLinks;
   }
+
   const base = trail || [node];
+  const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+
+  // A leaf/category page must never turn its own sellable products into
+  // navigation categories. For example, Poolside Haldi contains products,
+  // but its navigation rail should still show the Haldi sibling categories:
+  // Traditional, Floral, Boho, Poolside, Rustic and Theme-Based. This keeps
+  // the category tree consistent and lets visitors move between sibling
+  // themes without mistaking a product for a category.
+  if (!hasChildren && base.length > 1) {
+    const parent = base[base.length - 2];
+    const siblings = Array.isArray(parent?.children) ? parent.children : [];
+    const siblingLinks = siblings.map((child) => ({
+      label: child.label,
+      image: child.image || child.heroImg,
+      href: pathFor([...base.slice(0, -1), child]),
+      type: child.type,
+      slug: child.slug,
+    }));
+    if (siblingLinks.length > 0) return siblingLinks;
+  }
+
   const links = flattenQuickLinkNodes(node, base);
 
   // Kids Special is a catalogue-style theme collection. Keep the named

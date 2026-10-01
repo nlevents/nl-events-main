@@ -7,6 +7,7 @@ import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
 import usePageMeta from "../hooks/usePageMeta";
 import { onImgError } from "../lib/imageFallback";
 import AutoScrollRail from "../components/AutoScrollRail";
+import EventServicesSection from "../components/occasion/EventServicesSection";
 
 const FUNCTIONS = [
   { label: "Haldi", img: CATALOG_IMAGES.haldi, href: "/occasion/wedding/wedding-events/haldi" },
@@ -168,43 +169,8 @@ function WeddingFunctions() {
 }
 
 function WeddingServices() {
-  const getServices = () => {
-    const wedding = findOccasion("wedding");
-    const servicesNode = wedding?.children?.find((child) => child?.slug === "services");
-    return { wedding, servicesNode, items: Array.isArray(servicesNode?.children) ? servicesNode.children : [] };
-  };
-  const [state, setState] = useState(() => getServices());
-
-  useEffect(() => {
-    const refresh = () => setState(getServices());
-    refresh();
-    window.addEventListener("nle-catalog-updated", refresh);
-    return () => window.removeEventListener("nle-catalog-updated", refresh);
-  }, []);
-
-  const { wedding, servicesNode, items } = state;
-  return (
-    <section className="wedding-light-section">
-      <div className="wedding-container">
-        <SectionHead eyebrow="OUR SERVICES" title="Everything You Need for a Perfect Wedding" link={{ label: "View All Services", href: "/occasion/wedding/services" }} />
-        <HorizontalRail>
-          {items.map((service) => (
-            <Link
-              to={pathFor([wedding, servicesNode, service])}
-              className="wedding-service-card"
-              key={service.id || service.slug}
-            >
-              <img src={service.image || service.heroImg || IMAGES.showcase7} alt={service.label} loading="lazy" decoding="async" onError={onImgError} />
-              <strong>{service.label}</strong>
-              <span>{service.description || "Wedding service"}</span>
-            </Link>
-          ))}
-        </HorizontalRail>
-      </div>
-    </section>
-  );
+  return <EventServicesSection contextPath={["wedding"]} />;
 }
-
 
 function FeaturedPackages() {
   const [index, setIndex] = useState(0);

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import usePageMeta from "../../hooks/usePageMeta";
 import useReveal from "../../hooks/useReveal";
@@ -19,6 +19,7 @@ import {
   popularInCity,
 } from "../../data/occasions";
 import { onImgError } from "../../lib/imageFallback";
+import { trackServiceView } from "../../lib/siteEvents";
 
 // Renders a single product/package leaf, wherever it sits in the occasion
 // tree. One reusable template drives every product's detail page — new
@@ -33,6 +34,19 @@ export default function ProductTemplate({ node: product, trail }) {
     product.shortDesc || (product.name + " decor package from Next Level Events."),
   );
   useReveal([product.slug]);
+
+  useEffect(() => {
+    const serviceCategory = Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services"
+      ? product.categoryPath[1]
+      : undefined;
+    trackServiceView({
+      serviceName: product.name,
+      serviceCategory,
+      occasion: trail?.[0]?.slug,
+      functionPath: trail?.[0]?.slug === "event-services" ? "" : trail?.slice(1, -1).map((item) => item.slug).join("/"),
+      itemId: product.id || product.slug,
+    });
+  }, [product.id, product.slug, product.name, product.categoryPath, trail]);
 
   const parentNode = trail.length > 1 ? trail[trail.length - 2] : null;
   const parentTrail = trail.slice(0, -1);

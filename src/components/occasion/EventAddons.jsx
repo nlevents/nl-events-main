@@ -38,7 +38,7 @@ export default function EventAddons({ title, occasionLabel, items, contextPath =
                 )}
                 {addon.href ? (
                   <Link
-                    to={contextPath.length ? `${addon.href}?context=${encodeURIComponent(contextPath.join("/"))}` : addon.href}
+                    to={`/occasion/event-services?service=${encodeURIComponent((addon.categoryPath || []).slice(1).join("/"))}${contextPath.length ? `&context=${encodeURIComponent(contextPath.join("/"))}` : ""}`}
                     className="addon-btn occ-addon-cta"
                   >
                     View Options

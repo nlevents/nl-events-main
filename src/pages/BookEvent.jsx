@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import usePageMeta from "../hooks/usePageMeta";
 import { submitInquiry } from "../services/customersService";
+import { trackEvent, trackGenerateLead } from "../lib/siteEvents";
 
 const EVENT_TYPES = [
   { type: "Wedding", icon: "💍" },
@@ -129,6 +130,7 @@ export default function BookEvent() {
 
   function goNext() {
     if (!validateStep(step)) return;
+    trackEvent("inquiry_step", { step: step + 1, step_name: STEP_LABELS[step], event_type: eventType || undefined });
     setStep((s) => Math.min(STEP_LABELS.length - 1, s + 1));
     setTimeout(() => formRef.current && window.scrollTo({ top: formRef.current.offsetTop - 90, behavior: "smooth" }), 30);
   }
@@ -157,6 +159,7 @@ export default function BookEvent() {
       try {
         sessionStorage.setItem("nle-last-inquiry", JSON.stringify({ id: result?.data?.id, eventType, eventDate }));
       } catch { /* ignore */ }
+      trackGenerateLead({ source: "book_event", eventType });
       setSuccess(true);
     } catch (err) {
       setSubmitError(err.message || "Unable to submit your inquiry. Please try again.");

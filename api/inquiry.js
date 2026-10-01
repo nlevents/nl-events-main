@@ -65,8 +65,8 @@ export default async function handler(req, res) {
     const whatsapp = clean(body.whatsapp, 20);
     const eventVenue = clean(body.eventVenue, 160);
     const eventLocation = clean(body.eventLocation, 120);
-    const guestCount = clean(body.guestCount, 60);
     const message = clean(body.message, 2000);
+    const specificRequirements = clean(body.specificRequirements, 2000);
     const source = clean(body.source, 30);
     const sourceDetail = detectSourceDetail(source);
     const leadSource = detectLeadSource(body.leadSource || source);
@@ -77,10 +77,10 @@ export default async function handler(req, res) {
     if (!name || !/^\+?[0-9\s()\-.]{7,20}$/.test(phone) || (!isLanding && !message)) {
       return res.status(400).json({ ok: false, error: "Please complete the required fields." });
     }
-    if (isLanding && (!LANDING_EVENT_TYPES.has(eventType) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !eventLocation || !guestCount)) {
+    if (isLanding && (!LANDING_EVENT_TYPES.has(eventType) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !eventLocation)) {
       return res.status(400).json({ ok: false, error: "Please complete all required inquiry details." });
     }
-    if (!isContact && !isLanding && (!EVENT_TYPES.has(eventType) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !eventLocation || !guestCount)) {
+    if (!isContact && !isLanding && (!EVENT_TYPES.has(eventType) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !eventLocation)) {
       return res.status(400).json({ ok: false, error: "Please complete all required inquiry details." });
     }
 
@@ -120,9 +120,10 @@ export default async function handler(req, res) {
       event_time: eventTime,
       event_venue: eventVenue,
       event_location: eventLocation,
-      guest_count: guestCount,
+      ...(isLanding ? {} : { guest_count: clean(body.guestCount, 60) }),
       budget: "",
       message,
+      specific_requirements: specificRequirements,
       status: STAGE,
       admin_notes: "",
       source: sourceDetail,
@@ -152,9 +153,10 @@ export default async function handler(req, res) {
         event_time: inquiryPayload.event_time,
         event_venue: inquiryPayload.event_venue,
         event_location: inquiryPayload.event_location,
-        guest_count: inquiryPayload.guest_count,
+        ...(isLanding ? {} : { guest_count: inquiryPayload.guest_count }),
         budget: inquiryPayload.budget,
         message: inquiryPayload.message,
+        specific_requirements: inquiryPayload.specific_requirements,
         status: inquiryPayload.status,
         admin_notes: inquiryPayload.admin_notes,
         request_id: inquiryPayload.request_id,
@@ -166,9 +168,10 @@ export default async function handler(req, res) {
         city: inquiryPayload.city,
         event_type: inquiryPayload.event_type,
         event_date: inquiryPayload.event_date,
-        guest_count: inquiryPayload.guest_count,
+        ...(isLanding ? {} : { guest_count: inquiryPayload.guest_count }),
         budget: inquiryPayload.budget,
         message: inquiryPayload.message,
+        specific_requirements: inquiryPayload.specific_requirements,
         status: inquiryPayload.status,
         admin_notes: inquiryPayload.admin_notes,
       },

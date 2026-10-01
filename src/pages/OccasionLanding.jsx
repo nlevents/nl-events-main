@@ -6,6 +6,7 @@ import ProductCard from "../components/occasion/ProductCard";
 import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
 import { pathFor, sortProducts, listOccasions } from "../data/occasions";
 import { cloudinaryAsset } from "../lib/cloudinaryAssets";
+import EventServicesSection from "../components/occasion/EventServicesSection";
 
 const ICONS = ["✧", "♢", "♫", "◉", "⌂", "✦", "⌖", "◷", "◇", "◎"];
 
@@ -124,11 +125,18 @@ function ImageCards({ items, className = "", large = false, rootSlugs = [] }) {
   </div>;
 }
 
-function Services({ config }) {
-  return <section className="occasion-pro-section occasion-pro-services"><div className="occasion-pro-container">
-    <SectionHead eyebrow="OUR SERVICES" title={config.servicesTitle} text={config.servicesIntro} />
-    <div className="occasion-pro-service-grid">{config.services.map(([name, sub, image], i) => <Link to="/services" className="occasion-pro-service" key={name}><span>{ICONS[i % ICONS.length]}</span><strong>{name}</strong><small>{sub}</small></Link>)}</div>
-  </div></section>;
+function Services({ type }) {
+  // Keep the Shop-by-Occasion context attached to every service link on
+  // landing pages. These pages (Anniversary, Corporate, Festivals, Kids &
+  // Family) are separate from CategoryTemplate, so they must explicitly pass
+  // their canonical occasion slug into the shared service rail.
+  const contextPath = type === "festivals"
+    ? ["festivals-culture"]
+    : type === "family"
+      ? ["kids-family"]
+      : [type];
+
+  return <EventServicesSection contextPath={contextPath} />;
 }
 
 function FeaturedProducts({ type }) {
@@ -274,7 +282,7 @@ export default function OccasionLanding({ type }) {
     {config.other && <section className="occasion-pro-section occasion-pro-soft"><div className="occasion-pro-container"><SectionHead eyebrow="BEYOND FESTIVALS" title="Other Special Occasions" text="Because every occasion, big or small, deserves a beautiful celebration." /><ImageCards items={config.other} rootSlugs={["festivals-culture"]} /></div></section>}
     {config.family && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><ImageCards items={config.family} large rootSlugs={["kids-family"]} /></div></section>}
     {config.corporate && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} link={{ label: "View All Corporate Events", href: "/occasion/corporate" }} /><ImageCards items={config.corporate} large rootSlugs={["corporate"]} /></div></section>}
-    <Services config={config} />
+    <Services config={config} type={type} />
     <FeaturedProducts type={type} />
     <Gallery config={config} />
     <Moments config={config} />

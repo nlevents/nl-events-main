@@ -10,6 +10,7 @@ import { listOccasions, weddingFunctionLinks, birthdayThemeLinks } from "../data
 import Faq from "../components/Faq";
 import ProductRail from "../components/ProductRail";
 import AutoScrollRail from "../components/AutoScrollRail";
+import EventServicesSection from "../components/occasion/EventServicesSection";
 
 const CELEBRATIONS = [
   { label: "Weddings", href: "/occasion/wedding", img: IMAGES.typeWedding },
@@ -28,17 +29,6 @@ const WEDDING_CONCEPTS = [
   { label: "Reception", img: CATALOG_IMAGES.reception },
   { label: "Engagement", img: CATALOG_IMAGES.engagement },
   { label: "Mayra / Rituals", img: CATALOG_IMAGES.maira },
-];
-
-const WEDDING_SERVICES = [
-  { label: "Décor", sub: "Packages & elements", img: CATALOG_IMAGES.decor, href: "/occasion/event-services/decor" },
-  { label: "Entry", sub: "Grand & unique entries", img: IMAGES.showcase4, href: "/occasion/event-services/entry" },
-  { label: "Entertainment", sub: "Artists, DJ, live bands", img: CATALOG_IMAGES.entertainment, href: "/occasion/event-services/entertainment" },
-  { label: "Sound & Technical", sub: "Lighting, AV, effects", img: CATALOG_IMAGES["sound-technical"], href: "/occasion/event-services/sound-technical" },
-  { label: "Tent & Furniture", sub: "Tents, seating, tables", img: CATALOG_IMAGES["tent-furniture"], href: "/occasion/event-services/tent-furniture" },
-  { label: "Photography & Videography", sub: "Capture every moment", img: CATALOG_IMAGES["photography-videography"], href: "/occasion/event-services/photography-videography" },
-  { label: "Catering", sub: "Delicious food experiences", img: CATALOG_IMAGES.catering, href: "/occasion/event-services/catering" },
-  { label: "Baraat / Procession", sub: "Make an unforgettable entry", img: CATALOG_IMAGES["baraat-procession"], href: "/occasion/event-services/baraat-procession" },
 ];
 
 const BIRTHDAY_THEMES = [
@@ -241,13 +231,7 @@ function WeddingSection() {
         </div>
       </section>
 
-      <section className="ref-home-light-section">
-        <div className="ref-home-container">
-          <RefSectionHead title="Everything You Need for Your Event" link={{ label: "Explore all services", href: "/services" }} linkClass="ref-home-head-right" />
-          <p className="ref-home-intro">One team. All your event needs. Hassle-free planning, stunning execution.</p>
-          <HorizontalCards items={WEDDING_SERVICES} cardClass="ref-home-service-card" />
-        </div>
-      </section>
+<EventServicesSection />
     </>
   );
 }
@@ -315,43 +299,6 @@ function PopularPackagesSection() {
       viewAllHref="/packages"
       items={popularPackages}
     />
-  );
-}
-
-function AddonsSection() {
-  const [items, setItems] = useState([]);
-
-  useEffect(() => {
-    let active = true;
-    const load = () => import("../lib/catalogStore")
-      .then(({ getAddonsForOccasion }) => {
-        const live = ["wedding", "birthday"]
-          .flatMap((slug) => getAddonsForOccasion(slug))
-          .filter((item, index, list) => list.findIndex((x) => x.id === item.id) === index)
-          .map((item) => ({
-            ...item,
-            img: item.image,
-            sub: item.subLabel,
-            href: item.href,
-          }));
-        if (active) setItems(live);
-      })
-      .catch(() => {});
-    load();
-    window.addEventListener("nle-catalog-updated", load);
-    return () => { active = false; window.removeEventListener("nle-catalog-updated", load); };
-  }, []);
-
-  if (!items.length) return null;
-
-  return (
-    <section className="ref-home-addons">
-      <div className="ref-home-container">
-        <RefSectionHead title="Services to Elevate Your Celebration" link={{ label: "Explore services", href: "/occasion/event-services" }} />
-        <p className="ref-home-intro">Create more magical moments with our wide range of services.</p>
-        <HorizontalCards items={items} cardClass="ref-home-addon-card" />
-      </div>
-    </section>
   );
 }
 
@@ -529,7 +476,6 @@ export default function Home() {
       <WeddingSection />
       <BirthdaySection />
       <PopularPackagesSection />
-      <AddonsSection />
       <HomeUSPs />
       <FinalCTA />
 
