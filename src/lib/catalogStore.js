@@ -1161,7 +1161,14 @@ export function saveProduct(product) {
   delete safeProduct.setupType;
   delete safeProduct.isDemo;
 
-  const existingIdx = list.findIndex((p) => p.id === safeProduct.id || (safeProduct.slug && p.slug === safeProduct.slug));
+  // A brand-new product (no id) must never overwrite another product that
+  // happens to share its slug; give it a unique slug instead.
+  if (!safeProduct.id && safeProduct.slug && list.some((p) => p.slug === safeProduct.slug)) {
+    let n = 2;
+    while (list.some((p) => p.slug === `${safeProduct.slug}-${n}`)) n += 1;
+    safeProduct.slug = `${safeProduct.slug}-${n}`;
+  }
+  const existingIdx = list.findIndex((p) => (safeProduct.id && p.id === safeProduct.id) || (safeProduct.slug && p.slug === safeProduct.slug));
   // Services must carry an explicit context decision. A missing/empty
   // selection on a NEW service is rejected instead of silently going global.
   if (safeProduct.isAddon || catalogKind === "service") {

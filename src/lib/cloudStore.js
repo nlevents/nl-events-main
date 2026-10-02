@@ -128,6 +128,10 @@ export function queueCloudSync(key, data) {
 }
 
 export async function hydratePublicState({ versionsOnly = false } = {}) {
+  // Never overwrite the local cache while an admin save is still being written
+  // to the cloud; the cloud copy is older at that moment and would wipe the
+  // items that were just added.
+  if (cloudWriteChains.size > 0) return {};
   // The metadata request is tiny and is used for polling. The full request is
   // reserved for first load or when an actual catalog version changed.
   const data = await request(`${API_BASE}/catalog${versionsOnly ? "?meta=1" : ""}`, { cache: "no-store" });
@@ -169,7 +173,7 @@ export async function hydratePublicState({ versionsOnly = false } = {}) {
   })();
 
   if (!localProducts || (cloudProductVersion && localProductVersion !== cloudProductVersion)) {
-    const productPayload = await request(`${API_BASE}/catalog/products`, { cache: "no-store" });
+    const productPayload = await request(`${API_BASE}/catalog/products?v=${encodeURIComponent(cloudProductVersion || Date.now())}`, { cache: "no-store" });
     const products = productPayload?.data;
     if (products !== undefined) {
       const cleanProducts = removeLegacySeedProducts(products);

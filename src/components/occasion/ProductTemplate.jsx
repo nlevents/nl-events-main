@@ -4,6 +4,7 @@ import usePageMeta from "../../hooks/usePageMeta";
 import useReveal from "../../hooks/useReveal";
 import useIsDesktop from "../../hooks/useIsDesktop";
 import ProductGallery from "./ProductGallery";
+import ProductAddonServices from "./ProductAddonServices";
 import Icon from "../Icon";
 import RatingStars from "../RatingStars";
 import BookingPanel from "../BookingPanel";
@@ -196,6 +197,8 @@ export default function ProductTemplate({ node: product, trail }) {
                 </div>
               </div>
 
+              {!isQuoteOnly && <div className="occ-block"><ProductAddonServices product={product} /></div>}
+
               {product.importantInfo && product.importantInfo.length > 0 && (
                 <div className="reveal occ-block">
                   <h2 style={{ fontSize: 22, marginBottom: 12 }}>Important Information</h2>
@@ -283,6 +286,8 @@ export default function ProductTemplate({ node: product, trail }) {
             </div>
 
             {!isQuoteOnly && bookingPanel && <div className="pd-booking-inline reveal">{bookingPanel}</div>}
+
+            {!isQuoteOnly && <ProductAddonServices product={product} />}
 
             {product.includes?.length > 0 && (
               <div className="pd-market-section reveal">

@@ -87,6 +87,7 @@ export default function BookingPanel({ product, productHref, addons, requiresTim
   }, [addons, catalogServices]);
 
   const [selectedAddons, setSelectedAddons] = useState({});
+  const addonIds = useRef({});
   const detectedEventType = detectEventType(product, defaultEventType);
   const [eventType, setEventType] = useState(detectedEventType);
   const [locationType, setLocationType] = useState("");
@@ -129,10 +130,25 @@ export default function BookingPanel({ product, productHref, addons, requiresTim
         delete next[addon.name];
       } else {
         next[addon.name] = addon.price;
+        if (addon.id) addonIds.current[addon.name] = addon.id;
       }
       return next;
     });
   }
+
+  // Lets the "Add-on Services" section on the product page add/remove a
+  // service in this booking panel, and keeps both in sync.
+  useEffect(() => {
+    const onToggle = (e) => {
+      const a = e?.detail;
+      if (a?.name) toggleAddon(a);
+    };
+    window.addEventListener("nle-toggle-addon", onToggle);
+    return () => window.removeEventListener("nle-toggle-addon", onToggle);
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("nle-addons-selected", { detail: Object.keys(selectedAddons) }));
+  }, [selectedAddons]);
 
   function validate() {
     const next = {};
@@ -162,7 +178,7 @@ export default function BookingPanel({ product, productHref, addons, requiresTim
       return;
     }
     const complete = validate();
-    const addonsArr = Object.keys(selectedAddons).map((name) => ({ name, price: selectedAddons[name] }));
+    const addonsArr = Object.keys(selectedAddons).map((name) => ({ name, price: selectedAddons[name], ...(addonIds.current[name] ? { id: addonIds.current[name] } : {}) }));
     cart.addBooking({
       slug: product.slug || product.id,
       name: product.name,

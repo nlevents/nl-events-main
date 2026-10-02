@@ -1602,3 +1602,92 @@
   .occ-service-card strong{font-size:10px;padding:8px 8px 2px}
   .occ-service-card span{font-size:8px;padding:0 8px 10px}
 }
+
+/* Sub-category pages (Haldi, Mehndi, Sangeet, every theme/leaf, all occasions):
+   the product grid and its cards must never depend on the scroll-reveal
+   observer to become visible. The Wedding landing page already forces this;
+   without it the packages stayed at opacity:0 and the area under the
+   Services section looked empty. */
+.occ-category-content .occ-prod-grid.reveal,
+.occ-category-content .occ-prod-card.reveal,
+.occ-category-content .occ-block .section-head.reveal,
+.occ-category-content .occ-block .listing-controls.reveal {
+  opacity: 1;
+  transform: none;
+}
+
+/* ==========================================================================
+   ALIGNMENT FIXES (layout only — no colours, sizes, fonts or spacing changed)
+   Every card in a row gets the same height and the same internal anchor
+   points: image on top, title next, price/CTA pinned to the bottom edge, all
+   text starting from the left edge. Cards with or without rating/discount/
+   description therefore line up on one straight line.
+   ========================================================================== */
+
+/* Grids: equal-height cells, content always starts at the left */
+.occ-prod-grid, .occ-cat-grid, .occ-addon-grid, .wedding-addon-grid {
+  align-items: stretch;
+  justify-items: stretch;
+  justify-content: start;
+  text-align: left;
+}
+.occ-prod-grid > *, .occ-cat-grid > *, .occ-addon-grid > *, .wedding-addon-grid > * {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+}
+
+/* Listing cards */
+.occ-prod-grid .occ-prod-card,
+.occ-cat-grid .occ-cat-card,
+.occ-addon-grid .occ-addon-card,
+.occ-prod-card, .occ-cat-card, .occ-addon-card {
+  height: 100%;
+  text-align: left;
+}
+.occ-prod-media img, .occ-cat-pic img, .occ-addon-pic img { display: block; }
+.occ-prod-card .occ-prod-body,
+.occ-cat-card .occ-cat-body,
+.occ-addon-card .occ-addon-body {
+  flex: 1 1 auto;
+  align-items: stretch;
+  text-align: left;
+}
+.occ-prod-card .occ-prod-body h4,
+.occ-cat-card .occ-cat-body h4,
+.occ-addon-card .occ-addon-body h4 { text-align: left; margin: 0; }
+
+/* Price row (and CTA row) sit on the same baseline across the whole row */
+.occ-prod-card .occ-prod-price { margin-top: auto; justify-content: flex-start; }
+.occ-prod-card:not(.occ-prod-card--market) .occ-prod-price { padding-top: 4px; }
+.occ-prod-card .occ-prod-actions { margin-top: 8px; }
+.occ-addon-card .occ-addon-price { margin-top: auto; }
+.occ-cat-card .occ-cat-count { margin-top: auto; align-self: flex-start; }
+
+/* Cards wrapped in links/rails stretch to the same height */
+.cat-rail-track { align-items: stretch; }
+.cat-rail-card { display: flex; }
+.cat-rail-card > * { flex: 1 1 auto; }
+
+/* Event Services rail (the strip under the hero): identical card heights */
+.occ-services-rail { align-items: stretch; justify-content: flex-start; text-align: left; }
+.occ-service-card { display: flex; flex-direction: column; text-align: left; }
+.occ-service-card img { flex: 0 0 auto; }
+.occ-service-card strong, .occ-service-card span { text-align: left; }
+.occ-service-card span { flex: 1 1 auto; }
+
+/* Product rails (Popular in Your City / Similar Products / homepage rails) */
+.rail .rail-track { align-items: stretch; justify-content: flex-start; }
+.rail .rail-card { display: flex; flex-direction: column; text-align: left; }
+.rail .rail-card-media { flex: 0 0 auto; }
+.rail .rail-card-body { flex: 1 1 auto; display: flex; flex-direction: column; text-align: left; }
+.rail .rail-card-body h4 { text-align: left; }
+.rail .rail-card-price { margin-top: auto; }
+
+/* Featured package sliders (Wedding / Birthday / every occasion landing) */
+.wedding-featured-products-track, .occasion-pro-featured-track { align-items: stretch; justify-content: flex-start; }
+.wedding-featured-product-slide, .occasion-pro-featured-slide { display: flex; }
+.wedding-featured-product-slide > *, .occasion-pro-featured-slide > * { flex: 1 1 auto; width: 100%; }
+.wedding-addon-card { display: flex; flex-direction: column; height: 100%; text-align: left; }
+.wedding-addon-card .wedding-addon-copy { flex: 1 1 auto; display: flex; flex-direction: column; }
+.wedding-addon-card .wedding-addon-copy > strong { margin-top: auto; }

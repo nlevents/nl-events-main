@@ -33,6 +33,22 @@ function validateItem(item, cities) {
   if (!GUEST_COUNTS.has(clean(item.guestCount, 60))) throw new Error(`Please select a valid guest count for ${clean(item.name, 100) || "item"}.`);
   if (clean(item.timeSlot, 80) && !TIME_SLOTS.has(clean(item.timeSlot, 80))) throw new Error(`Please select a valid time slot for ${clean(item.name, 100) || "item"}.`);
 }
+function normName(value) { return String(value ?? "").trim().toLowerCase(); }
+// An add-on is valid when it is either one of the product's own embedded
+// add-ons, or a live (non-archived/draft) service from the admin catalog.
+// Price always comes from the server-side catalog, never from the browser.
+function findAddon(product, products, addon) {
+  const name = normName(addon?.name);
+  const id = String(addon?.id || addon?.productId || "");
+  const own = (product.addons || []).find((a) => normName(a.name) === name);
+  if (own) return own;
+  return (products || []).find((p) => {
+    if (!p || p.status === "archived" || p.status === "draft") return false;
+    const isService = p.catalogKind === "service" || p.isAddon === true || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
+    if (!isService) return false;
+    return (id && String(p.id) === id) || (name && normName(p.name) === name);
+  }) || null;
+}
 function normalizeAndPrice(items, products, cities) {
   let total = 0;
   const normalized = [];
@@ -45,7 +61,7 @@ function normalizeAndPrice(items, products, cities) {
     let addonTotal = 0;
     const addons = [];
     for (const addon of Array.isArray(item.addons) ? item.addons : []) {
-      const known = (product.addons || []).find((a) => a.name === addon.name);
+      const known = findAddon(product, products, addon);
       if (!known) throw new Error(`Invalid add-on selected for ${product.name}.`);
       addonTotal += cityPrice(known.price, item.city, cities);
       addons.push({ name: known.name, price: Number(known.price) || 0 });
