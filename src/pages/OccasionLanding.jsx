@@ -155,6 +155,45 @@ function FeaturedFamilyProducts() {
   return <ProductRail title="Popular Family Products" items={items} />;
 }
 
+function FeaturedOccasionProducts() {
+  const entries = useLiveEntries();
+  const liveProducts = useLiveProducts();
+  const matches = (value) => String(value || "").trim().toLowerCase() === "anniversary";
+
+  const entryProducts = entries
+    .filter((entry) => matches(entry?.occasion?.slug))
+    .filter((entry) => entry.product && entry.product.catalogKind === "product" && !entry.product.isAddon && entry.product.status !== "archived")
+    .map((entry) => entry.product);
+
+  const catalogProducts = liveProducts
+    .filter((product) => {
+      if (!product || product.catalogKind !== "product" || product.isAddon || product.status === "archived") return false;
+      if (matches(product.occasionSlug) || matches(product.occasion)) return true;
+      if (Array.isArray(product.categoryPath)) return product.categoryPath.some(matches);
+      return matches(product.categoryPath);
+    });
+
+  const products = [...entryProducts, ...catalogProducts].reduce((unique, product) => {
+    const key = product.slug || product.id;
+    if (key && !unique.some((item) => (item.slug || item.id) === key)) unique.push(product);
+    return unique;
+  }, []);
+
+  const items = products.map((product) => {
+    const existing = entries.find(
+      (entry) => entry.product && (entry.product.slug || entry.product.id) === (product.slug || product.id) && matches(entry?.occasion?.slug),
+    );
+    if (existing) return toRailItem(product, existing.trail);
+    return toRailItem(product, [
+      { slug: "anniversary" },
+      ...(Array.isArray(product.categoryPath) ? product.categoryPath.slice(1).map((slug) => ({ slug })) : []),
+      product,
+    ]);
+  });
+
+  return <ProductRail title="Popular Anniversary Products" viewAllHref="/products" items={items} />;
+}
+
 function FeaturedProducts({ type }) {
   const entries = useLiveEntries();
   const liveProducts = useLiveProducts();
@@ -299,6 +338,7 @@ export default function OccasionLanding({ type }) {
     {config.family && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><ImageCards items={config.family} large rootSlugs={["kids-family"]} /></div></section>}
     {config.corporate && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} link={{ label: "View All Corporate Events", href: "/occasion/corporate" }} /><ImageCards items={config.corporate} large rootSlugs={["corporate"]} /></div></section>}
     <Services config={config} type={type} />
+    {type === "anniversary" && <FeaturedOccasionProducts />}
     {type === "family" && <FeaturedFamilyProducts />}
     <FeaturedProducts type={type} />
     <Gallery config={config} />
