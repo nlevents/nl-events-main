@@ -42,6 +42,15 @@ function AdminProductCategoryMultiPicker({ options, selectedPaths, onToggle }) {
   const q = query.trim().toLowerCase();
   const selected = new Set((selectedPaths || []).map((path) => path.join("/")));
   const tree = buildCategoryTree(options);
+  const descendantKeys = (node) => {
+    const keys = [];
+    (node.children || []).forEach((child) => {
+      keys.push(child.key);
+      keys.push(...descendantKeys(child));
+    });
+    return keys;
+  };
+  const inheritedByParent = (key) => Array.from(selected).some((selectedKey) => selectedKey !== key && key.startsWith(`${selectedKey}/`));
 
   const matches = (node) => {
     if (!q) return true;
@@ -56,7 +65,9 @@ function AdminProductCategoryMultiPicker({ options, selectedPaths, onToggle }) {
   const renderNode = (node, depth = 0) => {
     if (!matches(node)) return null;
     const option = node.option;
-    const checked = option ? selected.has(node.key) : false;
+    const directlySelected = option ? selected.has(node.key) : false;
+    const inherited = option ? inheritedByParent(node.key) : false;
+    const checked = Boolean(option && (directlySelected || inherited));
     const hasChildren = node.children.length > 0;
     const open = hasChildren && (q ? node.children.some(matches) : expanded.has(node.key));
     const label = option?.label || option?.displayLabel?.split(" › ").pop() || node.path[node.path.length - 1] || "Category";
@@ -64,7 +75,25 @@ function AdminProductCategoryMultiPicker({ options, selectedPaths, onToggle }) {
       <div className={`admin-product-category-tree-row ${checked ? "selected" : ""}`}>
         {hasChildren ? <button type="button" className="admin-product-category-tree-caret" onClick={() => toggleExpanded(node.key)} aria-label={`${open ? "Collapse" : "Expand"} ${label}`}>{open ? "▾" : "▸"}</button> : <span className="admin-product-category-tree-caret-spacer" />}
         {option ? <label className="admin-product-category-option">
-          <input type="checkbox" checked={checked} onChange={() => onToggle(option.path || node.path)} />
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={inherited}
+            onChange={() => {
+              const path = option.path || node.path;
+              if (selected.has(node.key)) {
+                onToggle(path);
+                return;
+              }
+              const descendantSet = new Set(descendantKeys(node));
+              const withoutDescendants = (selectedPaths || []).filter((selectedPath) => !descendantSet.has(selectedPath.join("/")));
+              if (withoutDescendants.length !== (selectedPaths || []).length) {
+                onToggle(path, [...withoutDescendants, path]);
+              } else {
+                onToggle(path);
+              }
+            }}
+          />
           <span className="admin-product-category-check">{checked ? "✓" : ""}</span>
           <span title={label}>{label}</span>
         </label> : <button type="button" className="admin-product-category-parent-label" onClick={() => hasChildren && toggleExpanded(node.key)}>{label}</button>}
@@ -198,11 +227,13 @@ export default function AdminProductForm() {
     ? formData.categoryPaths
     : (Array.isArray(formData.categoryPath) && formData.categoryPath.length ? [formData.categoryPath] : []);
 
-  function toggleCategoryPath(path) {
+  function toggleCategoryPath(path, forcedNext) {
     const key = path.join("/");
-    const next = selectedCategoryPaths.some((selected) => selected.join("/") === key)
-      ? selectedCategoryPaths.filter((selected) => selected.join("/") !== key)
-      : [...selectedCategoryPaths, path];
+    const next = Array.isArray(forcedNext)
+      ? forcedNext
+      : (selectedCategoryPaths.some((selected) => selected.join("/") === key)
+        ? selectedCategoryPaths.filter((selected) => selected.join("/") !== key)
+        : [...selectedCategoryPaths, path]);
     setFormData((prev) => ({
       ...prev,
       categoryPaths: next,

@@ -386,32 +386,62 @@ export default function CategoryTemplate({ node, trail }) {
 
     if (isExactListing) {
       const currentPath = trail.map((item) => item.slug);
-      const directProducts = Array.isArray(node.products) ? node.products : [];
-      return directProducts
+      const currentPathKey = currentPath.join("/");
+      const candidates = [];
+
+      // A product assigned to a parent category is inherited by every child.
+      // The catalog tree keeps the product on the node where it was assigned,
+      // so collect products from the current node and its ancestors before
+      // applying the hierarchy-aware filter below.
+      trail.forEach((trailNode) => {
+        (Array.isArray(trailNode?.products) ? trailNode.products : []).forEach((product) => {
+          candidates.push(product);
+        });
+      });
+
+      const seen = new Set();
+      return candidates
         .filter((product) => {
-          const productPath = Array.isArray(product?.categoryPath)
-            ? product.categoryPath.filter(Boolean)
-            : [];
-          if (productPath.length) {
-            return productPath.length === currentPath.length &&
-              productPath.every((part, index) => part === currentPath[index]);
+          const productPathCandidates = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+            ? product.categoryPaths
+            : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+          if (productPathCandidates.length) {
+            return productPathCandidates.some((rawPath) => {
+              const productPath = rawPath.filter(Boolean);
+              if (!productPath.length || productPath[0] !== currentPath[0]) return false;
+              // Parent assignment => inherited by the current descendant.
+              return productPath.length <= currentPath.length &&
+                productPath.every((part, index) => part === currentPath[index]);
+            });
           }
 
-          // Older records may only have categorySlug. If that field points
-          // to the parent category (e.g. `haldi`), do not show it on a
-          // child theme (e.g. `traditional-haldi`).
+          // Older records may only have categorySlug. Preserve the same
+          // parent-to-child inheritance for those records.
           const categorySlug = String(product?.categorySlug || "").trim();
-          return !categorySlug || categorySlug === node.slug;
+          return !categorySlug || trail.some((item) => item.slug === categorySlug);
+        })
+        .filter((product) => {
+          const key = String(product?.id || product?.slug || product?.name || currentPathKey);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         })
         .map((product) => ({ product, trail: [...trail, product] }));
     }
 
     return collectProductEntries(node, trail);
   }, [node, trail]);
-  const products = useMemo(
-    () => productEntries.map((e) => ({ ...e.product, __trail: e.trail })),
-    [productEntries],
-  );
+  const products = useMemo(() => {
+    const seen = new Set();
+    return productEntries
+      .filter((entry) => {
+        const key = String(entry?.product?.id || entry?.product?.slug || entry?.product?.name || "");
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((e) => ({ ...e.product, __trail: e.trail }));
+  }, [productEntries]);
   const contextProducts = useMemo(() => {
     if (!isServiceCatalog || !serviceContextPath.length) return products;
     return products.filter((product) => serviceProductMatchesContext(product, serviceContextPath));

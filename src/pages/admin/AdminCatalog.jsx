@@ -18,6 +18,7 @@ import {
   deleteProduct,
   duplicateProduct,
   uploadMediaFile,
+  refreshAdminCatalogFromCloud,
 } from "../../lib/catalogStore";
 import { fmtINR } from "../../lib/pricing";
 import { sanitizeSlug } from "../../lib/sanitize";
@@ -73,10 +74,14 @@ function productMatchesCatalogPath(product, occasionSlug, categoryPath = [], { i
     if (productOccasion !== occasionSlug) return false;
     if (!categoryPath.length) return true;
     const wanted = [occasionSlug, ...categoryPath];
-    if (path.length < wanted.length) return false;
-    return includeDescendants
-      ? wanted.every((slug, index) => path[index] === slug)
-      : path.length === wanted.length && wanted.every((slug, index) => path[index] === slug);
+    const samePrefix = (shorter, longer) => shorter.every((slug, index) => longer[index] === slug);
+    if (includeDescendants) {
+      // A product assigned to a parent is inherited by every descendant, and
+      // a product assigned to a descendant is still included on its parent.
+      // Treat the category path as a hierarchy rather than an exact bucket.
+      return samePrefix(path, wanted) || samePrefix(wanted, path);
+    }
+    return path.length === wanted.length && samePrefix(path, wanted);
   });
 }
 function initialItem(kind = "product") {
@@ -302,6 +307,7 @@ export default function AdminCatalog() {
   const [treeSearch, setTreeSearch] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [reloading, setReloading] = useState(false);
   const [statFilter, setStatFilter] = useState("all");
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -310,6 +316,20 @@ export default function AdminCatalog() {
     // initial structure; after that, saved cloud/local state is authoritative.
     setOccasions(getOccasions());
     setProducts(getProducts());
+  }
+  async function handleReloadCatalog() {
+    if (reloading) return;
+    setReloading(true);
+    try {
+      await refreshAdminCatalogFromCloud();
+      refresh();
+      setFeedback("Catalog refreshed from the cloud.");
+    } catch (err) {
+      setError(err.message || "Unable to refresh the catalog from the cloud.");
+    } finally {
+      setReloading(false);
+      setTimeout(() => { setFeedback(""); setError(""); }, 3000);
+    }
   }
   useEffect(() => {
     const fn = () => refresh();
@@ -406,8 +426,12 @@ export default function AdminCatalog() {
     setAddMenu(false);
     const item = initialItem(kind);
     item.occasionSlug = kind === "service" ? "event-services" : activeOccasion;
-    item.categoryPath = kind === "service" ? ((getAddonCategoryOptions()[0]?.path) || ["event-services"]) : [activeOccasion, ...activeCategoryPath];
-    item.categoryPaths = kind === "service" || kind === "package" ? [item.categoryPath] : (item.categoryPath.length > 1 ? [item.categoryPath] : []);
+    // New products should start with no category selected. The currently viewed
+    // catalog category is a navigation/filter context, not a mandatory assignment.
+    // Services and packages keep their existing defaults because their placement
+    // rules are different.
+    item.categoryPath = kind === "service" ? ((getAddonCategoryOptions()[0]?.path) || ["event-services"]) : kind === "package" ? [activeOccasion || "wedding"] : [];
+    item.categoryPaths = kind === "service" || kind === "package" ? [item.categoryPath] : [];
     if (kind === "package") {
       item.packageOccasions = [activeOccasion || "wedding"];
       item.categoryPath = [activeOccasion || "wedding"];
@@ -702,6 +726,16 @@ export default function AdminCatalog() {
             <p>{tab === "products" ? "Add and manage every physical decor item, setup and product shown on your website." : tab === "packages" ? "Build reusable event packages from your products and services." : "Manage customer-facing event services in their dedicated catalog."}</p>
           </div>
           <div className="catalog-head-actions">
+            <button
+              type="button"
+              className="btn-icon"
+              title="Reload catalog from cloud"
+              aria-label="Reload catalog from cloud"
+              onClick={handleReloadCatalog}
+              disabled={reloading}
+            >
+              <Icon name="restart" className={reloading ? "admin-icon-spin" : ""} />
+            </button>
             <button type="button" className="btn btn-outline catalog-head-secondary" onClick={selectAllCatalog}><Icon name="search" /> Browse all</button>
             <div className="catalog-inline-add-wrap">
               <button type="button" className="btn btn-primary catalog-main-add" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> {tab === "products" ? "Add Product" : tab === "packages" ? "Add Package" : "Add Service"} <span>⌄</span></button>
@@ -849,6 +883,15 @@ function CategoryMultiPicker({ options, selectedPaths, onToggle, occasionLabel }
   const selectedKeys = new Set((selectedPaths || []).map((path) => path.join("/")));
   const normalizedQuery = query.trim().toLowerCase();
   const tree = useMemo(() => buildCategoryTree(options), [options]);
+  const descendantKeys = (node) => {
+    const keys = [];
+    (node.children || []).forEach((child) => {
+      keys.push(child.key);
+      keys.push(...descendantKeys(child));
+    });
+    return keys;
+  };
+  const inheritedByParent = (key) => Array.from(selectedKeys).some((selectedKey) => selectedKey !== key && key.startsWith(`${selectedKey}/`));
 
   const matchesQuery = (node) => {
     if (!normalizedQuery) return true;
@@ -868,7 +911,9 @@ function CategoryMultiPicker({ options, selectedPaths, onToggle, occasionLabel }
   const renderNode = (node, depth = 0) => {
     if (!matchesQuery(node)) return null;
     const option = node.option;
-    const checked = option ? selectedKeys.has(node.key) : false;
+    const directlySelected = option ? selectedKeys.has(node.key) : false;
+    const inherited = option ? inheritedByParent(node.key) : false;
+    const checked = Boolean(option && (directlySelected || inherited));
     const hasChildren = node.children.length > 0;
     const open = hasChildren && isExpanded(node);
     const label = option?.nodeLabel || option?.label?.split(" › ").pop() || node.path[node.path.length - 1] || "Category";
@@ -876,7 +921,31 @@ function CategoryMultiPicker({ options, selectedPaths, onToggle, occasionLabel }
       <div className={`catalog-category-tree-row ${checked ? "selected" : ""} ${hasChildren ? "has-children" : ""}`}>
         {hasChildren ? <button type="button" className="catalog-category-tree-caret" onClick={() => toggleExpanded(node.key)} aria-label={`${open ? "Collapse" : "Expand"} ${label}`}>{open ? "▾" : "▸"}</button> : <span className="catalog-category-tree-caret-spacer" />}
         {option ? <label className="catalog-category-tree-option">
-          <input type="checkbox" checked={checked} onChange={() => onToggle(option.path || node.path)} />
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={inherited}
+            onChange={() => {
+              const path = option.path || node.path;
+              if (selectedKeys.has(node.key)) {
+                onToggle(path);
+                return;
+              }
+              // Selecting a parent makes all descendants inherit the product.
+              // Keep the stored data compact by saving only the parent path;
+              // descendants are shown as checked and resolved by the storefront.
+              const descendantSet = new Set(descendantKeys(node));
+              const withoutDescendants = (selectedPaths || []).filter((selectedPath) => !descendantSet.has(selectedPath.join("/")));
+              if (withoutDescendants.length !== (selectedPaths || []).length) {
+                const next = [...withoutDescendants, path];
+                // Use the existing callback as a toggle primitive, then let the
+                // parent selection remain authoritative for this branch.
+                onToggle(path, next);
+              } else {
+                onToggle(path);
+              }
+            }}
+          />
           <span className="catalog-category-multi-check" aria-hidden="true">{checked ? "✓" : ""}</span>
           <span title={label}>{label}</span>
         </label> : <button type="button" className="catalog-category-tree-parent-label" onClick={() => hasChildren && toggleExpanded(node.key)}>{label}</button>}
@@ -915,12 +984,14 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
   const selectedCategoryPaths = Array.isArray(item.categoryPaths) && item.categoryPaths.length
     ? item.categoryPaths
     : (Array.isArray(item.categoryPath) && item.categoryPath.length ? [item.categoryPath] : []);
-  function toggleCategoryPath(path) {
+  function toggleCategoryPath(path, forcedNext) {
     const key = path.join("/");
     const current = selectedCategoryPaths;
-    const next = current.some((selected) => selected.join("/") === key)
-      ? current.filter((selected) => selected.join("/") !== key)
-      : [...current, path];
+    const next = Array.isArray(forcedNext)
+      ? forcedNext
+      : (current.some((selected) => selected.join("/") === key)
+        ? current.filter((selected) => selected.join("/") !== key)
+        : [...current, path]);
     setItem((p) => ({
       ...p,
       categoryPaths: next,

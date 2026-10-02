@@ -9,7 +9,7 @@ import { IMAGES, CATALOG_IMAGES } from "../data/images";
 import { EVENT_SERVICES } from "../data/eventServices";
 import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
-import { queueCloudSync, syncCloudState, hydratePublicState } from "./cloudStore";
+import { queueCloudSync, syncCloudState, syncCloudStateWithConflictResolver, hydratePublicState, hydrateAdminState, waitForCloudWrites } from "./cloudStore";
 import { serviceMatchesContext, resolveScopeOnSave, getScopeMode, SCOPE_MODE } from "./serviceContext";
 import { uploadImageBlob, uploadImageUrl, extractManagedCloudinaryPublicId, cleanupUnusedCloudinaryAssets } from "./cloudinary";
 
@@ -153,6 +153,14 @@ export async function hydrateCatalogFromCloud() {
     console.warn("Cloud catalog hydration skipped:", err?.message || err);
     return null;
   }
+}
+
+export async function refreshAdminCatalogFromCloud() {
+  // Do not let an explicit reload race an in-flight save. Finish pending cloud
+  // writes first, then pull the current authoritative snapshot from Supabase.
+  await waitForCloudWrites();
+  const state = await hydrateAdminState();
+  return Array.isArray(state?.nle_catalog_v2_products) ? state.nle_catalog_v2_products : getProducts();
 }
 
 let productsCacheRaw = null;
@@ -1301,15 +1309,27 @@ export async function saveProductToCloud(product) {
 
 export async function deleteProduct(idOrSlug) {
   const list = getProducts();
-  const targetId = String(list.find((p) => p.id === idOrSlug || p.slug === idOrSlug)?.id || idOrSlug);
+  const target = list.find((p) => p.id === idOrSlug || p.slug === idOrSlug);
+  const targetId = String(target?.id || idOrSlug);
   const referencingPackage = list.find((p) => p.catalogKind === "package" && Array.isArray(p.packageItems) && p.packageItems.some((item) => String(item?.productId || item?.id || "") === targetId));
   if (referencingPackage) {
     throw new Error(`Cannot delete this product because it is included in package "${referencingPackage.name}". Remove it from that package first.`);
   }
   const next = list.filter((p) => p.id !== idOrSlug && p.slug !== idOrSlug);
-  persist(KEYS.products, next);
+  const result = await syncCloudStateWithConflictResolver(KEYS.products, next, (_intended, latest) => {
+    const latestList = Array.isArray(latest) ? latest : [];
+    const latestPackage = latestList.find((p) => p.catalogKind === "package" && Array.isArray(p.packageItems) && p.packageItems.some((item) => String(item?.productId || item?.id || "") === targetId));
+    if (latestPackage) {
+      throw new Error(`Cannot delete this product because it is included in package "${latestPackage.name}". Remove it from that package first.`);
+    }
+    // Rebase the delete operation onto the newest cloud catalog so another
+    // admin's unrelated additions/edits are preserved. If the product is
+    // already gone, the operation is safely idempotent.
+    return latestList.filter((p) => p.id !== targetId && p.slug !== idOrSlug);
+  });
+  const savedList = Array.isArray(result?.data) ? result.data : next;
+  writeStorage(KEYS.products, savedList);
   dispatchCatalogUpdate();
-  await syncCloudState(KEYS.products, next);
   return true;
 }
 
@@ -1366,10 +1386,18 @@ export async function bulkDeleteProducts(ids) {
   if (referencingPackage) {
     throw new Error(`Cannot delete selected products because package "${referencingPackage.name}" still uses one of them. Remove the item from that package first.`);
   }
-  const next = list.filter((p) => !ids.includes(p.id) && !ids.includes(p.slug));
-  persist(KEYS.products, next);
+  const next = list.filter((p) => !selected.has(String(p.id)) && !selected.has(String(p.slug)));
+  const result = await syncCloudStateWithConflictResolver(KEYS.products, next, (_intended, latest) => {
+    const latestList = Array.isArray(latest) ? latest : [];
+    const latestPackage = latestList.find((p) => p.catalogKind === "package" && Array.isArray(p.packageItems) && p.packageItems.some((item) => selected.has(String(item?.productId || item?.id || ""))));
+    if (latestPackage) {
+      throw new Error(`Cannot delete selected products because package "${latestPackage.name}" still uses one of them. Remove the item from that package first.`);
+    }
+    return latestList.filter((p) => !selected.has(String(p.id)) && !selected.has(String(p.slug)));
+  });
+  const savedList = Array.isArray(result?.data) ? result.data : next;
+  writeStorage(KEYS.products, savedList);
   dispatchCatalogUpdate();
-  await syncCloudState(KEYS.products, next);
   return true;
 }
 

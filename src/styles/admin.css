@@ -1049,3 +1049,6 @@
   padding-left:9px;
   border-left:1px solid #e8edf2;
 }
+
+.admin-icon-spin{ animation:admin-icon-spin .8s linear infinite; }
+@keyframes admin-icon-spin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }

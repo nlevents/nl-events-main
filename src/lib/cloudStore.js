@@ -81,7 +81,12 @@ async function request(url, options = {}) {
   }
   let data = null;
   try { data = await res.json(); } catch { /* empty */ }
-  if (!res.ok) throw new Error(data?.error || data?.message || `Cloud request failed (${res.status}).`);
+  if (!res.ok) {
+    const error = new Error(data?.error || data?.message || `Cloud request failed (${res.status}).`);
+    error.status = res.status;
+    error.payload = data;
+    throw error;
+  }
   return data;
 }
 
@@ -94,7 +99,7 @@ async function request(url, options = {}) {
 // finish after a newer request and put stale data back into Supabase.
 const cloudWriteChains = new Map();
 
-function enqueueCloudWrite(key, data) {
+function enqueueCloudWrite(key, data, { onConflict } = {}) {
   const token = getAdminAccessToken();
   if (!token) return Promise.reject(new Error("Admin session expired. Please log in again."));
   if (!ADMIN_STATE_KEYS.includes(key)) return Promise.reject(new Error("This data bucket cannot be saved from the admin panel."));
@@ -103,13 +108,36 @@ function enqueueCloudWrite(key, data) {
   const next = previous
     .catch(() => {})
     .then(async () => {
-      const result = await request(`${API_BASE}/admin/state`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ key, data, expectedUpdatedAt: getCloudVersion(key) || undefined }),
-      });
-      setCloudVersion(key, result?.updatedAt || "");
-      return result;
+      const expectedUpdatedAt = getCloudVersion(key) || undefined;
+      try {
+        const result = await request(`${API_BASE}/admin/state`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ key, data, expectedUpdatedAt }),
+        });
+        setCloudVersion(key, result?.updatedAt || "");
+        return { ...result, data };
+      } catch (error) {
+        // A normal full-catalog edit still reports a real conflict.
+        // Special operations such as deletion can safely rebase their intent
+        // on the newest cloud snapshot instead of resurrecting stale local data.
+        if (error?.status !== 409 || typeof onConflict !== "function") throw error;
+
+        const latest = await request(`${API_BASE}/admin/state`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const latestData = latest?.state?.[key];
+        const latestVersion = latest?.versions?.[key] || "";
+        const rebasedData = await onConflict(data, latestData);
+        const retry = await request(`${API_BASE}/admin/state`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ key, data: rebasedData, expectedUpdatedAt: latestVersion || undefined }),
+        });
+        setCloudVersion(key, retry?.updatedAt || latestVersion);
+        return { ...retry, data: rebasedData, rebased: true };
+      }
     });
 
   cloudWriteChains.set(key, next);
@@ -121,6 +149,16 @@ function enqueueCloudWrite(key, data) {
 
 export function syncCloudState(key, data) {
   return enqueueCloudWrite(key, data);
+}
+
+export function syncCloudStateWithConflictResolver(key, data, onConflict) {
+  return enqueueCloudWrite(key, data, { onConflict });
+}
+
+export async function waitForCloudWrites() {
+  const pending = Array.from(cloudWriteChains.values());
+  if (!pending.length) return;
+  await Promise.allSettled(pending);
 }
 
 export function queueCloudSync(key, data) {
