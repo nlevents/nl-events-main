@@ -447,28 +447,6 @@ export default function CategoryTemplate({ node, trail }) {
   // re-run so their `.reveal` nodes never stay at opacity:0 (the blank gap).
   useReveal([node.slug, addonItems.length, products.length]);
 
-  if (isServiceCatalog) {
-    return (
-      <div className="occ-category-page">
-        <section className="hero hero-sm occ-hero">
-          <div className="hero-media"><HeroImageCarousel images={heroImages?.length ? heroImages : [node.heroImg || node.image || PLACEHOLDER_IMAGE]} alt={node.label} /></div>
-          <div className="hero-content">
-            <span className="eyebrow">{trail.length > 1 ? trail[trail.length - 2].label : "Event Services"}</span>
-            <h1>{node.label}</h1>
-            <p>{node.tagline || node.description}</p>
-          </div>
-        </section>
-        <section className="section-tight container occ-category-content">
-          <Breadcrumb items={crumbs} />
-          {node.description && <p className="occ-lead reveal">{node.description}</p>}
-          <ServiceCatalogContent node={node} serviceContextPath={serviceContextPath} />
-        </section>
-      </div>
-    );
-  }
-
-
-
   const visibleProducts = useMemo(() => {
     let list = contextProducts;
     if (priceFilter !== "all") {
@@ -527,6 +505,26 @@ export default function CategoryTemplate({ node, trail }) {
       return itemTrail ? toRailItem(p, itemTrail) : null;
     }).filter(Boolean);
   }, [parent, relatedFromParent, trail]);
+
+  if (isServiceCatalog) {
+    return (
+      <div className="occ-category-page">
+        <section className="hero hero-sm occ-hero">
+          <div className="hero-media"><HeroImageCarousel images={heroImages?.length ? heroImages : [node.heroImg || node.image || PLACEHOLDER_IMAGE]} alt={node.label} /></div>
+          <div className="hero-content">
+            <span className="eyebrow">{trail.length > 1 ? trail[trail.length - 2].label : "Event Services"}</span>
+            <h1>{node.label}</h1>
+            <p>{node.tagline || node.description}</p>
+          </div>
+        </section>
+        <section className="section-tight container occ-category-content">
+          <Breadcrumb items={crumbs} />
+          {node.description && <p className="occ-lead reveal">{node.description}</p>}
+          <ServiceCatalogContent node={node} serviceContextPath={serviceContextPath} />
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="occ-category-page">
