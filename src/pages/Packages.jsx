@@ -23,7 +23,8 @@ export default function Packages() {
     "Browse every wedding, birthday, anniversary, baby shower and event package by Next Level Events, filterable by occasion, theme, city and price.",
   );
   const { city } = useCity();
-  const ALL_ENTRIES = useLiveEntries();
+  const liveEntries = useLiveEntries();
+  const ALL_ENTRIES = useMemo(() => liveEntries.filter((entry) => entry?.product?.catalogKind === "package"), [liveEntries]);
   const [sortKey, setSortKey] = useState("popular");
   const [occasionFilter, setOccasionFilter] = useState("all");
   const [themeFilter, setThemeFilter] = useState("all");

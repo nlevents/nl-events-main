@@ -30,30 +30,6 @@ const SERVICES = [
   ["Baraat / Procession", "Make an Unforgettable Entry", CATALOG_IMAGES["baraat-procession"]],
 ];
 
-const PACKAGES = [
-  {
-    name: "Royal Wedding Celebration",
-    subtitle: "A complete multi-function wedding experience",
-    image: IMAGES.pkgRoyalWedding,
-    price: "Starting from ₹4.99 Lakh",
-    includes: ["Haldi + Mehendi styling", "Sangeet stage & entertainment", "Wedding mandap & décor", "Reception styling", "Photography & videography", "Catering coordination"],
-  },
-  {
-    name: "Grand Wedding Experience",
-    subtitle: "Designed for a beautifully coordinated celebration",
-    image: IMAGES.pkgDreamWedding,
-    price: "Starting from ₹7.49 Lakh",
-    includes: ["Complete function planning", "Premium décor & floral styling", "Entry & baraat production", "Sound, LED & lighting", "Guest hospitality support", "On-ground event management"],
-  },
-  {
-    name: "Signature Wedding Package",
-    subtitle: "A polished package for couples who want everything handled",
-    image: IMAGES.showcase4,
-    price: "Starting from ₹9.99 Lakh",
-    includes: ["All major wedding functions", "Concept & theme development", "Premium entertainment", "Photography & cinematic video", "Catering coordination", "Dedicated event manager"],
-  },
-];
-
 
 const MOMENTS = [
   ["Mandap & Ceremony", IMAGES.galWedding1, false],
@@ -172,43 +148,65 @@ function WeddingServices() {
   return <EventServicesSection contextPath={["wedding"]} />;
 }
 
+function formatPackagePrice(price) {
+  const amount = Number(price);
+  if (!Number.isFinite(amount) || amount <= 0) return "Contact for pricing";
+  return `Starting from ₹${amount.toLocaleString("en-IN")}`;
+}
+
 function FeaturedPackages() {
+  const entries = useLiveEntries();
   const [index, setIndex] = useState(0);
-  const active = PACKAGES[index];
+  const packages = entries
+    .filter((entry) => entry?.occasion?.slug === "wedding")
+    .map((entry) => entry.product)
+    .filter((product) => product?.catalogKind === "package" && product.status !== "archived")
+    .filter((product, i, list) => list.findIndex((item) => (item?.id || item?.slug) === (product?.id || product?.slug)) === i);
+
   useEffect(() => {
-    if (PACKAGES.length < 2) return undefined;
-    const timer = window.setInterval(() => setIndex((value) => (value + 1) % PACKAGES.length), 1000);
+    setIndex((value) => Math.min(value, Math.max(0, packages.length - 1)));
+  }, [packages.length]);
+
+  useEffect(() => {
+    if (packages.length < 2) return undefined;
+    const timer = window.setInterval(() => setIndex((value) => (value + 1) % packages.length), 1000);
     return () => window.clearInterval(timer);
-  }, []);
-  const go = (next) => setIndex((next + PACKAGES.length) % PACKAGES.length);
+  }, [packages.length]);
+
+  const go = (next) => setIndex((next + packages.length) % packages.length);
+  const active = packages[index];
 
   return (
     <section className="wedding-package-section">
       <div className="wedding-container">
         <SectionHead eyebrow="FEATURED WEDDING PACKAGES" title="Handpicked Wedding Packages" link={{ label: "View All Packages", href: "/packages" }} />
-        <div className="wedding-package-slider">
-          <button type="button" className="wedding-slider-arrow prev" onClick={() => go(index - 1)} aria-label="Previous package">←</button>
-          <article className="wedding-package-card">
-            <div className="wedding-package-image-wrap">
-              <img src={active.image} alt={active.name} loading="lazy" decoding="async" />
-              <span className="wedding-package-count">{index + 1} / {PACKAGES.length}</span>
-            </div>
-            <div className="wedding-package-copy">
-              <span className="wedding-package-kicker">COMPLETE WEDDING EXPERIENCE</span>
-              <h3>{active.name}</h3>
-              <p>{active.subtitle}</p>
-              <strong className="wedding-package-price">{active.price}</strong>
-              <ul>
-                {active.includes.map((item) => <li key={item}>✓ {item}</li>)}
-              </ul>
-              <div className="wedding-package-actions">
-                <Link to="/packages" className="wedding-gold-btn">View Package <b>→</b></Link>
-                <Link to="/book-event" className="wedding-text-btn">Enquire Now</Link>
+        {active ? (
+          <div className="wedding-package-slider">
+            <button type="button" className="wedding-slider-arrow prev" onClick={() => go(index - 1)} disabled={packages.length < 2} aria-label="Previous package">←</button>
+            <article className="wedding-package-card">
+              <div className="wedding-package-image-wrap">
+                <img src={active.image} alt={active.name} loading="lazy" decoding="async" onError={onImgError} />
+                <span className="wedding-package-count">{index + 1} / {packages.length}</span>
               </div>
-            </div>
-          </article>
-          <button type="button" className="wedding-slider-arrow next" onClick={() => go(index + 1)} aria-label="Next package">→</button>
-        </div>
+              <div className="wedding-package-copy">
+                <span className="wedding-package-kicker">COMPLETE WEDDING EXPERIENCE</span>
+                <h3>{active.name}</h3>
+                <p>{active.description || active.tagline || "A complete wedding experience, tailored to your celebration."}</p>
+                <strong className="wedding-package-price">{formatPackagePrice(active.price)}</strong>
+                <ul>
+                  {(Array.isArray(active.includes) ? active.includes : []).slice(0, 6).map((item) => <li key={item}>✓ {item}</li>)}
+                </ul>
+                <div className="wedding-package-actions">
+                  <Link to={`/package-details?id=${encodeURIComponent(active.id || active.slug)}`} className="wedding-gold-btn">View Package <b>→</b></Link>
+                  <Link to="/book-event" className="wedding-text-btn">Enquire Now</Link>
+                </div>
+              </div>
+            </article>
+            <button type="button" className="wedding-slider-arrow next" onClick={() => go(index + 1)} disabled={packages.length < 2} aria-label="Next package">→</button>
+          </div>
+        ) : (
+          <p className="wedding-featured-empty">No wedding packages are available yet.</p>
+        )}
       </div>
     </section>
   );
@@ -251,12 +249,12 @@ function FeaturedPackageCarousel() {
 
   const entryProducts = entries
     .filter((entry) => isWeddingValue(entry?.occasion?.slug) || isWeddingValue(entry?.product?.occasionSlug))
-    .filter((entry) => entry.product && !entry.product.isAddon && entry.product.status !== "archived")
+    .filter((entry) => entry.product && entry.product.catalogKind === "product" && !entry.product.isAddon && entry.product.status !== "archived")
     .map((entry) => entry.product);
 
   const catalogProducts = liveProducts
     .filter(isWeddingProduct)
-    .filter((product) => !product.isAddon && product.status !== "archived")
+    .filter((product) => product.catalogKind === "product" && !product.isAddon && product.status !== "archived")
     .map((product) => ({
       ...product,
       categorySlug: product.categorySlug || (Array.isArray(product.categoryPath) ? product.categoryPath[product.categoryPath.length - 1] : "wedding"),
@@ -305,7 +303,7 @@ function FeaturedPackageCarousel() {
   return (
     <section className="wedding-featured-section">
       <div className="wedding-container">
-        <SectionHead eyebrow="FEATURED PACKAGES" title="Popular Wedding Packages" link={{ label: "View All Packages", href: "/packages" }} />
+        <SectionHead eyebrow="FEATURED PRODUCTS" title="Popular Wedding Products" link={{ label: "View All Products", href: "/products" }} />
         {productEntries.length > 0 ? (
           <div className="wedding-featured-products-wrap">
             <button

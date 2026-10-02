@@ -1,14 +1,14 @@
 import { getServerSupabase } from "./supabase/serverClient.js";
 
-export async function readState(env, key) {
-  const db = getServerSupabase(env);
+export async function readState(env, key, accessToken = "") {
+  const db = getServerSupabase(env, accessToken);
   if (!db) return null;
   const rows = await db.query(`app_state?key=eq.${encodeURIComponent(key)}&select=key,data,updated_at`, { method: "GET" });
   return rows?.[0]?.data ?? null;
 }
 
-export async function readStates(env, keys) {
-  const db = getServerSupabase(env);
+export async function readStates(env, keys, accessToken = "") {
+  const db = getServerSupabase(env, accessToken);
   if (!db) return {};
   const params = keys.map((k) => `"${String(k).replaceAll('"', '\\"')}"`).join(",");
   const rows = await db.query(`app_state?key=in.(${params})&select=key,data,updated_at`, { method: "GET" });
@@ -16,23 +16,23 @@ export async function readStates(env, keys) {
 }
 
 
-export async function readStateUpdatedAt(env, key) {
-  const db = getServerSupabase(env);
+export async function readStateUpdatedAt(env, key, accessToken = "") {
+  const db = getServerSupabase(env, accessToken);
   if (!db) return null;
   const rows = await db.query(`app_state?key=eq.${encodeURIComponent(key)}&select=key,updated_at`, { method: "GET" });
   return rows?.[0]?.updated_at ?? null;
 }
 
-export async function readStateVersions(env, keys) {
-  const db = getServerSupabase(env);
+export async function readStateVersions(env, keys, accessToken = "") {
+  const db = getServerSupabase(env, accessToken);
   if (!db || !Array.isArray(keys) || !keys.length) return {};
   const params = keys.map((key) => `"${String(key).replaceAll('"', '\\"')}"`).join(",");
   const rows = await db.query(`app_state?key=in.(${params})&select=key,updated_at`, { method: "GET" });
   return Object.fromEntries((rows || []).filter((row) => row?.key && row?.updated_at).map((row) => [row.key, row.updated_at]));
 }
 
-export async function writeState(env, key, data, userId = null, expectedUpdatedAt = null) {
-  const db = getServerSupabase(env);
+export async function writeState(env, key, data, userId = null, expectedUpdatedAt = null, accessToken = "") {
+  const db = getServerSupabase(env, accessToken);
   if (!db) throw new Error("Supabase is not configured on the server.");
 
   const updatedAt = new Date().toISOString();
@@ -64,8 +64,8 @@ export async function writeState(env, key, data, userId = null, expectedUpdatedA
   return { key, updatedAt };
 }
 
-export async function writeMissingStates(env, state, userId = null) {
-  const db = getServerSupabase(env);
+export async function writeMissingStates(env, state, userId = null, accessToken = "") {
+  const db = getServerSupabase(env, accessToken);
   if (!db) throw new Error("Supabase is not configured on the server.");
   const existing = await db.query("app_state?select=key", { method: "GET" });
   const keys = new Set((existing || []).map((r) => r.key));

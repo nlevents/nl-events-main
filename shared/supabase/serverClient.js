@@ -3,11 +3,19 @@
 // Works seamlessly in Node.js, Vercel Serverless, and Cloudflare Workers
 // ============================================================================
 
-export function getServerSupabase(env) {
+export function getServerSupabase(env, accessToken = "") {
   const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY || "";
+  // Prefer the server-only service-role key. When it is not available (for
+  // example, a local/Vercel setup that only has the public Supabase vars),
+  // fall back to the public anon key and, for authenticated admin requests,
+  // the caller's access token. This keeps the service-role key out of the
+  // browser while allowing the API to use the same Supabase project config.
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const publicKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || "";
+  const key = serviceKey || publicKey;
+  const authorizationKey = serviceKey || accessToken || publicKey;
 
-  if (!url || !key) {
+  if (!url || !key || !authorizationKey) {
     return null;
   }
 
@@ -23,7 +31,7 @@ export function getServerSupabase(env) {
         method,
         headers: {
           apikey: key,
-          Authorization: `Bearer ${key}`,
+          Authorization: `Bearer ${authorizationKey}`,
           "Content-Type": "application/json",
           Prefer: options.prefer || "return=representation",
           ...headers,

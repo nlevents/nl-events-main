@@ -10,13 +10,25 @@
  */
 export function sanitizeText(str) {
   if (typeof str !== "string") return "";
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .replace(/\//g, "&#x2F;");
+
+  // Keep catalog content as plain text. React safely escapes text at render time,
+  // so storing HTML entities here causes values such as "&" to become "&amp;"
+  // in the UI. Decode entities produced by the legacy sanitizer first so existing
+  // records are also normalized, then remove actual HTML tags.
+  let value = str;
+  for (let i = 0; i < 3; i += 1) {
+    const decoded = value
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#x27;|&#39;/gi, "'")
+      .replace(/&#x2f;|&#47;/gi, "/");
+    if (decoded === value) break;
+    value = decoded;
+  }
+
+  return value.replace(/<[^>]*>/g, "");
 }
 
 /**

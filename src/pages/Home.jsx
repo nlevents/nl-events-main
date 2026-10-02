@@ -31,16 +31,6 @@ const WEDDING_CONCEPTS = [
   { label: "Mayra / Rituals", img: CATALOG_IMAGES.maira },
 ];
 
-const BIRTHDAY_THEMES = [
-  { label: "Jungle", img: CATALOG_IMAGES["jungle-theme"] },
-  { label: "Cocomelon", img: CATALOG_IMAGES["cocomelon-theme"] },
-  { label: "Fairy", img: CATALOG_IMAGES["princess-theme"] },
-  { label: "Superhero", img: CATALOG_IMAGES["superhero-theme"] },
-  { label: "Barbie", img: CATALOG_IMAGES["unicorn-theme"] },
-  { label: "Frozen", img: CATALOG_IMAGES["jungle-theme"] },
-  { label: "And Many More!", img: CATALOG_IMAGES["theme-party"] },
-];
-
 const RECENT_WORK = [
   { category: "Weddings", label: "Royal Wedding", img: IMAGES.galWedding1 },
   { category: "Weddings", label: "Reception Night", img: IMAGES.galWedding2 },
@@ -142,6 +132,13 @@ function HorizontalCards({ items, cardClass = "ref-home-card", dark = false }) {
   );
 }
 
+function cleanCelebrationImage(src) {
+  if (typeof src !== "string") return src;
+  return src.includes("res.cloudinary.com/")
+    ? src.replace("/image/upload/", "/image/upload/e_bgremoval:screen/")
+    : src;
+}
+
 function CelebrationSection() {
   const [celebrations, setCelebrations] = useState(() => {
     const live = listOccasions();
@@ -174,7 +171,7 @@ function CelebrationSection() {
             return {
               label: occ.label,
               href: matching?.href || `/occasion/${occ.slug}`,
-              img: occ.slug === "birthday" ? (matching?.img || occ.image || occ.heroImg || IMAGES.typeWedding) : (occ.image || occ.heroImg || matching?.img || IMAGES.typeWedding),
+              img: occ.image || occ.heroImg || matching?.img || IMAGES.typeWedding,
             };
           })
         );
@@ -195,7 +192,7 @@ function CelebrationSection() {
           {celebrations.map((item) => (
             <Link to={item.href} className="ref-home-celebration-card" key={item.label} onPointerEnter={() => prefetchOccasionRoute(item.href)} onFocus={() => prefetchOccasionRoute(item.href)}>
               <span className="ref-home-celebration-image">
-                <img src={item.img} alt={item.label} data-context={item.label} loading="eager" fetchPriority="high" decoding="async" onError={onImgError} />
+                <img src={cleanCelebrationImage(item.img)} alt={item.label} data-context={item.label} loading="eager" fetchPriority="high" decoding="async" onError={onImgError} />
               </span>
               <b>{item.label}</b>
             </Link>
@@ -238,26 +235,23 @@ function WeddingSection() {
 
 function BirthdaySection() {
   const [themes, setThemes] = useState(() => {
-    const live = birthdayThemeLinks(8);
-    if (!live.length) return BIRTHDAY_THEMES;
-    return live.map((t) => ({ label: t.label, img: t.image, href: t.href }));
+    return birthdayThemeLinks().map((t) => ({ label: t.label, img: t.image, href: t.href }));
   });
 
   useEffect(() => {
     const refresh = () => {
-      const live = birthdayThemeLinks(8);
-      if (live.length) {
-        setThemes(live.map((t) => ({ label: t.label, img: t.image, href: t.href })));
-      }
+      setThemes(birthdayThemeLinks().map((t) => ({ label: t.label, img: t.image, href: t.href })));
     };
     window.addEventListener("nle-catalog-updated", refresh);
     return () => window.removeEventListener("nle-catalog-updated", refresh);
   }, []);
 
+  if (!themes.length) return null;
+
   return (
     <section className="ref-home-birthday">
       <div className="ref-home-container">
-        <RefSectionHead title="A World of Imagination for Little Celebrations" link={{ label: "Explore kids birthday themes", href: "/occasion/birthday/kids-birthday" }} linkClass="ref-home-head-right" />
+        <RefSectionHead title="A World of Imagination for Little Celebrations" link={{ label: "Explore kids birthday themes", href: "/occasion/birthday/birthday-types/theme-party" }} linkClass="ref-home-head-right" />
         <p className="ref-home-intro">Magical themes, joyful setups and unforgettable moments for your little one.</p>
         <HorizontalCards items={themes} cardClass="ref-home-theme-card" />
       </div>
@@ -271,7 +265,7 @@ function PopularPackagesSection() {
   useEffect(() => {
     let active = true;
     import("../data/occasions").then(({ listAllProducts, sortProducts, toRailItem }) => {
-      const entries = listAllProducts();
+      const entries = listAllProducts().filter((entry) => entry?.product?.catalogKind === "package");
       const seen = new Set();
       const items = sortProducts(entries.map((entry) => entry.product), "popular")
         .filter((product) => {

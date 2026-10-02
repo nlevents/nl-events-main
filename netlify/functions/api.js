@@ -9,8 +9,6 @@ import createBookingHandler from "../../api/create-booking.js";
 import adminBootstrapHandler from "../../api/admin/bootstrap.js";
 import adminInquiriesHandler from "../../api/admin/inquiries.js";
 import adminStateHandler from "../../api/admin/state.js";
-import accountBookingsHandler from "../../api/account/bookings.js";
-import accountProfileHandler from "../../api/account/profile.js";
 
 const ROUTES = new Map([
   ["catalog", catalogHandler],
@@ -20,8 +18,6 @@ const ROUTES = new Map([
   ["admin/bootstrap", adminBootstrapHandler],
   ["admin/inquiries", adminInquiriesHandler],
   ["admin/state", adminStateHandler],
-  ["account/bookings", accountBookingsHandler],
-  ["account/profile", accountProfileHandler],
 ]);
 
 function routeFromEvent(event) {

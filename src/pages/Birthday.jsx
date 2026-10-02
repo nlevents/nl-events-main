@@ -6,18 +6,9 @@ import { BIRTHDAY_AGE_CATEGORIES } from "../data/birthdayAgeCategories";
 import { birthdayThemeLinks } from "../data/occasions";
 import AutoScrollRail from "../components/AutoScrollRail";
 import EventServicesSection from "../components/occasion/EventServicesSection";
-
-
-const THEMES = [
-  ["Cocomelon Theme", IMAGES.themeBalloonCelebration],
-  ["Jungle Theme", IMAGES.themeJungleLeaves],
-  ["Princess Theme", IMAGES.themeTiaraCrown],
-  ["Superhero Theme", IMAGES.pkgBirthdayBash],
-  ["Unicorn Theme", IMAGES.themePony],
-  ["Cars Theme", IMAGES.pkgBirthdayBash],
-  ["Dinosaur Theme", IMAGES.themeDinosaurToy],
-  ["Golden Glam", IMAGES.pkgPremiumBirthday],
-];
+import ProductRail from "../components/ProductRail";
+import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
+import { toRailItem } from "../data/occasions";
 
 
 const MOMENTS = [
@@ -130,6 +121,73 @@ function BirthdayServices() {
   return <EventServicesSection contextPath={["birthday"]} />;
 }
 
+function BirthdayCatalogSections() {
+  const entries = useLiveEntries();
+  const liveProducts = useLiveProducts();
+
+  const birthdayEntries = entries.filter((entry) => {
+    const product = entry?.product;
+    if (!product || product.status === "archived" || product.isAddon) return false;
+    const occasion = String(entry?.occasion?.slug || product?.occasionSlug || "").trim().toLowerCase();
+    const path = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
+    return occasion === "birthday" || path[0] === "birthday";
+  });
+
+  const birthdayProducts = birthdayEntries
+    .filter((entry) => entry.product.catalogKind === "product")
+    .map((entry) => toRailItem(entry.product, entry.trail));
+
+  const birthdayPackages = birthdayEntries
+    .filter((entry) => entry.product.catalogKind === "package")
+    .map((entry) => toRailItem(entry.product, entry.trail));
+
+  const liveBirthdayProducts = liveProducts.filter((product) => {
+    if (!product || product.status === "archived" || product.isAddon) return false;
+    const occasion = String(product.occasionSlug || product.occasion || "").trim().toLowerCase();
+    const path = Array.isArray(product.categoryPath) ? product.categoryPath : [];
+    return occasion === "birthday" || path[0] === "birthday";
+  });
+
+  const mergeUnique = (items) => items.reduce((out, item) => {
+    const key = item.id || item.name;
+    if (key && !out.some((candidate) => (candidate.id || candidate.name) === key)) out.push(item);
+    return out;
+  }, []);
+
+  const products = mergeUnique([
+    ...birthdayProducts,
+    ...liveBirthdayProducts
+      .filter((product) => product.catalogKind === "product")
+      .map((product) => toRailItem(product, [
+        { slug: "birthday" },
+        ...(Array.isArray(product.categoryPath) && product.categoryPath.length > 1
+          ? product.categoryPath.slice(1).map((slug) => ({ slug }))
+          : []),
+        product,
+      ])),
+  ]);
+
+  const packages = mergeUnique([
+    ...birthdayPackages,
+    ...liveBirthdayProducts
+      .filter((product) => product.catalogKind === "package")
+      .filter((product) => Array.isArray(product.packageOccasions)
+        ? product.packageOccasions.includes("birthday")
+        : String(product.occasionSlug || "").trim().toLowerCase() === "birthday")
+      .map((product) => toRailItem(product, [
+        { slug: "birthday" },
+        product,
+      ])),
+  ]);
+
+  return (
+    <>
+      <ProductRail title="Popular Birthday Products" viewAllHref="/products" items={products} />
+      <ProductRail title="Popular Birthday Packages" viewAllHref="/packages" items={packages} />
+    </>
+  );
+}
+
 function PopularThemes() {
   const [liveThemes, setLiveThemes] = useState(() => birthdayThemeLinks());
 
@@ -137,8 +195,7 @@ function PopularThemes() {
     let cancelled = false;
     const refresh = () => {
       if (!cancelled) {
-        const next = birthdayThemeLinks();
-        if (next.length) setLiveThemes(next);
+        setLiveThemes(birthdayThemeLinks());
       }
     };
     const schedule = () => {
@@ -156,14 +213,16 @@ function PopularThemes() {
     };
   }, []);
 
-  const themes = liveThemes.length
-    ? liveThemes.map((item) => [item.label, item.image, item.href])
-    : THEMES.map(([title, image]) => [title, image, "/occasion/birthday"]);
+  // The live Theme Party catalogue is the only source. Never fall back to a
+  // static list: it would show themes that do not exist and link to the
+  // Birthday landing page instead of a real theme route.
+  const themes = liveThemes.map((item) => [item.label, item.image, item.href]);
+  if (!themes.length) return null;
 
   return (
     <section className="birthday-white-section">
       <div className="birthday-container">
-        <SectionHead eyebrow="POPULAR BIRTHDAY THEMES" title="Themes They’ll Love" link={{ label: "View All Themes", href: "/occasion/birthday" }} />
+        <SectionHead eyebrow="POPULAR BIRTHDAY THEMES" title="Themes They’ll Love" link={{ label: "View All Themes", href: "/occasion/birthday/birthday-types/theme-party" }} />
         <p className="birthday-intro">Explore our most-loved themes for kids and adults.</p>
         <Rail className="birthday-theme-rail">
           {themes.map(([title, image, href]) => (
@@ -251,6 +310,7 @@ export default function Birthday() {
       <BirthdayHero />
       <BirthdayCategories />
       <BirthdayServices />
+      <BirthdayCatalogSections />
       <PopularThemes />
       <BirthdayMoments />
       <BirthdayReviews />

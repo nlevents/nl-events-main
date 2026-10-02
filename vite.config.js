@@ -13,8 +13,6 @@ const API_ROUTES = {
   '/api/admin/state': './api/admin/state.js',
   '/api/admin/bootstrap': './api/admin/bootstrap.js',
   '/api/admin/inquiries': './api/admin/inquiries.js',
-  '/api/account/bookings': './api/account/bookings.js',
-  '/api/account/profile': './api/account/profile.js',
 }
 
 function localApiPlugin() {

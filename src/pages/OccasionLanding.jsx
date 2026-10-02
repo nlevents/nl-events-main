@@ -4,7 +4,8 @@ import { IMAGES } from "../data/images";
 import usePageMeta from "../hooks/usePageMeta";
 import ProductCard from "../components/occasion/ProductCard";
 import { useLiveEntries, useLiveProducts } from "../hooks/useLiveCatalog";
-import { pathFor, sortProducts, listOccasions } from "../data/occasions";
+import { pathFor, sortProducts, listOccasions, toRailItem } from "../data/occasions";
+import ProductRail from "../components/ProductRail";
 import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 import EventServicesSection from "../components/occasion/EventServicesSection";
 
@@ -139,6 +140,21 @@ function Services({ type }) {
   return <EventServicesSection contextPath={contextPath} />;
 }
 
+function FeaturedFamilyProducts() {
+  const entries = useLiveEntries();
+  const items = entries
+    .filter((entry) => String(entry?.occasion?.slug || "").trim().toLowerCase() === "kids-family")
+    .filter((entry) => entry?.product && entry.product.catalogKind === "product" && !entry.product.isAddon && entry.product.status !== "archived")
+    .map((entry) => toRailItem(entry.product, entry.trail))
+    .filter((item, index, all) => {
+      const key = item.id || item.name;
+      return key && all.findIndex((candidate) => (candidate.id || candidate.name) === key) === index;
+    });
+
+  if (items.length === 0) return null;
+  return <ProductRail title="Popular Family Products" items={items} />;
+}
+
 function FeaturedProducts({ type }) {
   const entries = useLiveEntries();
   const liveProducts = useLiveProducts();
@@ -168,12 +184,12 @@ function FeaturedProducts({ type }) {
 
   const entryProducts = entries
     .filter((entry) => matches(entry?.occasion?.slug))
-    .filter((entry) => entry.product && !entry.product.isAddon && entry.product.status !== "archived")
+    .filter((entry) => entry.product && entry.product.catalogKind === "package" && !entry.product.isAddon && entry.product.status !== "archived")
     .map((entry) => entry.product);
 
   const catalogProducts = liveProducts
     .filter((product) => {
-      if (!product || product.isAddon || product.status === "archived") return false;
+      if (!product || product.catalogKind !== "package" || product.isAddon || product.status === "archived") return false;
       if (matches(product.occasionSlug) || matches(product.occasion)) return true;
       if (Array.isArray(product.categoryPath)) return product.categoryPath.some(matches);
       return matches(product.categoryPath);
@@ -283,6 +299,7 @@ export default function OccasionLanding({ type }) {
     {config.family && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><ImageCards items={config.family} large rootSlugs={["kids-family"]} /></div></section>}
     {config.corporate && <section className="occasion-pro-section occasion-pro-white"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} link={{ label: "View All Corporate Events", href: "/occasion/corporate" }} /><ImageCards items={config.corporate} large rootSlugs={["corporate"]} /></div></section>}
     <Services config={config} type={type} />
+    {type === "family" && <FeaturedFamilyProducts />}
     <FeaturedProducts type={type} />
     <Gallery config={config} />
     <Moments config={config} />

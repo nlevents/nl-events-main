@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Icon from "./Icon";
-import { CATEGORY_NAV } from "../data/megaMenu";
+import useCategoryNav from "../hooks/useCategoryNav";
 import { useCity } from "../context/CityContext";
 import useActiveCities from "../hooks/useActiveCities";
 import { onImgError } from "../lib/imageFallback";
@@ -14,6 +14,7 @@ export default function CategoryNav() {
   const wrapRef = useRef(null);
   const closeTimer = useRef(null);
   const { city, setCity } = useCity();
+  const categoryNav = useCategoryNav();
   const CITIES = useActiveCities();
   const navigate = useNavigate();
 
@@ -56,7 +57,7 @@ export default function CategoryNav() {
     <div className="category-nav" ref={wrapRef}>
       <div className="container category-nav-inner">
         <ul className="category-nav-list" role="menubar" aria-label="Shop by category">
-          {CATEGORY_NAV.map((cat) => {
+          {categoryNav.map((cat) => {
             const isOpen = openKey === cat.key;
             const hasPanel = cat.type !== "link";
             return (
@@ -119,7 +120,7 @@ export default function CategoryNav() {
                       <div className="mega-panel-inner">
                         <div className="mega-columns">
                           {cat.columns.map((col) => (
-                            <div className="mega-col" key={col.heading}>
+                            <div className={"mega-col" + (col.dynamicThemes ? " mega-col--themes" : "")} key={col.heading}>
                               <h4>{col.heading}</h4>
                               <ul>
                                 {col.links.map((l) => (
@@ -128,6 +129,15 @@ export default function CategoryNav() {
                                   </li>
                                 ))}
                               </ul>
+                              {col.themes && col.themes.length > 0 && (
+                                <ul className="mega-theme-scroll">
+                                  {col.themes.map((l) => (
+                                    <li key={l.href}>
+                                      <Link to={l.href} onClick={() => setOpenKey(null)}>{l.label}</Link>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
                           ))}
                         </div>

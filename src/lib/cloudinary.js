@@ -69,3 +69,62 @@ export async function uploadImageUrl(url) {
   }
   return data;
 }
+
+
+function getAdminAccessToken() {
+  try {
+    const raw = sessionStorage.getItem("nle-admin-supabase-session");
+    const session = raw ? JSON.parse(raw) : null;
+    return session?.access_token || "";
+  } catch {
+    return "";
+  }
+}
+
+export function extractManagedCloudinaryPublicId(urlOrPublicId) {
+  const raw = String(urlOrPublicId || "").trim();
+  if (!raw) return "";
+  if (/^next-level-events\//.test(raw)) return raw.replace(/\.[a-z0-9]+$/i, "");
+  try {
+    const url = new URL(raw);
+    if (!/^(?:www\.)?res\.cloudinary\.com$/i.test(url.hostname)) return "";
+    const marker = "/image/upload/";
+    const index = url.pathname.indexOf(marker);
+    if (index === -1) return "";
+    const payload = url.pathname.slice(index + marker.length).replace(/^\/+/, "");
+    const managedIndex = payload.indexOf("next-level-events/");
+    if (managedIndex === -1) return "";
+    return payload.slice(managedIndex).replace(/\.[a-z0-9]+$/i, "");
+  } catch {
+    return "";
+  }
+}
+
+export async function cleanupUnusedCloudinaryAssets(publicIds = []) {
+  const token = getAdminAccessToken();
+  const ids = Array.from(new Set((Array.isArray(publicIds) ? publicIds : [])
+    .map(extractManagedCloudinaryPublicId)
+    .filter(Boolean)));
+  if (!ids.length) return { ok: true, results: [] };
+  if (!token) throw new Error("Admin session expired. Please log in again.");
+
+  let response;
+  try {
+    response = await fetch("/api/admin/cloudinary", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ publicIds: ids }),
+    });
+  } catch {
+    throw new Error("Unable to reach the Cloudinary cleanup service.");
+  }
+  let data = null;
+  try { data = await response.json(); } catch { /* ignore */ }
+  if (!response.ok && response.status !== 207) {
+    throw new Error(data?.error || `Cloudinary cleanup failed (${response.status}).`);
+  }
+  return data || { ok: response.ok, results: [] };
+}

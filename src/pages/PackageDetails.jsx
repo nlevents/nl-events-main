@@ -102,6 +102,14 @@ function hashStr(str) {
   return h;
 }
 function buildGallery(product) {
+  // Use the images uploaded for this product (admin: up to 8). Only products
+  // that still have a single image fall back to the legacy stock-photo filler.
+  const own = Array.from(new Set([
+    ...(Array.isArray(product.gallery) ? product.gallery : []),
+    ...(Array.isArray(product.images) ? product.images : []),
+    ...(product.image ? [product.image] : []),
+  ].filter(Boolean)));
+  if (own.length > 1) return own.slice(0, 8);
   const h = hashStr(product.id);
   const pool = GALLERY_POOL.filter((img) => img !== product.image);
   const picks = [0, 1, 2, 3, 4].map((i) => pool[(h + i * 7) % pool.length]);

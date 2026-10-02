@@ -1,4 +1,5 @@
 import { readStates, readStateVersions } from "../shared/stateStore.js";
+import { getServerSupabase } from "../shared/supabase/serverClient.js";
 
 // Keep the public bootstrap response intentionally small. Products are the
 // largest state bucket (~2.7 MB in production) and must not be downloaded on
@@ -12,6 +13,10 @@ const PUBLIC_KEYS = [
 
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
+  if (!getServerSupabase(process.env)) {
+    console.error("Supabase not configured: set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY, then restart.");
+    return res.status(503).json({ ok: false, error: "Database is not configured." });
+  }
   try {
     const versionKeys = [...PUBLIC_KEYS, "nle_catalog_v2_products"];
     const versions = await readStateVersions(process.env, versionKeys);

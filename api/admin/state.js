@@ -9,6 +9,10 @@ const KEYS = [
   "nle_catalog_v2_birthday_age_categories",
 ];
 
+function bearerToken(req) {
+  return String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+}
+
 async function auth(req, res) {
   const result = await requireAdmin(process.env, req.headers.authorization);
   if (!result.user) { res.status(401).json({ ok: false, error: result.error }); return null; }
@@ -19,7 +23,7 @@ function validateProductsPayload(data) {
   if (!Array.isArray(data)) throw new Error("Products catalog must be an array.");
   const products = data.filter((product) => {
     const id = String(product?.id || "");
-    return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+    return !product?.isDemo && !id.startsWith("demo-prod-");
   });
   const ids = new Set(products.map((product) => String(product?.id || "")).filter(Boolean));
   const byId = new Map(products.map((product) => [String(product?.id || ""), product]));
@@ -43,16 +47,17 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      const state = await readStates(process.env, KEYS);
-      const versions = await readStateVersions(process.env, KEYS);
+      const token = bearerToken(req);
+      const state = await readStates(process.env, KEYS, token);
+      const versions = await readStateVersions(process.env, KEYS, token);
       const products = Array.isArray(state.nle_catalog_v2_products) ? state.nle_catalog_v2_products : [];
       const cleanProducts = products.filter((product) => {
         const id = String(product?.id || "");
-        return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+        return !product?.isDemo && !id.startsWith("demo-prod-");
       });
       if (JSON.stringify(products) !== JSON.stringify(cleanProducts)) {
         state.nle_catalog_v2_products = cleanProducts;
-        await writeState(process.env, "nle_catalog_v2_products", cleanProducts, user.id);
+        await writeState(process.env, "nle_catalog_v2_products", cleanProducts, user.id, null, token);
       }
       return res.status(200).json({ ok: true, state, versions });
     }
@@ -61,7 +66,7 @@ export default async function handler(req, res) {
       if (!KEYS.includes(key)) return res.status(400).json({ ok: false, error: "Unknown state key." });
       if (data === undefined) return res.status(400).json({ ok: false, error: "Missing data." });
       const safeData = key === "nle_catalog_v2_products" ? validateProductsPayload(data) : data;
-      const result = await writeState(process.env, key, safeData, user.id, expectedUpdatedAt || null);
+      const result = await writeState(process.env, key, safeData, user.id, expectedUpdatedAt || null, bearerToken(req));
       return res.status(200).json({ ok: true, key, updatedAt: result.updatedAt || null });
     }
     return res.status(405).json({ ok: false, error: "Method not allowed" });

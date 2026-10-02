@@ -7,7 +7,6 @@ import Breadcrumb from "./Breadcrumb";
 import CategoryCard from "./CategoryCard";
 import ProductCard from "./ProductCard";
 import OccasionQuickLinks from "./OccasionQuickLinks";
-import EventAddons from "./EventAddons";
 import EventServicesSection from "./EventServicesSection";
 import HeroImageCarousel from "../HeroImageCarousel";
 import ListingControls from "./ListingControls";
@@ -419,33 +418,10 @@ export default function CategoryTemplate({ node, trail }) {
   }, [products, isServiceCatalog, serviceContextPath]);
   const quickLinks = useMemo(() => quickLinksFor(node, trail), [node, trail]);
 
-  // Event services are admin-owned data. Start empty and load only the live
-  // catalog; never show bundled placeholder services when the cloud catalog is empty.
-  const [addonItems, setAddonItems] = useState([]);
-  useEffect(() => {
-    let cancelled = false;
-    const refreshAddons = () =>
-      import("../../lib/catalogStore")
-        .then(({ getAddonsForOccasion }) => {
-          if (cancelled) return;
-          let items = [];
-          try { items = getAddonsForOccasion(topSlug, serviceContextPath); } catch { items = []; }
-          setAddonItems(Array.isArray(items) ? items.filter((a) => a && typeof a === "object") : []);
-        })
-        .catch(() => {});
-    refreshAddons();
-    window.addEventListener("nle-catalog-updated", refreshAddons);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("nle-catalog-updated", refreshAddons);
-    };
-  }, [topSlug, serviceContextPath.join("/")]);
   const heroImages = useMemo(() => heroGalleryFor(node, trail), [node, trail]);
-  // "Services Categories" block is hidden on every subcategory of Wedding & Birthday.
-  const hideServiceCategories = (topSlug === "wedding" || topSlug === "birthday") && trail.length > 1;
   // Add-on/service blocks mount asynchronously after the first reveal pass;
   // re-run so their `.reveal` nodes never stay at opacity:0 (the blank gap).
-  useReveal([node.slug, addonItems.length, products.length]);
+  useReveal([node.slug, products.length]);
 
   const visibleProducts = useMemo(() => {
     let list = contextProducts;
@@ -547,10 +523,6 @@ export default function CategoryTemplate({ node, trail }) {
         <OccasionQuickLinks title={node.label + " Decoration Themes"} items={quickLinks} node={node} trail={trail} />
 
         {!node.addonOnly && <EventServicesSection contextPath={serviceContextPath} />}
-
-        {!node.addonOnly && !hideServiceCategories && addonItems.length > 0 && (
-          <EventAddons title="Services Categories" occasionLabel={node.label} items={addonItems} contextPath={serviceContextPath} />
-        )}
 
         {products.length > 0 && (
           <div className="occ-block">

@@ -12,6 +12,76 @@ import usePageMeta from "../../hooks/usePageMeta";
 
 const BADGES = ["", "Bestseller", "Premium", "Popular", "Trending", "New", "Limited"];
 
+function buildCategoryTree(options = []) {
+  const roots = [];
+  const byKey = new Map();
+  options.forEach((option) => {
+    const path = Array.isArray(option.path) ? option.path.filter(Boolean) : [];
+    if (!path.length) return;
+    let parent = null;
+    let trail = [path[0]];
+    path.slice(1).forEach((slug, index) => {
+      trail = [...trail, slug];
+      const key = trail.join("/");
+      let node = byKey.get(key);
+      if (!node) {
+        node = { key, path: [...trail], option: null, children: [] };
+        byKey.set(key, node);
+        if (parent) parent.children.push(node); else roots.push(node);
+      }
+      if (index === path.length - 2) node.option = option;
+      parent = node;
+    });
+  });
+  return roots;
+}
+
+function AdminProductCategoryMultiPicker({ options, selectedPaths, onToggle }) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(() => new Set());
+  const q = query.trim().toLowerCase();
+  const selected = new Set((selectedPaths || []).map((path) => path.join("/")));
+  const tree = buildCategoryTree(options);
+
+  const matches = (node) => {
+    if (!q) return true;
+    const label = String(node.option?.displayLabel || node.option?.label || node.path[node.path.length - 1] || "").toLowerCase();
+    return label.includes(q) || node.key.toLowerCase().includes(q) || node.children.some(matches);
+  };
+  const toggleExpanded = (key) => setExpanded((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const renderNode = (node, depth = 0) => {
+    if (!matches(node)) return null;
+    const option = node.option;
+    const checked = option ? selected.has(node.key) : false;
+    const hasChildren = node.children.length > 0;
+    const open = hasChildren && (q ? node.children.some(matches) : expanded.has(node.key));
+    const label = option?.label || option?.displayLabel?.split(" › ").pop() || node.path[node.path.length - 1] || "Category";
+    return <div key={node.key} className="admin-product-category-tree-node" data-depth={depth}>
+      <div className={`admin-product-category-tree-row ${checked ? "selected" : ""}`}>
+        {hasChildren ? <button type="button" className="admin-product-category-tree-caret" onClick={() => toggleExpanded(node.key)} aria-label={`${open ? "Collapse" : "Expand"} ${label}`}>{open ? "▾" : "▸"}</button> : <span className="admin-product-category-tree-caret-spacer" />}
+        {option ? <label className="admin-product-category-option">
+          <input type="checkbox" checked={checked} onChange={() => onToggle(option.path || node.path)} />
+          <span className="admin-product-category-check">{checked ? "✓" : ""}</span>
+          <span title={label}>{label}</span>
+        </label> : <button type="button" className="admin-product-category-parent-label" onClick={() => hasChildren && toggleExpanded(node.key)}>{label}</button>}
+      </div>
+      {open ? <div className="admin-product-category-tree-children">{node.children.map((child) => renderNode(child, depth + 1))}</div> : null}
+    </div>;
+  };
+
+  return <div className="admin-product-category-multi">
+    <div className="admin-product-category-search"><Icon name="search" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search categories & themes…" /></div>
+    <div className="admin-product-category-list" role="tree">
+      {tree.length ? tree.map((node) => renderNode(node)) : <p className="admin-field-help">No categories or themes found for this occasion.</p>}
+    </div>
+    <div className="admin-product-category-summary"><strong>{selectedPaths?.length || 0}</strong> selected{selectedPaths?.length ? <button type="button" onClick={() => selectedPaths.forEach((path) => onToggle(path))}>Clear</button> : null}</div>
+  </div>;
+}
+
 export default function AdminProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,6 +104,7 @@ export default function AdminProductForm() {
     categorySlug: "",
     isAddon: isAddonMode,
     categoryPath: [],
+    categoryPaths: [],
     badge: "",
     shortDesc: "",
     tagline: "",
@@ -97,6 +168,7 @@ export default function AdminProductForm() {
           addons: Array.isArray(p.addons) ? p.addons : [],
           cities: Array.isArray(p.cities) ? p.cities : ["Ranchi", "Jamshedpur"],
           categoryPath: Array.isArray(p.categoryPath) ? p.categoryPath : (p.categorySlug ? [p.occasionSlug, p.categorySlug] : []),
+          categoryPaths: Array.isArray(p.categoryPaths) && p.categoryPaths.length ? p.categoryPaths : (Array.isArray(p.categoryPath) && p.categoryPath.length ? [p.categoryPath] : (p.categorySlug ? [[p.occasionSlug, p.categorySlug]] : [])),
           serviceScopes: Array.isArray(p.serviceScopes) ? p.serviceScopes : [],
           serviceScopeMode: p.serviceScopeMode,
         });
@@ -121,6 +193,23 @@ export default function AdminProductForm() {
     formData.originalPrice && formData.originalPrice > formData.price
       ? Math.round(((formData.originalPrice - formData.price) / formData.originalPrice) * 100)
       : 0;
+
+  const selectedCategoryPaths = Array.isArray(formData.categoryPaths) && formData.categoryPaths.length
+    ? formData.categoryPaths
+    : (Array.isArray(formData.categoryPath) && formData.categoryPath.length ? [formData.categoryPath] : []);
+
+  function toggleCategoryPath(path) {
+    const key = path.join("/");
+    const next = selectedCategoryPaths.some((selected) => selected.join("/") === key)
+      ? selectedCategoryPaths.filter((selected) => selected.join("/") !== key)
+      : [...selectedCategoryPaths, path];
+    setFormData((prev) => ({
+      ...prev,
+      categoryPaths: next,
+      categoryPath: next[0] || [],
+      categorySlug: next[0]?.[next[0].length - 1] || "",
+    }));
+  }
 
   function handleAddInclusion(e) {
     e.preventDefault();
@@ -224,6 +313,8 @@ export default function AdminProductForm() {
         images: galleryImages,
         gallery: galleryImages,
         ...(isAddonMode ? { isAddon: true, occasionSlug: "event-services" } : {}),
+        categoryPaths: isAddonMode ? [formData.categoryPath] : selectedCategoryPaths,
+        categoryPath: isAddonMode ? formData.categoryPath : (selectedCategoryPaths[0] || []),
         id: formData.id || (isEditing ? id : undefined),
       });
 
@@ -705,8 +796,8 @@ export default function AdminProductForm() {
               </>
             ) : (
               <>
-                <div className="admin-form-group"><label className="admin-form-label">Occasion</label><select className="admin-select" value={formData.occasionSlug} onChange={(e) => setFormData({ ...formData, occasionSlug: e.target.value, categorySlug: "", categoryPath: [], isAddon: false })}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></div>
-                {availableCategories.length > 0 && <div className="admin-form-group"><label className="admin-form-label">Subcategory / Theme</label><select className="admin-select" value={(formData.categoryPath || []).join("/")} onChange={(e) => { const selected = availableCategories.find((c) => c.path.join("/") === e.target.value); setFormData({ ...formData, categorySlug: selected ? selected.slug : "", categoryPath: selected ? selected.path : [] }); }}><option value="">(Select Subcategory)</option>{availableCategories.map((c) => <option key={c.path.join("/")} value={c.path.join("/")}>{c.displayLabel}</option>)}</select></div>}
+                <div className="admin-form-group"><label className="admin-form-label">Occasion</label><select className="admin-select" value={formData.occasionSlug} onChange={(e) => setFormData({ ...formData, occasionSlug: e.target.value, categorySlug: "", categoryPath: [], categoryPaths: [], isAddon: false })}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></div>
+                {availableCategories.length > 0 && <div className="admin-form-group"><label className="admin-form-label">Categories / Themes {selectedCategoryPaths.length ? `(${selectedCategoryPaths.length} selected)` : ""}</label><AdminProductCategoryMultiPicker options={availableCategories} selectedPaths={selectedCategoryPaths} onToggle={toggleCategoryPath} /></div>}
               </>
             )}
             <div className="admin-form-group"><label className="admin-form-label">Publishing Status</label><select className="admin-select" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="active">Active (Visible to customers)</option><option value="draft">Draft (Hidden)</option><option value="featured">Featured (Top of listings)</option><option value="archived">Archived</option></select></div>
@@ -740,8 +831,8 @@ export default function AdminProductForm() {
         onSelect={(selection) => {
           const urls = (Array.isArray(selection) ? selection : [selection]).filter(Boolean);
           if (!urls.length) return;
-          const next = Array.from(new Set([...urls, ...(formData.images || [])].filter(Boolean)));
-          setFormData({ ...formData, images: next, gallery: next, image: urls[0] || next[0] || formData.image });
+          const next = Array.from(new Set([...(formData.images || []), ...urls].filter(Boolean))).slice(0, 8);
+          setFormData({ ...formData, images: next, gallery: next, image: formData.image || next[0] });
         }}
       />
 

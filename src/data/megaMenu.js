@@ -5,6 +5,7 @@
 // drawer accordion can both render from the same source without drifting.
 
 import { IMAGES } from "./images";
+import { birthdayThemeLinks } from "./occasions";
 
 // type: "mega"   -> multi-column dropdown with an optional featured image
 // type: "simple" -> single-column flat link list (no featured image)
@@ -30,10 +31,9 @@ export const CATEGORY_NAV = [
         heading: "Kids Theme Birthday",
         links: [
           { label: "All Themes", href: "/occasion/birthday/birthday-types/kids-birthday" },
-          { label: "Animal Themes", href: "/occasion/birthday/birthday-types/theme-party/jungle-theme" },
-          { label: "Princess Themes", href: "/occasion/birthday/birthday-types/theme-party/princess-theme" },
-          { label: "Superhero Themes", href: "/occasion/birthday/birthday-types/theme-party/superhero-theme" },
         ],
+        // Theme links are filled live (all of them, no limit) from Birthday -> Birthday Types -> Theme Party.
+        dynamicThemes: true,
       },
       {
         heading: "Party Setups",
@@ -193,10 +193,8 @@ export const CATEGORY_NAV = [
         heading: "Kids Birthday",
         links: [
           { label: "All Kids Themes", href: "/occasion/birthday/birthday-types/kids-birthday" },
-          { label: "Princess Themes", href: "/occasion/birthday/birthday-types/theme-party/princess-theme" },
-          { label: "Superhero Themes", href: "/occasion/birthday/birthday-types/theme-party/superhero-theme" },
-          { label: "Jungle Themes", href: "/occasion/birthday/birthday-types/theme-party/jungle-theme" },
         ],
+        dynamicThemes: true,
       },
     ],
   },
@@ -283,3 +281,20 @@ export const CATEGORY_NAV = [
     ],
   },
 ];
+
+// CATEGORY_NAV with every `dynamicThemes` column filled from the live
+// Theme Party catalogue, so a theme added in Admin appears in the menus
+// without touching this file.
+export function getCategoryNav() {
+  const themes = birthdayThemeLinks(Infinity);
+  return CATEGORY_NAV.map((cat) => {
+    if (!cat.columns) return cat;
+    return {
+      ...cat,
+      columns: cat.columns.map((col) => {
+        if (!col.dynamicThemes) return col;
+        return { ...col, themes: themes.map((t) => ({ label: t.label, href: t.href })) };
+      }),
+    };
+  });
+}

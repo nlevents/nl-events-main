@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Icon from "./Icon";
 import { NAV_LINKS, SEARCH_INDEX } from "../data/nav";
-import { CATEGORY_NAV } from "../data/megaMenu";
+import useCategoryNav from "../hooks/useCategoryNav";
 import { waLink } from "../data/images";
 import { useTheme } from "../context/ThemeContext";
 import { useCity } from "../context/CityContext";
@@ -17,6 +17,7 @@ export default function Header() {
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
   const { city, setCity } = useCity();
+  const categoryNav = useCategoryNav();
   const CITIES = useActiveCities();
   const cart = useCart();
 
@@ -241,7 +242,7 @@ export default function Header() {
         <div className="container">
           <div className="mobile-menu-section-label">Shop by Category</div>
           <div className="mm-accordion">
-            {CATEGORY_NAV.map((cat) => {
+            {categoryNav.map((cat) => {
               const isOpen = openMobileCat === cat.key;
               return (
                 <div className="mm-acc-item" key={cat.key}>
@@ -279,6 +280,15 @@ export default function Header() {
                               </li>
                             ))}
                           </ul>
+                          {col.themes && col.themes.length > 0 && (
+                            <ul className="mm-theme-scroll">
+                              {col.themes.map((l) => (
+                                <li key={l.href}>
+                                  <Link to={l.href} onClick={() => setOpenMobileCat(null)}>{l.label}</Link>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       ))
                     )}

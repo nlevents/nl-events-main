@@ -30,6 +30,11 @@ export const ADMIN_STATE_KEYS = [
 const ADMIN_SESSION_KEY = "nle-admin-supabase-session";
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const CLOUD_VERSION_PREFIX = "nle_catalog_v2_cloud_version_";
+// Bumped because older builds incorrectly discarded real products whose IDs
+// happened to start with `addon-prod-`. This forces one clean product refresh
+// in browsers that already have the old filtered cache.
+const PRODUCT_CACHE_FORMAT = "products-v2";
+const PRODUCT_CACHE_FORMAT_KEY = "nle_catalog_v2_products_cache_format";
 
 function cloudVersionKey(key) { return `${CLOUD_VERSION_PREFIX}${key}`; }
 
@@ -46,7 +51,7 @@ function removeLegacySeedProducts(products) {
   if (!Array.isArray(products)) return [];
   return products.filter((product) => {
     const id = String(product?.id || "");
-    return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+    return !product?.isDemo && !id.startsWith("demo-prod-");
   });
 }
 
@@ -144,6 +149,11 @@ export async function hydratePublicState({ versionsOnly = false } = {}) {
       if (value && previous && previous !== value) changed = true;
       if (value && !previous) changed = true;
     });
+    // Products missing locally while the cloud has them (e.g. an earlier fetch failed): refetch.
+    try {
+      const lp = localStorage.getItem("nle_catalog_v2_products");
+      if (versions.nle_catalog_v2_products && (!lp || lp === "[]")) changed = true;
+    } catch { /* cache only */ }
     if (changed) return hydratePublicState();
     Object.entries(versions).forEach(([key, value]) => setCloudVersion(key, value));
     return { versions };
@@ -171,8 +181,11 @@ export async function hydratePublicState({ versionsOnly = false } = {}) {
   const localProducts = (() => {
     try { return localStorage.getItem("nle_catalog_v2_products"); } catch { return null; }
   })();
+  const localProductCacheFormat = (() => {
+    try { return localStorage.getItem(PRODUCT_CACHE_FORMAT_KEY) || ""; } catch { return ""; }
+  })();
 
-  if (!localProducts || (cloudProductVersion && localProductVersion !== cloudProductVersion)) {
+  if (!localProducts || (cloudProductVersion && localProductVersion !== cloudProductVersion) || localProductCacheFormat !== PRODUCT_CACHE_FORMAT) {
     const productPayload = await request(`${API_BASE}/catalog/products?v=${encodeURIComponent(cloudProductVersion || Date.now())}`, { cache: "no-store" });
     const products = productPayload?.data;
     if (products !== undefined) {
@@ -183,6 +196,7 @@ export async function hydratePublicState({ versionsOnly = false } = {}) {
           localStorage.setItem("nle_catalog_v2_products", nextRaw);
           changed = true;
         }
+        localStorage.setItem(PRODUCT_CACHE_FORMAT_KEY, PRODUCT_CACHE_FORMAT);
       } catch { /* cache only */ }
     }
   }

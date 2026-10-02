@@ -58,3 +58,15 @@ The project uses Vite and is configured for Netlify deployment.
 - Static Vite assets use long-lived immutable caching.
 - Vercel/Netlify SPA fallbacks do not rewrite missing `/assets/*` files to `index.html`, preventing stale-chunk MIME errors.
 - Server-only Supabase and Cloudinary credentials are expected through deployment environment variables and are not stored in the repository.
+
+## Cloudinary image replacement safety
+
+Managed uploads are stored under the `next-level-events/` Cloudinary folder. When an
+admin replaces an image, the new catalog state is written to Supabase first. Only
+then is the old asset considered for cleanup. The server-side `/api/admin/cloudinary`
+endpoint deletes an old asset only when it is no longer referenced anywhere in the
+managed catalog and invalidates Cloudinary CDN copies at deletion time.
+
+Configure these **server-only** deployment variables before enabling automatic
+cleanup: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`.
+Do not expose `CLOUDINARY_API_SECRET` or prefix it with `VITE_`.

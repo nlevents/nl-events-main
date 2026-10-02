@@ -49,10 +49,35 @@ function walkOptions(occasions) {
         label: `${o.label} › ${trail.map((n) => n.label).join(" › ")}`,
         occasionSlug: o.slug,
         categorySlug: trail[trail.length - 1]?.slug || "",
+        nodeLabel: trail[trail.length - 1]?.label || "",
       });
     });
   });
   return result;
+}
+
+function getProductCategoryPaths(product) {
+  const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+    ? product.categoryPaths
+    : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+  return paths.filter(Array.isArray).map((path) => path.filter(Boolean)).filter((path) => path.length);
+}
+
+function productMatchesCatalogPath(product, occasionSlug, categoryPath = [], { includeDescendants = true } = {}) {
+  if (!product || !occasionSlug) return false;
+  const paths = getProductCategoryPaths(product);
+  const fallbackOccasion = product.occasionSlug || "";
+  if (!paths.length) return !categoryPath.length && fallbackOccasion === occasionSlug;
+  return paths.some((path) => {
+    const productOccasion = path[0] || fallbackOccasion;
+    if (productOccasion !== occasionSlug) return false;
+    if (!categoryPath.length) return true;
+    const wanted = [occasionSlug, ...categoryPath];
+    if (path.length < wanted.length) return false;
+    return includeDescendants
+      ? wanted.every((slug, index) => path[index] === slug)
+      : path.length === wanted.length && wanted.every((slug, index) => path[index] === slug);
+  });
 }
 function initialItem(kind = "product") {
   return {
@@ -65,6 +90,7 @@ function initialItem(kind = "product") {
     image: "",
     occasionSlug: "wedding",
     categoryPath: [],
+    categoryPaths: [],
     priceType: kind === "package" ? "fixed" : "starting",
     price: "",
     originalPrice: "",
@@ -89,6 +115,116 @@ function initialItem(kind = "product") {
 
 function Field({ label, children, required }) {
   return <div className="catalog-field"><label>{label}{required ? <span> *</span> : null}</label>{children}</div>;
+}
+
+const MAX_PRODUCT_IMAGES = 8;
+
+// Multi-image uploader for products / packages / services. Keeps the same
+// dropzone look as ImagePicker; `images` is an ordered array (first = main
+// thumbnail shown on listing cards).
+function MultiImagePicker({ images, onChange, max = MAX_PRODUCT_IMAGES }) {
+  const list = Array.isArray(images) ? images.filter(Boolean) : [];
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList || []).filter((f) => f.type?.startsWith("image/"));
+    if (!files.length) return window.alert("Please choose image files.");
+    const room = max - list.length;
+    if (room <= 0) return window.alert(`You can add up to ${max} images per product. Remove one first.`);
+    const batch = files.slice(0, room);
+    const skipped = files.length - batch.length;
+    setBusy(true);
+    const added = [];
+    const failed = [];
+    for (let i = 0; i < batch.length; i++) {
+      setProgress(`Uploading ${i + 1} of ${batch.length}…`);
+      try {
+        const saved = await uploadMediaFile(batch[i], batch[i].name);
+        added.push(saved.url);
+      } catch (err) {
+        failed.push(`${batch[i].name}: ${err.message || "upload failed"}`);
+      }
+    }
+    if (added.length) onChange(Array.from(new Set([...list, ...added])).slice(0, max));
+    setBusy(false);
+    setProgress("");
+    const notes = [];
+    if (skipped > 0) notes.push(`${skipped} file(s) skipped — maximum is ${max} images.`);
+    if (failed.length) notes.push(`Could not upload:\n${failed.join("\n")}`);
+    if (notes.length) window.alert(notes.join("\n\n"));
+  }
+  function addUrl() {
+    const url = urlInput.trim();
+    if (!url) return;
+    if (list.length >= max) return window.alert(`You can add up to ${max} images per product.`);
+    onChange(Array.from(new Set([...list, url])));
+    setUrlInput("");
+  }
+  function makeMain(index) { onChange([list[index], ...list.filter((_, i) => i !== index)]); }
+  function remove(index) { onChange(list.filter((_, i) => i !== index)); }
+  function move(index, dir) {
+    const to = index + dir;
+    if (to < 0 || to >= list.length) return;
+    const next = [...list];
+    [next[index], next[to]] = [next[to], next[index]];
+    onChange(next);
+  }
+
+  return (
+    <div className={`catalog-image-uploader ${dragging ? "is-dragging" : ""}`}>
+      <label
+        className="catalog-image-dropzone"
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); uploadFiles(e.dataTransfer.files); }}
+      >
+        <span className="catalog-image-upload-icon"><Icon name="upload" /></span>
+        <span className="catalog-image-drop-copy">
+          <strong>{busy ? progress || "Uploading…" : list.length ? "Add more images" : "Upload product images"}</strong>
+          <small>{list.length}/{max} added · select multiple files at once, or drag & drop</small>
+        </span>
+        <input
+          hidden
+          type="file"
+          multiple
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          onChange={(e) => { const files = e.target.files; if (files?.length) uploadFiles(files); e.target.value = ""; }}
+          disabled={busy || list.length >= max}
+        />
+      </label>
+
+      {list.length > 0 && (
+        <div className="catalog-multi-grid">
+          {list.map((url, i) => (
+            <div key={url + i} className={`catalog-multi-item${i === 0 ? " is-main" : ""}`}>
+              <img src={url} alt={`Product ${i + 1}`} />
+              {i === 0 && <span className="catalog-multi-badge">Main</span>}
+              <div className="catalog-multi-actions">
+                {i !== 0 && <button type="button" onClick={() => makeMain(i)} title="Make main image">★</button>}
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} title="Move left">‹</button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === list.length - 1} title="Move right">›</button>
+                <button type="button" onClick={() => remove(i)} title="Remove image">×</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="catalog-image-url-row">
+        <input
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl(); } }}
+          placeholder="Or paste an image URL and press Add"
+          aria-label="Image URL"
+        />
+        <button type="button" className="catalog-image-clear" style={{ width: "auto", padding: "0 10px" }} onClick={addUrl}>Add</button>
+      </div>
+    </div>
+  );
 }
 
 function ImagePicker({ value, onChange }) {
@@ -121,7 +257,7 @@ function ImagePicker({ value, onChange }) {
         onDrop={(e) => { e.preventDefault(); setDragging(false); uploadFile(e.dataTransfer.files?.[0]); }}
       >
         {value ? <img src={value} alt="Selected" /> : <span className="catalog-image-upload-icon"><Icon name="upload" /></span>}
-        <span className="catalog-image-drop-copy"><strong>{busy ? "Uploading image…" : value ? "Change image" : "Upload product image"}</strong><small>{value ? "Click to choose a different image" : "Drag & drop or click to browse"}</small></span>
+        <span className="catalog-image-drop-copy"><strong>{busy ? "Uploading image…" : value ? "Change image" : "Upload category image"}</strong><small>{value ? "Click to choose a different image" : "Drag & drop or click to browse"}</small></span>
         <input hidden type="file" accept="image/*" onChange={onFileChange} disabled={busy} />
       </label>
       <div className="catalog-image-url-row">
@@ -163,6 +299,7 @@ export default function AdminCatalog() {
   const [modal, setModal] = useState(null);
   const [categoryModal, setCategoryModal] = useState(null);
   const [expanded, setExpanded] = useState({});
+  const [treeSearch, setTreeSearch] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [statFilter, setStatFilter] = useState("all");
@@ -201,23 +338,23 @@ export default function AdminCatalog() {
     return node || currentOccasion;
   }, [currentOccasion, activeCategoryPath]);
   const categoryProducts = useMemo(() => {
-    if (tab === "packages") {
-      return products.filter((p) => p.catalogKind === "package");
-    }
     const isServiceTab = tab === "services";
     const catalogProducts = products.filter((p) => {
       const kind = p.catalogKind || (p.isAddon ? "service" : "product");
       const isService = kind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
       if (isServiceTab) return isService;
+      if (tab === "packages") return kind === "package" && !isService;
       if (tab === "products") return !isService && kind === "product";
       return !isService;
     });
     if (showAllCatalog) return catalogProducts;
-    const path = [activeOccasion, ...activeCategoryPath].join("/");
     return catalogProducts.filter((p) => {
-      const productPath = (p.categoryPath || []).join("/");
-      if (productPath === path) return true;
-      return !activeCategoryPath.length && p.occasionSlug === activeOccasion && !(p.categoryPath || []).length;
+      if (tab === "packages") {
+        const packageOccasions = Array.isArray(p.packageOccasions) ? p.packageOccasions : [];
+        const packageMatchesOccasion = packageOccasions.includes(activeOccasion) || p.occasionSlug === activeOccasion;
+        if (!packageMatchesOccasion) return false;
+      }
+      return productMatchesCatalogPath(p, activeOccasion, activeCategoryPath);
     });
   }, [products, activeOccasion, activeCategoryPath, showAllCatalog, tab]);
   const visibleProducts = useMemo(() => {
@@ -235,17 +372,17 @@ export default function AdminCatalog() {
     });
   }, [categoryProducts, search, status, type, sort]);
 
-  function selectOccasion(slug) { setStatFilter("all"); setShowAllCatalog(false); setActiveOccasion(slug); setActiveCategoryPath([]); }
-  function selectCategory(path) { setStatFilter("all"); setShowAllCatalog(false); setActiveCategoryPath(path); }
+  function selectOccasion(slug) { setStatFilter("all"); setShowAllCatalog(false); setActiveOccasion(slug); setActiveCategoryPath([]); setTreeSearch(""); }
+  function selectCategory(path) { setStatFilter("all"); setShowAllCatalog(false); setActiveCategoryPath(path); setTreeSearch(""); }
   function selectAllCatalog() {
     setStatFilter("all");
-    setTab("products");
     setShowAllCatalog(true);
     setActiveCategoryPath([]);
-    setType("all");
+    setType(tab === "products" ? "product" : tab === "services" ? "service" : "package");
     setStatus("all");
     setSearch("");
-    setActiveOccasion(getOccasions().find((o) => !o.addonOnly)?.slug || "wedding");
+    setTreeSearch("");
+    setActiveOccasion(tab === "services" ? "event-services" : (getOccasions().find((o) => !o.addonOnly)?.slug || "wedding"));
   }
   function selectStatFilter(filter) {
     setStatFilter(filter);
@@ -270,9 +407,11 @@ export default function AdminCatalog() {
     const item = initialItem(kind);
     item.occasionSlug = kind === "service" ? "event-services" : activeOccasion;
     item.categoryPath = kind === "service" ? ((getAddonCategoryOptions()[0]?.path) || ["event-services"]) : [activeOccasion, ...activeCategoryPath];
+    item.categoryPaths = kind === "service" || kind === "package" ? [item.categoryPath] : (item.categoryPath.length > 1 ? [item.categoryPath] : []);
     if (kind === "package") {
       item.packageOccasions = [activeOccasion || "wedding"];
       item.categoryPath = [activeOccasion || "wedding"];
+      item.categoryPaths = [item.categoryPath];
     }
     setModal({ mode: "create", kind, item });
   }
@@ -281,32 +420,39 @@ export default function AdminCatalog() {
     const packageOccasions = Array.isArray(product.packageOccasions) && product.packageOccasions.length
       ? product.packageOccasions
       : (Array.isArray(product.occasions) && product.occasions.length ? product.occasions : [product.occasionSlug || "wedding"]);
-    setModal({ mode: "edit", kind, item: { ...initialItem(kind), ...product, packageItems: product.packageItems || [], packageOccasions } });
+    const legacyPaths = Array.isArray(product.categoryPaths) && product.categoryPaths.length
+      ? product.categoryPaths
+      : (Array.isArray(product.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+    setModal({ mode: "edit", kind, item: { ...initialItem(kind), ...product, categoryPaths: legacyPaths, packageItems: product.packageItems || [], packageOccasions } });
   }
   async function saveItem(item) {
     setError("");
     if (!item.name.trim()) return setError("Name is required.");
     if (!item.price || Number(item.price) <= 0) return setError("Enter a valid price.");
-    if (modal.kind !== "package" && !item.categoryPath?.length) return setError(modal.kind === "service" ? "Choose a service category." : "Choose a catalog category.");
-    if (modal.kind === "service" && item.categoryPath[0] !== "event-services") return setError("Choose a category from Event Services.");
+    const selectedCategoryPaths = modal.kind === "service" || modal.kind === "package"
+      ? (Array.isArray(item.categoryPath) && item.categoryPath.length ? [item.categoryPath] : [])
+      : (Array.isArray(item.categoryPaths) ? item.categoryPaths.filter((path) => Array.isArray(path) && path.length) : []);
+    if (modal.kind !== "package" && !selectedCategoryPaths.length) return setError(modal.kind === "service" ? "Choose a service category." : "Choose at least one category or theme.");
+    if (modal.kind === "service" && selectedCategoryPaths[0]?.[0] !== "event-services") return setError("Choose a category from Event Services.");
+    if (modal.kind === "product" && selectedCategoryPaths.some((path) => path[0] !== item.occasionSlug)) return setError("All selected categories/themes must belong to the selected occasion.");
     if (modal.kind === "package" && !item.packageItems?.length) return setError("Add at least one product or service to this package.");
     if (modal.kind === "package" && (!Array.isArray(item.packageOccasions) || !item.packageOccasions.length)) return setError("Select at least one occasion for this package.");
     try {
-      const primaryImg = item.image || (Array.isArray(item.images) && item.images[0]) || (Array.isArray(item.gallery) && item.gallery[0]) || DEFAULT_IMAGE;
-      const gallery = Array.from(new Set([
-        primaryImg,
-        ...(Array.isArray(item.images) ? item.images : []),
-        ...(Array.isArray(item.gallery) ? item.gallery : []),
-      ].filter(Boolean)));
+      const ordered = Array.from(new Set([
+        ...(Array.isArray(item.images) && item.images.length ? item.images : (Array.isArray(item.gallery) ? item.gallery : [])),
+      ].filter(Boolean))).slice(0, MAX_PRODUCT_IMAGES);
+      const gallery = ordered.length ? ordered : [item.image || DEFAULT_IMAGE];
+      const primaryImg = gallery[0];
       const saved = await saveProductToCloud({
         ...item,
         slug: sanitizeSlug(item.slug || item.name),
         catalogKind: modal.kind,
         isAddon: modal.kind === "service",
         occasionSlug: modal.kind === "service" ? "event-services" : (modal.kind === "package" ? (item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding") : item.categoryPath[0]),
-        categoryPath: modal.kind === "service" ? item.categoryPath : (modal.kind === "package" ? [item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding"] : item.categoryPath),
+        categoryPath: modal.kind === "service" ? item.categoryPath : (modal.kind === "package" ? [item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding"] : (selectedCategoryPaths[0] || [])),
+        categoryPaths: modal.kind === "service" || modal.kind === "package" ? [modal.kind === "service" ? item.categoryPath : [item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding"]] : selectedCategoryPaths,
         packageOccasions: modal.kind === "package" ? item.packageOccasions : [],
-        categorySlug: item.categoryPath[item.categoryPath.length - 1],
+        categorySlug: (selectedCategoryPaths[0] || item.categoryPath || [])[((selectedCategoryPaths[0] || item.categoryPath || []).length - 1)],
         image: primaryImg,
         images: gallery,
         gallery: gallery,
@@ -370,13 +516,14 @@ export default function AdminCatalog() {
       mode,
       occasionSlug,
       parentCategorySlug: parent?.slug || null,
+      parentCategoryPath: trail.slice(0, -1).map((n) => n.slug),
       parentLabel: parent ? trail.slice(0, -1).map((n) => n.label).join(" › ") : "Top level",
       cat: mode === "edit" ? { ...node } : { label: "", slug: "", description: "", image: node?.image || currentOccasion?.image || DEFAULT_IMAGE, type: "category", children: [] },
     });
   }
   function openChildEditor(occasionSlug, trail) {
     const parent = trail[trail.length - 1];
-    setCategoryModal({ occasionSlug, parentCategorySlug: parent.slug, parentLabel: trail.map((n) => n.label).join(" › "), cat: { label: "", slug: "", description: "", image: parent.image || DEFAULT_IMAGE, type: "category", children: [] } });
+    setCategoryModal({ occasionSlug, parentCategorySlug: parent.slug, parentCategoryPath: trail.map((n) => n.slug), parentLabel: trail.map((n) => n.label).join(" › "), cat: { label: "", slug: "", description: "", image: parent.image || DEFAULT_IMAGE, type: "category", children: [] } });
   }
   async function saveCategoryForm(e) {
     e.preventDefault(); setError("");
@@ -386,7 +533,7 @@ export default function AdminCatalog() {
       if (categoryModal.isOccasion) {
         await saveOccasionToCloud({ ...c, slug: sanitizeSlug(c.slug || c.label) });
       } else {
-        await saveCategoryToCloud(categoryModal.occasionSlug, { ...c, slug: sanitizeSlug(c.slug || c.label), parentCategorySlug: categoryModal.parentCategorySlug || null });
+        await saveCategoryToCloud(categoryModal.occasionSlug, { ...c, slug: sanitizeSlug(c.slug || c.label), parentCategorySlug: categoryModal.parentCategorySlug || null, parentCategoryPath: categoryModal.parentCategoryPath || [] });
       }
       refresh(); setCategoryModal(null); flash(`Saved ${categoryModal.isOccasion ? "occasion" : "category"} "${c.label}".`);
     } catch (err) { setError(err.message || "Unable to save category to the cloud."); }
@@ -396,7 +543,7 @@ export default function AdminCatalog() {
     const parent = trail[trail.length - 2];
     if (!window.confirm(`Delete "${node.label}" and its nested categories?`)) return;
     try {
-      await deleteCategoryFromCloud(occasionSlug, node.slug, parent?.slug || null);
+      await deleteCategoryFromCloud(occasionSlug, node.slug, parent?.slug || null, trail.slice(0, -1).map((n) => n.slug));
       refresh();
       if (activeCategoryPath.join("/") === trail.map((n) => n.slug).join("/")) setActiveCategoryPath(parent ? trail.slice(0, -1).map((n) => n.slug) : []);
       flash(`Deleted "${node.label}".`);
@@ -409,33 +556,60 @@ export default function AdminCatalog() {
   function countProductsForPath(occasionSlug, categoryPath = []) {
     const isServiceTab = tab === "services";
     return products.filter((p) => {
-      const isService = p.catalogKind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
-      if (isService !== isServiceTab) return false;
       const kind = p.catalogKind || (p.isAddon ? "service" : "product");
+      const isService = kind === "service" || p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services");
+      if (isService !== isServiceTab) return false;
       if (tab === "products" && kind !== "product") return false;
       if (tab === "packages" && kind !== "package") return false;
-      const path = Array.isArray(p.categoryPath) ? p.categoryPath : [];
-      if (path[0] !== occasionSlug) return false;
-      return categoryPath.every((slug, index) => path[index + 1] === slug);
+      if (tab === "packages" && categoryPath.length) {
+        const packageOccasions = Array.isArray(p.packageOccasions) ? p.packageOccasions : [];
+        if (!packageOccasions.includes(occasionSlug) && p.occasionSlug !== occasionSlug) return false;
+      }
+      return productMatchesCatalogPath(p, occasionSlug, categoryPath);
     }).length;
   }
 
-  function renderTree(nodes, trail = [], depth = 0) {
-    return (nodes || []).map((node) => {
+  function treeHasMatch(nodes, query) {
+    if (!query) return false;
+    const stack = [...(nodes || [])];
+    while (stack.length) {
+      const node = stack.pop();
+      if (`${node.label || ""} ${node.slug || ""}`.toLowerCase().includes(query)) return true;
+      stack.push(...(node.children || []));
+    }
+    return false;
+  }
+
+  function renderTree(nodes, trail = [], depth = 0, occasionSlug = currentOccasion?.slug) {
+    const q = treeSearch.trim().toLowerCase();
+    const filteredNodes = (nodes || []).filter((node) => {
+      if (!q) return true;
+      const ownMatch = `${node.label || ""} ${node.slug || ""}`.toLowerCase().includes(q);
+      return ownMatch || (node.children || []).some((child) => {
+        const stack = [child];
+        while (stack.length) {
+          const current = stack.pop();
+          if (`${current.label || ""} ${current.slug || ""}`.toLowerCase().includes(q)) return true;
+          stack.push(...(current.children || []));
+        }
+        return false;
+      });
+    });
+    return filteredNodes.map((node) => {
       const next = [...trail, node];
       const key = next.map((n) => n.slug).join("/");
-      const open = expanded[key] !== false;
+      const open = q ? true : expanded[key] !== false;
       const hasChildren = (node.children || []).length > 0;
-      const selected = activeCategoryPath.join("/") === next.map((n) => n.slug).join("/") && activeOccasion === currentOccasion.slug;
+      const selected = activeCategoryPath.join("/") === next.map((n) => n.slug).join("/") && activeOccasion === occasionSlug;
       return <div key={key} className="catalog-tree-node" style={{ marginLeft: depth * 12 }}>
         <div className={`catalog-tree-row ${selected ? "selected" : ""}`}>
           <button type="button" className="catalog-tree-caret" onClick={() => hasChildren && toggleNode(key)}>{hasChildren ? (open ? "⌄" : "›") : ""}</button>
-          <button type="button" className="catalog-tree-label" onClick={() => selectCategory(next.map((n) => n.slug))}><CatalogTreeThumb node={node} /><span>{node.label}</span><em>{countProductsForPath(currentOccasion.slug, next.map((n) => n.slug))}</em></button>
-          <button type="button" className="catalog-mini-action" title="Add child" onClick={() => openChildEditor(currentOccasion.slug, next)}><Icon name="plus" /></button>
-          <button type="button" className="catalog-mini-action" title="Edit" onClick={() => openCategoryEditor(currentOccasion.slug, next, "edit")}><Icon name="edit" /></button>
-          <button type="button" className="catalog-mini-action danger" title="Delete" onClick={() => removeCategory(currentOccasion.slug, next)}><Icon name="trash" /></button>
+          <button type="button" className="catalog-tree-label" onClick={() => { setActiveOccasion(occasionSlug); selectCategory(next.map((n) => n.slug)); }}><CatalogTreeThumb node={node} /><span>{node.label}</span><em>{countProductsForPath(occasionSlug, next.map((n) => n.slug))}</em></button>
+          <button type="button" className="catalog-mini-action" title="Add child" onClick={() => openChildEditor(occasionSlug, next)}><Icon name="plus" /></button>
+          <button type="button" className="catalog-mini-action" title="Edit" onClick={() => openCategoryEditor(occasionSlug, next, "edit")}><Icon name="edit" /></button>
+          <button type="button" className="catalog-mini-action danger" title="Delete" onClick={() => removeCategory(occasionSlug, next)}><Icon name="trash" /></button>
         </div>
-        {open && hasChildren && renderTree(node.children, next, depth + 1)}
+        {open && hasChildren && renderTree(node.children, next, depth + 1, occasionSlug)}
       </div>;
     });
   }
@@ -510,7 +684,12 @@ export default function AdminCatalog() {
   const serviceCount = products.filter((p) => (p.catalogKind || (p.isAddon ? "service" : "product")) === "service" || p.isAddon).length;
   const activeCount = products.filter((p) => p.status === "active").length;
   const categoryLabel = activeCategoryPath.length
-    ? activeCategoryPath.map((slug) => flattenTree(currentOccasion?.children || []).find((x) => x.node.slug === slug)?.node.label || slug).join(" / ")
+    ? activeCategoryPath.reduce((labels, slug) => {
+        const parent = labels.node || currentOccasion;
+        const node = (parent?.children || []).find((child) => child.slug === slug);
+        if (!node) return { labels: [...labels.labels, slug], node: null };
+        return { labels: [...labels.labels, node.label], node };
+      }, { labels: [], node: currentOccasion }).labels.join(" / ")
     : "All categories";
 
   return <div className="admin-page catalog-modern-page">
@@ -523,7 +702,7 @@ export default function AdminCatalog() {
             <p>{tab === "products" ? "Add and manage every physical decor item, setup and product shown on your website." : tab === "packages" ? "Build reusable event packages from your products and services." : "Manage customer-facing event services in their dedicated catalog."}</p>
           </div>
           <div className="catalog-head-actions">
-            <button type="button" className="btn btn-outline catalog-head-secondary" onClick={() => { setShowAllCatalog(true); setActiveCategoryPath([]); setSearch(""); }}><Icon name="search" /> Browse all</button>
+            <button type="button" className="btn btn-outline catalog-head-secondary" onClick={selectAllCatalog}><Icon name="search" /> Browse all</button>
             <div className="catalog-inline-add-wrap">
               <button type="button" className="btn btn-primary catalog-main-add" onClick={() => setAddMenu((v) => !v)}><Icon name="plus" /> {tab === "products" ? "Add Product" : tab === "packages" ? "Add Package" : "Add Service"} <span>⌄</span></button>
               {addMenu && <div className="catalog-add-menu catalog-add-menu--header">
@@ -542,7 +721,7 @@ export default function AdminCatalog() {
 
     <div className="catalog-modern-tabs" role="tablist" aria-label="Catalog type">
       {[['products','Products',productCount],['packages','Packages',packageCount],['services','Event Services',serviceCount]].map(([key,label,count]) => <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => {
-        setTab(key); setSearchParams({ tab: key }); setShowAllCatalog(false); setSearch(""); setActiveCategoryPath([]); setStatFilter("all");
+        setTab(key); setSearchParams({ tab: key }); setShowAllCatalog(false); setSearch(""); setTreeSearch(""); setActiveCategoryPath([]); setStatFilter("all");
         setType(key === "products" ? "product" : key === "services" ? "service" : "package");
         setActiveOccasion(key === "services" ? "event-services" : (getOccasions().find((o) => !o.addonOnly)?.slug || "wedding"));
       }}><span>{label}</span><b>{count}</b></button>)}
@@ -561,8 +740,15 @@ export default function AdminCatalog() {
           <div><span>CATALOG STRUCTURE</span><h2>{tab === "services" ? "Service categories" : "Shop categories"}</h2></div>
           <button type="button" className="catalog-sidebar-add" title="Add category" onClick={() => openCategoryEditor(activeOccasion, [])}><Icon name="plus" /></button>
         </div>
+        <div className="catalog-tree-tools">
+          <div className="catalog-tree-search"><Icon name="search" /><input value={treeSearch} onChange={(e) => setTreeSearch(e.target.value)} placeholder={tab === "services" ? "Search service categories…" : "Search categories & themes…"} aria-label="Search catalog structure" /></div>
+          <button type="button" className={`catalog-tree-all ${showAllCatalog ? "active" : ""}`} onClick={selectAllCatalog}>
+            <span><Icon name="grid" /> {tab === "services" ? "All services" : tab === "packages" ? "All packages" : "All shop products"}</span>
+            <b>{tab === "services" ? serviceCount : tab === "packages" ? packageCount : productCount}</b>
+          </button>
+        </div>
         <div className="catalog-occasion-stack">
-          {displayOccasions.map((o) => <div key={o.slug} className={`catalog-occasion-block ${o.slug === activeOccasion ? "active" : ""}`}>
+          {displayOccasions.map((o) => <div key={o.slug} className={`catalog-occasion-block ${o.slug === activeOccasion && !showAllCatalog ? "active" : ""}`}>
             <div className="catalog-modern-occasion-row">
               <button type="button" onClick={() => selectOccasion(o.slug)} className="catalog-modern-occasion-select">
                 <CatalogTreeThumb node={o} /><span>{o.label}</span><b>{countProductsForPath(o.slug, [])}</b>
@@ -571,7 +757,7 @@ export default function AdminCatalog() {
                 <button type="button" title="Edit occasion" onClick={() => openOccasionEditor(o)}><Icon name="edit" /></button>
               </div>
             </div>
-            {o.slug === activeOccasion && <div className="catalog-modern-tree">{renderTree(o.children || [])}</div>}
+            {(o.slug === activeOccasion || (treeSearch.trim() && treeHasMatch(o.children || [], treeSearch.trim().toLowerCase()))) && <div className="catalog-modern-tree">{renderTree(o.children || [], [], 0, o.slug)}</div>}
           </div>)}
         </div>
         {tab !== "services" && <div className="catalog-sidebar-tip"><strong>Tip</strong><p>Select a function such as <b>Haldi</b> or <b>Mehndi</b> to see only the products assigned to it.</p></div>}
@@ -581,7 +767,7 @@ export default function AdminCatalog() {
         <div className="catalog-modern-main-head">
           <div>
             <div className="catalog-path">{currentOccasion?.label || "Catalog"} <span>›</span> {categoryLabel}</div>
-            <h2>{showAllCatalog ? "All products" : tab === "services" ? (activeCategory?.label || "Event Services") : activeCategory?.label || currentOccasion?.label}</h2>
+            <h2>{showAllCatalog ? (tab === "packages" ? "All packages" : tab === "services" ? "All Event Services" : "All products") : tab === "services" ? (activeCategory?.label || "Event Services") : activeCategory?.label || currentOccasion?.label}</h2>
             <p>{visibleProducts.length} {tab === "products" ? "product" : tab === "packages" ? "package" : "service"}{visibleProducts.length === 1 ? "" : "s"} in this view</p>
           </div>
           <div className="catalog-main-quick-actions">
@@ -632,6 +818,81 @@ function ProductRow({ p, onEdit, onDelete, onDuplicate }) {
 }
 function ProductCard({ p, onEdit, onDelete, onDuplicate }) { const kind = p.catalogKind || (p.isAddon ? "service" : "product"); return <article className="catalog-card"><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><div><span className={`catalog-type-badge ${kind}`}>{KIND_LABELS[kind]}</span><h3>{p.name}</h3><p>{p.shortDescription || p.description}</p><strong>{fmtINR(p.price)}</strong><div><button onClick={() => onEdit(p)}>Edit</button><button onClick={() => onDuplicate(p)}>Duplicate</button><button onClick={() => onDelete(p)}>Delete</button></div></div></article>; }
 
+function buildCategoryTree(options = [], labelKey = "label") {
+  const roots = [];
+  const byKey = new Map();
+  options.forEach((option) => {
+    const path = Array.isArray(option.path) ? option.path.filter(Boolean) : String(option.value || "").split("/").filter(Boolean);
+    if (!path.length) return;
+    let parent = null;
+    let trail = [path[0]];
+    path.slice(1).forEach((slug, index) => {
+      trail = [...trail, slug];
+      const key = trail.join("/");
+      let node = byKey.get(key);
+      if (!node) {
+        node = { key, path: [...trail], option: null, children: [] };
+        byKey.set(key, node);
+        if (parent) parent.children.push(node);
+        else roots.push(node);
+      }
+      if (index === path.length - 2) node.option = option;
+      parent = node;
+    });
+  });
+  return roots;
+}
+
+function CategoryMultiPicker({ options, selectedPaths, onToggle, occasionLabel }) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(() => new Set());
+  const selectedKeys = new Set((selectedPaths || []).map((path) => path.join("/")));
+  const normalizedQuery = query.trim().toLowerCase();
+  const tree = useMemo(() => buildCategoryTree(options), [options]);
+
+  const matchesQuery = (node) => {
+    if (!normalizedQuery) return true;
+    const option = node.option || {};
+    const label = String(option.label || node.path[node.path.length - 1] || "").toLowerCase();
+    const value = String(option.value || node.key).toLowerCase();
+    return label.includes(normalizedQuery) || value.includes(normalizedQuery) || node.children.some(matchesQuery);
+  };
+
+  const isExpanded = (node) => normalizedQuery ? node.children.some(matchesQuery) : expanded.has(node.key);
+  const toggleExpanded = (key) => setExpanded((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  const renderNode = (node, depth = 0) => {
+    if (!matchesQuery(node)) return null;
+    const option = node.option;
+    const checked = option ? selectedKeys.has(node.key) : false;
+    const hasChildren = node.children.length > 0;
+    const open = hasChildren && isExpanded(node);
+    const label = option?.nodeLabel || option?.label?.split(" › ").pop() || node.path[node.path.length - 1] || "Category";
+    return <div key={node.key} className="catalog-category-tree-node" data-depth={depth}>
+      <div className={`catalog-category-tree-row ${checked ? "selected" : ""} ${hasChildren ? "has-children" : ""}`}>
+        {hasChildren ? <button type="button" className="catalog-category-tree-caret" onClick={() => toggleExpanded(node.key)} aria-label={`${open ? "Collapse" : "Expand"} ${label}`}>{open ? "▾" : "▸"}</button> : <span className="catalog-category-tree-caret-spacer" />}
+        {option ? <label className="catalog-category-tree-option">
+          <input type="checkbox" checked={checked} onChange={() => onToggle(option.path || node.path)} />
+          <span className="catalog-category-multi-check" aria-hidden="true">{checked ? "✓" : ""}</span>
+          <span title={label}>{label}</span>
+        </label> : <button type="button" className="catalog-category-tree-parent-label" onClick={() => hasChildren && toggleExpanded(node.key)}>{label}</button>}
+      </div>
+      {open ? <div className="catalog-category-tree-children">{node.children.map((child) => renderNode(child, depth + 1))}</div> : null}
+    </div>;
+  };
+
+  return <div className="catalog-category-multi-picker">
+    <div className="catalog-category-multi-search"><Icon name="search" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${occasionLabel || "categories"}…`} aria-label="Search categories and themes" /></div>
+    <div className="catalog-category-multi-list" role="tree" aria-label={`${occasionLabel || "Occasion"} categories and themes`}>
+      {tree.length ? tree.map((node) => renderNode(node)) : <p className="catalog-category-multi-empty">No categories or themes found for this occasion.</p>}
+    </div>
+    <div className="catalog-category-multi-summary"><strong>{selectedPaths?.length || 0}</strong> selected{selectedPaths?.length ? <button type="button" onClick={() => selectedPaths.forEach((path) => onToggle(path))}>Clear</button> : null}</div>
+  </div>;
+}
 function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error, setError }) {
   const [item, setItem] = useState(modal.item);
   const [packageSearch, setPackageSearch] = useState("");
@@ -642,14 +903,34 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
   // Service categories come only from the persisted Event Services branch.
   // Add-on options use `path` rather than the normal occasion option shape.
   // Normalize both shapes here so every saved service category is selectable.
+  const selectedOccasion = occasions.find((occasion) => occasion.slug === item.occasionSlug);
+  const normalCategoryOptions = categoryOptions.filter((x) => x.occasionSlug === item.occasionSlug && x.occasionSlug !== "event-services");
   const options = isService
     ? categoryOptions.filter((x) => (
         x.occasionSlug === "event-services"
         || String(x.value || "").startsWith("event-services/")
         || (Array.isArray(x.path) && x.path[0] === "event-services")
       ))
-    : categoryOptions;
-  function chooseImage(url) { set("image", url); }
+    : normalCategoryOptions;
+  const selectedCategoryPaths = Array.isArray(item.categoryPaths) && item.categoryPaths.length
+    ? item.categoryPaths
+    : (Array.isArray(item.categoryPath) && item.categoryPath.length ? [item.categoryPath] : []);
+  function toggleCategoryPath(path) {
+    const key = path.join("/");
+    const current = selectedCategoryPaths;
+    const next = current.some((selected) => selected.join("/") === key)
+      ? current.filter((selected) => selected.join("/") !== key)
+      : [...current, path];
+    setItem((p) => ({
+      ...p,
+      categoryPaths: next,
+      categoryPath: next[0] || [],
+      categorySlug: next[0]?.[next[0].length - 1] || "",
+      occasionSlug: isService ? "event-services" : (next[0]?.[0] || p.occasionSlug),
+      serviceCategory: isService ? (options.find((o) => (o.value || o.path?.join("/")) === key)?.label || p.serviceCategory) : p.serviceCategory,
+    }));
+  }
+  function chooseImages(urls) { setItem((p) => ({ ...p, images: urls, gallery: urls, image: urls[0] || "" })); }
   function addPackageItem(product) { if (!item.packageItems.some((x) => (x.productId || x.id) === product.id)) set("packageItems", [...item.packageItems, { productId: product.id, id: product.id, name: product.name, qty: 1, price: product.price, image: product.image || "" }]); }
   function updatePackageItem(id, key, value) { set("packageItems", item.packageItems.map((x) => x.id === id ? { ...x, [key]: key === "qty" ? Math.max(1, Number(value) || 1) : value } : x)); }
   function removePackageItem(id) { set("packageItems", item.packageItems.filter((x) => x.id !== id)); }
@@ -661,12 +942,12 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
     <form onSubmit={(e) => { e.preventDefault(); onSave(item); }}>
       <div className="catalog-form-tabs"><span className="active">Basic Details</span><span>{isPackage ? "Package Contents" : isService ? "Service Details" : "Pricing & Inventory"}</span><span>Media</span><span>SEO & Display</span><span>Additional Info</span></div>
       <section className="catalog-form-section"><h3>1. Basic Information</h3><div className="catalog-form-grid two"><Field label={`${KIND_LABELS[modal.kind]} Name`} required><input value={item.name} onChange={(e) => { const name = e.target.value; setItem((p) => ({ ...p, name, slug: !p.slug ? sanitizeSlug(name) : p.slug })); }} placeholder="e.g. Floral Stage Setup" /></Field><Field label="SKU"><input value={item.sku || ""} onChange={(e) => set("sku", e.target.value)} placeholder="e.g. NLE-DEC-001" /></Field></div><Field label="Short Description" required><textarea rows="2" maxLength={200} value={item.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="A short catchy description shown in list view" /></Field><Field label="Full Description"><textarea rows="4" value={item.description} onChange={(e) => set("description", e.target.value)} placeholder="Write detailed description, dimensions, materials, inclusions, deliverables, etc." /></Field></section>
-      {!isPackage && <section className="catalog-form-section"><h3>2. {isService ? "Service category" : "Occasion, Function & Category"}</h3><div className={`catalog-form-grid ${isService ? "two" : "three"}`}>{!isService && <Field label="Occasions" required><select value={item.occasionSlug || "wedding"} onChange={(e) => set("occasionSlug", e.target.value)}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field>}<Field label={isService ? "What service is this?" : "Category / Theme"} required>{isService ? <ServiceCategoryPicker options={options} value={item.categoryPath} onChange={(path) => { const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === path.join("/")); setItem((p) => ({ ...p, categoryPath: path, occasionSlug: "event-services", serviceCategory: selected?.label || selected?.displayLabel || "" })); }} /> : <select value={(item.categoryPath || []).join("/")} onChange={(e) => { const path = e.target.value.split("/").filter(Boolean); const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === e.target.value); setItem((p) => ({ ...p, categoryPath: path, occasionSlug: path[0] || p.occasionSlug, serviceCategory: selected?.label || p.serviceCategory })); }}><option value="">Select category</option>{options.map((o) => { const value = o.value || (Array.isArray(o.path) ? o.path.join("/") : ""); return <option key={value} value={value}>{o.label}</option>; })}</select>}{isService && <small className="catalog-field-help">Pick the category that describes this service. This is where the service belongs in the catalog.</small>}</Field>{!isService && <Field label="Service Category"><input value={item.serviceCategory || ""} onChange={(e) => set("serviceCategory", e.target.value)} placeholder="e.g. Decor" /></Field>}</div></section>}
+      {!isPackage && <section className="catalog-form-section"><h3>2. {isService ? "Service category" : "Occasion, Category & Theme"}</h3><div className={`catalog-form-grid ${isService ? "two" : "two"}`}>{!isService && <Field label="Occasion" required><select value={item.occasionSlug || "wedding"} onChange={(e) => setItem((p) => ({ ...p, occasionSlug: e.target.value, categoryPath: [], categoryPaths: [], categorySlug: "", serviceCategory: "" }))}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field>}<Field label={isService ? "What service is this?" : `Categories / Themes${selectedCategoryPaths.length ? ` (${selectedCategoryPaths.length} selected)` : ""}`} required>{isService ? <ServiceCategoryPicker options={options} value={item.categoryPath} onChange={(path) => { const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === path.join("/")); setItem((p) => ({ ...p, categoryPath: path, categoryPaths: path.length ? [path] : [], occasionSlug: "event-services", serviceCategory: selected?.label || selected?.displayLabel || "" })); }} /> : <CategoryMultiPicker options={options} selectedPaths={selectedCategoryPaths} onToggle={toggleCategoryPath} occasionLabel={selectedOccasion?.label || item.occasionSlug} />}{isService && <small className="catalog-field-help">Pick the category that describes this service. This is where the service belongs in the catalog.</small>}</Field></div></section>}
       {isPackage && <section className="catalog-form-section"><h3>2. Package Occasions</h3><Field label="Show this package for occasions"><div className="catalog-occasion-checks" role="group" aria-label="Package occasions">{occasions.filter((o) => !o.addonOnly).map((occasion) => { const selected = Array.isArray(item.packageOccasions) && item.packageOccasions.includes(occasion.slug); return <label className={`catalog-occasion-check ${selected ? "selected" : ""}`} key={occasion.slug}><input type="checkbox" checked={selected} onChange={(e) => { const current = Array.isArray(item.packageOccasions) ? item.packageOccasions : []; const next = e.target.checked ? Array.from(new Set([...current, occasion.slug])) : current.filter((slug) => slug !== occasion.slug); set("packageOccasions", next); }} /><span className="catalog-check-box" aria-hidden="true">{selected ? "✓" : ""}</span><span>{occasion.label}</span></label>; })}</div><small className="catalog-field-help">Select every occasion where this package should be available.</small></Field></section>}
       {isPackage && <section className="catalog-form-section"><h3>3. Package Contents</h3><div className="catalog-package-picker"><input placeholder="Search products or services to add…" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />{packageSearch && <div>{products.filter((p) => p.catalogKind !== "package" && p.status === "active" && p.name.toLowerCase().includes(packageSearch.toLowerCase())).slice(0, 8).map((p) => { const isAdded = item.packageItems.some((x) => (x.productId || x.id) === p.id); return <button type="button" key={p.id} className={isAdded ? "added" : ""} onClick={() => addPackageItem(p)} disabled={isAdded}><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><span>{p.name}<small style={{ display: "block", opacity: 0.65 }}>{p.catalogKind === "service" || p.isAddon ? "Service" : "Product"}</small></span>{isAdded ? <strong className="catalog-package-added-label">Added</strong> : <strong>{fmtINR(p.price)}</strong>}</button>; })}</div>}</div><div className="catalog-package-table">{item.packageItems.length ? item.packageItems.map((x) => <div key={x.id}><span>{x.name}</span><input type="number" min="1" value={x.qty} onChange={(e) => updatePackageItem(x.id, "qty", e.target.value)} /><span>{fmtINR(Number(x.price) * Number(x.qty))}</span><button type="button" onClick={() => removePackageItem(x.id)}>×</button></div>) : <p>No items added yet.</p>}</div><div className="catalog-package-total"><span>Items Total</span><strong>{fmtINR(packageItemsTotal)}</strong></div></section>}
       {isService && <section className="catalog-form-section"><div className="service-visibility-heading"><div><h3>3. Customer visibility</h3><p className="service-simple-intro">Choose where customers will find this service. Select a whole occasion to include every function, or pick specific functions.</p></div><span className="service-visibility-badge">Shown on customer pages</span></div><ServiceContextPicker occasions={occasions} value={item.serviceScopes} onChange={(value) => set("serviceScopes", value)} /></section>}
       {isService && <section className="catalog-form-section"><h3>4. Optional service details</h3><div className="catalog-form-grid three"><Field label="Service Type"><input value={item.serviceType} onChange={(e) => set("serviceType", e.target.value)} placeholder="e.g. Photography" /></Field><Field label="Coverage Duration"><input value={item.coverageDuration} onChange={(e) => set("coverageDuration", e.target.value)} placeholder="e.g. 8 Hours / Full Day" /></Field><Field label="Team Size"><input value={item.teamSize} onChange={(e) => set("teamSize", e.target.value)} placeholder="e.g. 2 People" /></Field></div><div className="catalog-form-grid two"><Field label="Deliverables"><textarea rows="3" value={item.deliverables} onChange={(e) => set("deliverables", e.target.value)} /></Field><Field label="Process / Workflow"><textarea rows="3" value={item.workflow} onChange={(e) => set("workflow", e.target.value)} /></Field></div></section>}
-      <section className="catalog-form-section"><h3>{isPackage ? "4" : isService ? "5" : "3"}. Pricing & Media</h3><div className="catalog-form-grid four"><Field label="Price Type" required><select value={item.priceType} onChange={(e) => set("priceType", e.target.value)}><option value="starting">Starting From</option><option value="fixed">Fixed Price</option></select></Field><Field label="Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field><Field label="Unit"><select value={item.unit} onChange={(e) => set("unit", e.target.value)}><option>Per Event</option><option>Per Piece</option><option>Per Day</option><option>Per Hour</option></select></Field><Field label="Discount Price"><input type="number" value={item.discountPrice} onChange={(e) => set("discountPrice", e.target.value)} placeholder="e.g. 20000" /></Field></div><ImagePicker value={item.image} onChange={chooseImage} /></section>
+      <section className="catalog-form-section"><h3>{isPackage ? "4" : isService ? "5" : "3"}. Pricing & Media</h3><div className="catalog-form-grid four"><Field label="Price Type" required><select value={item.priceType} onChange={(e) => set("priceType", e.target.value)}><option value="starting">Starting From</option><option value="fixed">Fixed Price</option></select></Field><Field label="Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field><Field label="Unit"><select value={item.unit} onChange={(e) => set("unit", e.target.value)}><option>Per Event</option><option>Per Piece</option><option>Per Day</option><option>Per Hour</option></select></Field><Field label="Discount Price"><input type="number" value={item.discountPrice} onChange={(e) => set("discountPrice", e.target.value)} placeholder="e.g. 20000" /></Field></div><MultiImagePicker images={item.images && item.images.length ? item.images : (item.gallery && item.gallery.length ? item.gallery : (item.image ? [item.image] : []))} onChange={chooseImages} /></section>
       <section className="catalog-form-section"><h3>Status</h3><label className="catalog-switch"><input type="checkbox" checked={item.status === "active"} onChange={(e) => set("status", e.target.checked ? "active" : "draft")} /><span></span><strong>{item.status === "active" ? "Active" : "Draft"}</strong></label></section>
       <div className="catalog-modal-footer"><button type="button" className="btn btn-outline" onClick={() => setModal(null)}>Cancel</button><button className="btn btn-primary"><Icon name="plus" /> {modal.mode === "edit" ? `Save ${KIND_LABELS[modal.kind]}` : `Add ${KIND_LABELS[modal.kind]}`}</button></div>
     </form>
@@ -675,7 +956,14 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
 
 function CategoryModal({ data, setData, onSave, error }) {
   const cat = data.cat;
-  const update = (key, value) => setData((p) => ({ ...p, cat: { ...p.cat, [key]: value } }));
+  const update = (key, value) => setData((p) => ({
+    ...p,
+    cat: {
+      ...p.cat,
+      [key]: value,
+      ...(key === "label" && p.mode !== "edit" ? { slug: sanitizeSlug(value) } : {}),
+    },
+  }));
   const isOccasion = Boolean(data.isOccasion);
-  return <div className="catalog-modal-backdrop" onMouseDown={() => setData(null)}><div className="catalog-modal catalog-category-modal" onMouseDown={(e) => e.stopPropagation()}><div className="catalog-modal-head"><div><h2>{data.mode === "edit" ? `Edit ${cat.label}` : "Add Category / Theme"}</h2><p>{isOccasion ? "Edit this top-level occasion." : "Create categories at any depth. Every node can have children."}</p></div><button onClick={() => setData(null)}><Icon name="close" /></button></div>{error && <div className="admin-alert admin-alert--error">{error}</div>}<form onSubmit={onSave}><Field label="Parent"><div className="catalog-parent-box">{data.parentLabel || "Top level"}</div></Field><Field label={isOccasion ? "Occasion Name" : "Category / Theme Name"} required><input value={cat.label || ""} onChange={(e) => update("label", e.target.value)} placeholder={isOccasion ? "e.g. Annaprashan" : "e.g. Haldi"} /></Field><Field label="Slug" required><input value={cat.slug || ""} onChange={(e) => update("slug", sanitizeSlug(e.target.value))} placeholder={isOccasion ? "annaprashan" : "haldi"} /></Field>{!isOccasion && <Field label="Node Type"><select value={cat.type || "category"} onChange={(e) => update("type", e.target.value)}><option value="category">Category</option><option value="theme">Theme</option></select></Field>}<Field label="Description"><textarea rows="3" value={cat.description || ""} onChange={(e) => update("description", e.target.value)} /></Field><Field label={isOccasion ? "Occasion Image" : "Category Image"}><ImagePicker value={cat.image} onChange={(url) => update("image", url)} /></Field>{isOccasion && <><Field label="Tagline"><input value={cat.tagline || ""} onChange={(e) => update("tagline", e.target.value)} /></Field><Field label="Hero Image"><ImagePicker value={cat.heroImg || cat.image || ""} onChange={(url) => update("heroImg", url)} /></Field></>}<div className="catalog-modal-footer"><button type="button" className="btn btn-outline" onClick={() => setData(null)}>Cancel</button><button className="btn btn-primary">Save {isOccasion ? "Occasion" : "Category"}</button></div></form></div></div>;
+  return <div className="catalog-modal-backdrop" onMouseDown={() => setData(null)}><div className="catalog-modal catalog-category-modal" onMouseDown={(e) => e.stopPropagation()}><div className="catalog-modal-head"><div><h2>{data.mode === "edit" ? `Edit ${cat.label}` : "Add Category / Theme"}</h2><p>{isOccasion ? "Edit this top-level occasion." : "Create categories at any depth. Every node can have children."}</p></div><button onClick={() => setData(null)}><Icon name="close" /></button></div>{error && <div className="admin-alert admin-alert--error">{error}</div>}<form onSubmit={onSave}><Field label="Parent"><div className="catalog-parent-box">{data.parentLabel || "Top level"}</div></Field><Field label={isOccasion ? "Occasion Name" : "Category / Theme Name"} required><input value={cat.label || ""} onChange={(e) => update("label", e.target.value)} placeholder={isOccasion ? "e.g. Annaprashan" : "e.g. Haldi"} /></Field><Field label="Slug" required><input value={data.mode === "edit" ? (cat.slug || "") : sanitizeSlug(cat.label || "")} placeholder={isOccasion ? "annaprashan" : "haldi"} readOnly aria-describedby="catalog-slug-help" /><small id="catalog-slug-help" className="catalog-field-help">{data.mode === "edit" ? "Slug is locked after creation so existing product links and category assignments stay intact." : "Automatically generated from the name."}</small></Field>{!isOccasion && <Field label="Node Type"><select value={cat.type || "category"} onChange={(e) => update("type", e.target.value)}><option value="category">Category</option><option value="theme">Theme</option></select></Field>}<Field label="Description"><textarea rows="3" value={cat.description || ""} onChange={(e) => update("description", e.target.value)} /></Field><Field label={isOccasion ? "Occasion Image" : "Category Image"}><ImagePicker value={cat.image} onChange={(url) => update("image", url)} /></Field>{isOccasion && <><Field label="Tagline"><input value={cat.tagline || ""} onChange={(e) => update("tagline", e.target.value)} /></Field><Field label="Hero Image"><ImagePicker value={cat.heroImg || cat.image || ""} onChange={(url) => update("heroImg", url)} /></Field></>}<div className="catalog-modal-footer"><button type="button" className="btn btn-outline" onClick={() => setData(null)}>Cancel</button><button className="btn btn-primary">Save {isOccasion ? "Occasion" : "Category"}</button></div></form></div></div>;
 }

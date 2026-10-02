@@ -11,7 +11,7 @@ import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
 import { queueCloudSync, syncCloudState, hydratePublicState } from "./cloudStore";
 import { serviceMatchesContext, resolveScopeOnSave, getScopeMode, SCOPE_MODE } from "./serviceContext";
-import { uploadImageBlob, uploadImageUrl } from "./cloudinary";
+import { uploadImageBlob, uploadImageUrl, extractManagedCloudinaryPublicId, cleanupUnusedCloudinaryAssets } from "./cloudinary";
 
 const STORE_KEY_PREFIX = "nle_catalog_v2_";
 const KEYS = {
@@ -893,7 +893,7 @@ function initializeSeedsIfNeeded() {
     const cleanedProducts = Array.isArray(storedProducts)
       ? storedProducts.filter((product) => {
           const id = String(product?.id || "");
-          return !product?.isDemo && !id.startsWith("demo-prod-") && !id.startsWith("addon-prod-");
+          return !product?.isDemo && !id.startsWith("demo-prod-");
         })
       : [];
     if (!localStorage.getItem(KEYS.products) || JSON.stringify(cleanedProducts) !== JSON.stringify(storedProducts)) {
@@ -1075,11 +1075,15 @@ export function getProducts() {
         }).filter(Boolean)
       : product?.packageItems;
 
+    const categoryPaths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+      ? product.categoryPaths
+      : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
     return {
       ...product,
       image: primaryImage,
       images: gallery,
       gallery,
+      categoryPaths,
       ...(product?.catalogKind === "package" ? { packageItems } : {}),
     };
   });
@@ -1089,6 +1093,68 @@ export function getProducts() {
 export function getProduct(idOrSlug) {
   const list = getProducts();
   return list.find((p) => p.id === idOrSlug || p.slug === idOrSlug) || null;
+}
+
+function getProductImageAssetIds(product) {
+  const ids = new Set();
+  const media = getMediaItems();
+  const urls = [
+    product?.image,
+    ...(Array.isArray(product?.images) ? product.images : []),
+    ...(Array.isArray(product?.gallery) ? product.gallery : []),
+  ].filter(Boolean);
+
+  const storedAssets = Array.isArray(product?.imageAssets) ? product.imageAssets : [];
+  storedAssets.forEach((asset) => {
+    const id = extractManagedCloudinaryPublicId(asset?.publicId || asset?.cloudinaryPublicId || asset?.url || "");
+    if (id) ids.add(id);
+  });
+
+  if (product?.cloudinaryPublicId) {
+    const id = extractManagedCloudinaryPublicId(product.cloudinaryPublicId);
+    if (id) ids.add(id);
+  }
+
+  urls.forEach((url) => {
+    const mediaItem = media.find((item) => String(item?.url || "") === String(url));
+    const id = extractManagedCloudinaryPublicId(mediaItem?.cloudinaryPublicId || url);
+    if (id) ids.add(id);
+  });
+
+  return ids;
+}
+
+function buildProductImageAssets(galleryList) {
+  const media = getMediaItems();
+  const assets = [];
+  const seen = new Set();
+  (galleryList || []).forEach((url) => {
+    const mediaItem = media.find((item) => String(item?.url || "") === String(url));
+    const publicId = extractManagedCloudinaryPublicId(mediaItem?.cloudinaryPublicId || url);
+    if (!publicId || seen.has(publicId)) return;
+    seen.add(publicId);
+    assets.push({ url, publicId });
+  });
+  return assets;
+}
+
+function normalizeProductCategoryPaths(product, catalogKind) {
+  const source = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+    ? product.categoryPaths
+    : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+  const normalized = source
+    .filter(Array.isArray)
+    .map((path) => path.map(sanitizeSlug).filter(Boolean))
+    .filter((path) => path.length);
+  const unique = [];
+  const seen = new Set();
+  normalized.forEach((path) => {
+    const key = path.join("/");
+    if (!seen.has(key)) { seen.add(key); unique.push(path); }
+  });
+  if (catalogKind === "service") return unique.slice(0, 1);
+  if (catalogKind === "package") return unique.slice(0, 1);
+  return unique;
 }
 
 export function saveProduct(product) {
@@ -1111,7 +1177,7 @@ export function saveProduct(product) {
       primaryImage,
       ...(Array.isArray(product.images) ? product.images : []),
       ...(Array.isArray(product.gallery) ? product.gallery : []),
-    ].map((url) => sanitizeUrl(url)).filter(Boolean)));
+    ].map((url) => sanitizeUrl(url)).filter(Boolean))).slice(0, 8);
 
     const safeProduct = {
       ...product,
@@ -1130,6 +1196,7 @@ export function saveProduct(product) {
       image: primaryImage,
       images: galleryList,
       gallery: galleryList,
+      imageAssets: buildProductImageAssets(galleryList),
     status: ["active", "draft", "archived", "featured"].includes(product.status) ? product.status : "active",
     includes: Array.isArray(product.includes) ? product.includes.map(sanitizeText).filter(Boolean) : [],
     notIncluded: Array.isArray(product.notIncluded) ? product.notIncluded.map(sanitizeText).filter(Boolean) : [],
@@ -1153,9 +1220,16 @@ export function saveProduct(product) {
       : [],
     cities: Array.isArray(product.cities) ? product.cities.map(sanitizeText) : [],
     categoryPath: Array.isArray(product.categoryPath) ? product.categoryPath.map(sanitizeSlug).filter(Boolean) : [],
+    categoryPaths: normalizeProductCategoryPaths(product, catalogKind),
     isAddon: Boolean(product.isAddon || product.occasionSlug === "event-services" || (Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services")),
     updatedAt: now,
   };
+  if (safeProduct.categoryPaths.length) {
+    safeProduct.categoryPath = safeProduct.categoryPaths[0];
+    safeProduct.categorySlug = safeProduct.categoryPath[safeProduct.categoryPath.length - 1] || "";
+    if (!safeProduct.occasionSlug && safeProduct.categoryPath[0]) safeProduct.occasionSlug = safeProduct.categoryPath[0];
+  }
+
   // Category hierarchy is the source of truth. setupType is intentionally
   // ignored so legacy records cannot recreate the old flat filter.
   delete safeProduct.setupType;
@@ -1199,9 +1273,29 @@ export function saveProduct(product) {
 // used by the product form so a failed cloud write can never look like a
 // successful save.
 export async function saveProductToCloud(product) {
+  const existing = product?.id ? getProduct(product.id) : null;
+  const previousImageIds = getProductImageAssetIds(existing);
+
   const saved = saveProduct(product);
   const list = getProducts();
+
+  // The database write must succeed before any old Cloudinary asset can be
+  // considered for deletion. If the write fails, the old asset remains safe.
   await syncCloudState(KEYS.products, list);
+
+  const nextImageIds = getProductImageAssetIds(saved);
+  const obsoleteImageIds = Array.from(previousImageIds).filter((id) => !nextImageIds.has(id));
+
+  if (obsoleteImageIds.length) {
+    try {
+      await cleanupUnusedCloudinaryAssets(obsoleteImageIds);
+    } catch (error) {
+      // A failed cleanup must never turn a successful product save into a
+      // broken product. The old asset is simply left for a later cleanup.
+      console.warn("Cloudinary image cleanup deferred:", error?.message || error);
+    }
+  }
+
   return saved;
 }
 
@@ -1512,6 +1606,82 @@ export function getOccasions() {
     }
   }
 
+  // Birthday theme migration: older catalog versions used a separate
+  // `Popular Birthday Themes` branch. Theme Party is now the canonical
+  // container. Merge legacy children into Theme Party in-place, preserving
+  // order (canonical themes first, newly added themes after them), and remove
+  // the legacy branch. This is idempotent and requires no SQL/schema change.
+  {
+    const birthday = loadedOccasions.find((occasion) => sanitizeSlug(occasion?.slug) === "birthday");
+    const birthdayTypes = birthday?.children?.find((node) => sanitizeSlug(node?.slug) === "birthday-types");
+    const themeParty = birthdayTypes?.children?.find((node) => sanitizeSlug(node?.slug) === "theme-party");
+    const legacyThemeParty = birthdayTypes?.children?.find((node) => sanitizeSlug(node?.slug) === "popular-birthday-themes");
+    if (birthdayTypes && themeParty && legacyThemeParty) {
+      const existing = new Map((themeParty.children || []).filter((node) => node?.slug).map((node) => [sanitizeSlug(node.slug), node]));
+      const merged = Array.isArray(themeParty.children) ? [...themeParty.children] : [];
+      (legacyThemeParty.children || []).forEach((node) => {
+        const slug = sanitizeSlug(node?.slug);
+        if (!slug || existing.has(slug)) return;
+        existing.set(slug, node);
+        merged.push(node);
+      });
+      themeParty.children = merged;
+      birthdayTypes.children = birthdayTypes.children.filter((node) => node !== legacyThemeParty && sanitizeSlug(node?.slug) !== "popular-birthday-themes");
+      loadedOccasions = loadedOccasions.map((occasion) => occasion?.slug === birthday?.slug ? birthday : occasion);
+      writeStorage(KEYS.occasions, loadedOccasions);
+      queueCloudSync(KEYS.occasions, loadedOccasions);
+      occasionsCacheRaw = JSON.stringify(loadedOccasions);
+    }
+
+    // Keep existing product assignments aligned with the canonical Theme Party
+    // path too. This is a data-only migration: product IDs, names, prices and
+    // images are untouched. It prevents an existing product such as the one
+    // attached to Iron Man from becoming orphaned after the legacy branch is
+    // removed.
+    const rawProducts = readStorage(KEYS.products, []);
+    let productsChanged = false;
+    const normalizeBirthdayThemePath = (path) => {
+      if (!Array.isArray(path) || path.length === 0) return path;
+      const clean = path.map(sanitizeSlug).filter(Boolean);
+      if (clean[0] !== "birthday") return clean;
+      if (clean[1] === "birthday-types" && clean[2] === "popular-birthday-themes") {
+        productsChanged = true;
+        return ["birthday", "birthday-types", "theme-party", ...clean.slice(3)];
+      }
+      if (clean[1] === "popular-birthday-themes") {
+        productsChanged = true;
+        return ["birthday", "birthday-types", "theme-party", ...clean.slice(2)];
+      }
+      return clean;
+    };
+    const migratedProducts = rawProducts.map((product) => {
+      const sourcePaths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+        ? product.categoryPaths
+        : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+      if (!sourcePaths.length) return product;
+      const nextPaths = [];
+      const seen = new Set();
+      sourcePaths.forEach((path) => {
+        const next = normalizeBirthdayThemePath(path);
+        const key = Array.isArray(next) ? next.join("/") : "";
+        if (key && !seen.has(key)) { seen.add(key); nextPaths.push(next); }
+      });
+      if (!nextPaths.length) return product;
+      const nextPrimary = nextPaths[0];
+      const samePrimary = JSON.stringify(product.categoryPath || []) === JSON.stringify(nextPrimary);
+      const samePaths = JSON.stringify(product.categoryPaths || []) === JSON.stringify(nextPaths);
+      if (samePrimary && samePaths) return product;
+      productsChanged = true;
+      return { ...product, categoryPath: nextPrimary, categoryPaths: nextPaths };
+    });
+    if (productsChanged) {
+      writeStorage(KEYS.products, migratedProducts);
+      productsCacheRaw = JSON.stringify(migratedProducts);
+      productsCacheValue = null;
+      queueCloudSync(KEYS.products, migratedProducts);
+    }
+  }
+
   // The public catalog has six canonical top-level occasions. Older cloud/local
   // catalog snapshots can contain only five (for example, a snapshot created
   // before Kids & Family was added). The reference hierarchy migration is
@@ -1571,6 +1741,25 @@ export function getOccasion(slug) {
   return getOccasions().find((o) => o.slug === slug) || null;
 }
 
+function findCategoryNodeByIdOrSlug(root, id, slug) {
+  if (!root) return null;
+  if ((id && root.id === id) || (!id && slug && root.slug === slug)) return root;
+  for (const child of (Array.isArray(root.children) ? root.children : [])) {
+    const found = findCategoryNodeByIdOrSlug(child, id, slug);
+    if (found) return found;
+  }
+  return null;
+}
+
+function getManagedImageIdsFromValues(values = []) {
+  const ids = new Set();
+  values.filter(Boolean).forEach((value) => {
+    const id = extractManagedCloudinaryPublicId(value);
+    if (id) ids.add(id);
+  });
+  return ids;
+}
+
 export function saveOccasion(occasion) {
   const list = getOccasions();
   const safe = {
@@ -1612,8 +1801,18 @@ export function deleteOccasion(slug) {
 }
 
 export async function saveOccasionToCloud(occasion) {
+  const existing = occasion?.id || occasion?.slug ? getOccasions().find((item) => item.id === occasion.id || item.slug === occasion.slug) : null;
+  const previousImageIds = getManagedImageIdsFromValues([existing?.image, existing?.heroImg]);
+
   const saved = saveOccasion(occasion);
   await syncCloudState(KEYS.occasions, getOccasions());
+
+  const nextImageIds = getManagedImageIdsFromValues([saved?.image, saved?.heroImg]);
+  const obsolete = Array.from(previousImageIds).filter((id) => !nextImageIds.has(id));
+  if (obsolete.length) {
+    try { await cleanupUnusedCloudinaryAssets(obsolete); }
+    catch (error) { console.warn("Cloudinary occasion image cleanup deferred:", error?.message || error); }
+  }
   return saved;
 }
 
@@ -1628,43 +1827,55 @@ export function saveCategory(parentOccasionSlug, category) {
   const occ = occasions.find((o) => o.slug === parentOccasionSlug);
   if (!occ) return null;
 
+  const parentPath = Array.isArray(category.parentCategoryPath)
+    ? category.parentCategoryPath.map(sanitizeSlug).filter(Boolean)
+    : (category.parentCategorySlug ? [sanitizeSlug(category.parentCategorySlug)] : []);
+  const safeSlug = sanitizeSlug(category.slug || category.label || "category");
   const safeCat = {
     ...category,
-    slug: sanitizeSlug(category.slug || category.label || "category"),
+    slug: safeSlug,
     label: sanitizeText(category.label || "New Category"),
     description: sanitizeText(category.description || ""),
     image: sanitizeUrl(category.image) || IMAGES.pkgDreamWedding,
+    heroImg: sanitizeUrl(category.heroImg) || IMAGES.heroWedding,
     type: category.type || "category",
     products: Array.isArray(category.products) ? category.products : [],
   };
+  // Parent metadata is used only for locating the node. It must never become
+  // part of the stored catalog node itself.
+  delete safeCat.parentCategorySlug;
+  delete safeCat.parentCategoryPath;
 
-  // If parentCategorySlug is provided, insert under that category recursively
-  if (category.parentCategorySlug) {
-    const parentCat = findCategoryRecursive(occ, category.parentCategorySlug);
-    if (!parentCat) return null;
-    parentCat.children = parentCat.children || [];
-    const idx = parentCat.children.findIndex((c) => c.slug === safeCat.slug || c.id === safeCat.id);
-    if (idx !== -1) {
-      parentCat.children[idx] = { ...parentCat.children[idx], ...safeCat };
-    } else {
-      safeCat.id = safeCat.id || uid("cat");
-      parentCat.children.push(safeCat);
-    }
+  const parentCat = parentPath.length ? findCategoryByPath(occ, parentPath) : null;
+  if (parentPath.length && !parentCat) return null;
+
+  const siblings = parentCat ? (parentCat.children || []) : (occ.children || []);
+  const existingById = safeCat.id ? siblings.find((node) => node.id === safeCat.id) : null;
+  const existingBySlug = siblings.find((node) => node.slug === safeSlug);
+
+  if (existingById) {
+    // Preserve the node identity and its descendants while updating editable
+    // fields. This makes image/name/description edits deterministic even when
+    // multiple branches happen to use the same label.
+    const next = { ...existingById, ...safeCat, id: existingById.id };
+    const idx = siblings.indexOf(existingById);
+    siblings[idx] = next;
+    persist(KEYS.occasions, occasions);
+    dispatchCatalogUpdate();
+    return next;
+  }
+
+  if (existingBySlug) {
+    throw new Error(`A category named "${safeCat.label}" already exists at this level.`);
+  }
+
+  safeCat.id = safeCat.id || uid("cat");
+  if (parentCat) {
+    parentCat.children = Array.isArray(parentCat.children) ? parentCat.children : [];
+    parentCat.children.push(safeCat);
   } else {
-    // Check if the category already exists anywhere in the occasion tree
-    const existing = findCategoryRecursive(occ, safeCat.slug) || (safeCat.id ? findCategoryRecursive(occ, safeCat.id) : null);
-    if (existing) {
-      Object.assign(existing, safeCat);
-    } else {
-      occ.children = occ.children || [];
-      const idx = occ.children.findIndex((c) => c.slug === safeCat.slug || c.id === safeCat.id);
-      if (idx !== -1) {
-        occ.children[idx] = { ...occ.children[idx], ...safeCat };
-      } else {
-        safeCat.id = safeCat.id || uid("cat");
-        occ.children.push(safeCat);
-      }
-    }
+    occ.children = Array.isArray(occ.children) ? occ.children : [];
+    occ.children.push(safeCat);
   }
 
   persist(KEYS.occasions, occasions);
@@ -1672,39 +1883,63 @@ export function saveCategory(parentOccasionSlug, category) {
   return safeCat;
 }
 
-export function deleteCategory(parentOccasionSlug, categorySlug, parentCategorySlug = null) {
+export function deleteCategory(parentOccasionSlug, categorySlug, parentCategorySlug = null, parentCategoryPath = []) {
   const occasions = getOccasions();
   const occ = occasions.find((o) => o.slug === parentOccasionSlug);
   if (!occ) return false;
 
-  const removeFromArray = (arr, slug) => {
-    const idx = arr.findIndex((c) => c.slug === slug);
-    if (idx !== -1) arr.splice(idx, 1);
-  };
+  const normalizedParentPath = Array.isArray(parentCategoryPath)
+    ? parentCategoryPath.map(sanitizeSlug).filter(Boolean)
+    : (parentCategorySlug ? [sanitizeSlug(parentCategorySlug)] : []);
+  const parentCat = normalizedParentPath.length ? findCategoryByPath(occ, normalizedParentPath) : null;
+  if (normalizedParentPath.length && !parentCat) return false;
 
-  if (parentCategorySlug) {
-    const parentCat = findCategoryRecursive(occ, parentCategorySlug);
-    if (!parentCat || !parentCat.children) return false;
-    removeFromArray(parentCat.children, categorySlug);
-  } else {
-    if (!occ.children) return false;
-    removeFromArray(occ.children, categorySlug);
+  const siblings = parentCat ? (parentCat.children || []) : (occ.children || []);
+  const target = siblings.find((node) => node.slug === categorySlug);
+  if (!target) return false;
+
+  // Never orphan real products by deleting the category that owns them. The
+  // admin must move/delete those products first, which keeps the storefront
+  // and future category filters consistent.
+  const targetPath = [parentOccasionSlug, ...normalizedParentPath, target.slug];
+  const hasProducts = getProducts().some((product) => {
+    const paths = Array.isArray(product.categoryPaths) && product.categoryPaths.length
+      ? product.categoryPaths
+      : (Array.isArray(product.categoryPath) ? [product.categoryPath] : []);
+    return paths.some((path) => targetPath.every((slug, index) => path[index] === slug));
+  });
+  if (hasProducts) {
+    throw new Error(`Cannot delete "${target.label}" while products are assigned to this category or one of its subcategories. Move or delete those products first.`);
   }
 
+  const idx = siblings.indexOf(target);
+  siblings.splice(idx, 1);
   persist(KEYS.occasions, occasions);
   dispatchCatalogUpdate();
   return true;
 }
 
 export async function saveCategoryToCloud(parentOccasionSlug, category) {
+  const occasionsBefore = getOccasions();
+  const occasionBefore = occasionsBefore.find((item) => item.slug === parentOccasionSlug);
+  const existing = findCategoryNodeByIdOrSlug(occasionBefore, category?.id || "", category?.slug || "");
+  const previousImageIds = getManagedImageIdsFromValues([existing?.image, existing?.heroImg]);
+
   const saved = saveCategory(parentOccasionSlug, category);
   if (!saved) throw new Error("Unable to save category.");
   await syncCloudState(KEYS.occasions, getOccasions());
+
+  const nextImageIds = getManagedImageIdsFromValues([saved?.image, saved?.heroImg]);
+  const obsolete = Array.from(previousImageIds).filter((id) => !nextImageIds.has(id));
+  if (obsolete.length) {
+    try { await cleanupUnusedCloudinaryAssets(obsolete); }
+    catch (error) { console.warn("Cloudinary category image cleanup deferred:", error?.message || error); }
+  }
   return saved;
 }
 
-export async function deleteCategoryFromCloud(parentOccasionSlug, categorySlug, parentCategorySlug = null) {
-  const deleted = deleteCategory(parentOccasionSlug, categorySlug, parentCategorySlug);
+export async function deleteCategoryFromCloud(parentOccasionSlug, categorySlug, parentCategorySlug = null, parentCategoryPath = []) {
+  const deleted = deleteCategory(parentOccasionSlug, categorySlug, parentCategorySlug, parentCategoryPath);
   if (!deleted) throw new Error("Unable to delete category.");
   await syncCloudState(KEYS.occasions, getOccasions());
   return deleted;
@@ -1714,15 +1949,25 @@ export async function deleteCategoryFromCloud(parentOccasionSlug, categorySlug, 
  * Recursively finds a category by slug within an occasion.
  * Returns the category object or null if not found.
  */
+function findCategoryByPath(occurrence, path = []) {
+  if (!occurrence || !Array.isArray(path)) return null;
+  let nodes = Array.isArray(occurrence.children) ? occurrence.children : [];
+  let current = null;
+  for (const slug of path) {
+    current = nodes.find((node) => sanitizeSlug(node?.slug) === sanitizeSlug(slug));
+    if (!current) return null;
+    nodes = Array.isArray(current.children) ? current.children : [];
+  }
+  return current;
+}
+
 function findCategoryRecursive(occurrence, slug) {
   if (!occurrence || !occurrence.children) return null;
   const stack = [...occurrence.children];
   while (stack.length) {
     const cat = stack.pop();
     if (cat.slug === slug) return cat;
-    if (cat.children && cat.children.length) {
-      stack.push(...cat.children);
-    }
+    if (cat.children && cat.children.length) stack.push(...cat.children);
   }
   return null;
 }

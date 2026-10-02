@@ -843,6 +843,48 @@ function applyCatalogImages(nodes) {
   return nodes;
 }
 
+
+// Collapses siblings that share a slug into the first occurrence, preserving
+// order and carrying over children/products the first copy is missing.
+function dedupeSiblingsBySlug(list) {
+  const out = [];
+  const bySlug = new Map();
+  (list || []).forEach((node) => {
+    const slug = node?.slug;
+    if (!slug) return;
+    const kept = bySlug.get(slug);
+    if (!kept) { bySlug.set(slug, node); out.push(node); return; }
+    const childSlugs = new Set((kept.children || []).map((c) => c?.slug));
+    const extraChildren = (node.children || []).filter((c) => c?.slug && !childSlugs.has(c.slug));
+    if (extraChildren.length) kept.children = [...(kept.children || []), ...extraChildren];
+    const productKeys = new Set((kept.products || []).map((p) => p?.id || p?.slug));
+    const extraProducts = (node.products || []).filter((p) => { const k = p?.id || p?.slug; return k && !productKeys.has(k); });
+    if (extraProducts.length) kept.products = [...(kept.products || []), ...extraProducts];
+  });
+  return out;
+}
+
+// Direct children of the canonical Theme Party node as unique cards. A theme
+// is identified by its stable id, then slug, then (only within this single
+// parent) its normalized label. Type is deliberately ignored: nodes created in
+// the Admin Catalog are stored as "category" and must still count as themes.
+function uniqueThemeChildren(children) {
+  const ids = new Set();
+  const slugs = new Set();
+  const labels = new Set();
+  const out = [];
+  (children || []).forEach((node) => {
+    if (!node || !node.slug || node.type === "product") return;
+    const label = normalizedLabel(node.label);
+    if (slugs.has(node.slug) || (node.id && ids.has(node.id)) || (label && labels.has(label))) return;
+    slugs.add(node.slug);
+    if (node.id) ids.add(node.id);
+    if (label) labels.add(label);
+    out.push(node);
+  });
+  return out;
+}
+
 let liveOccasionsCache = null;
 let liveOccasionsCacheKey = "";
 
@@ -852,6 +894,18 @@ let liveOccasionsCacheKey = "";
 // preserving admin-managed metadata and products attached to matching nodes.
 function reconcilePublicHierarchy(stored) {
   const bySlug = new Map((Array.isArray(stored) ? stored : []).map((n) => [n?.slug, n]));
+
+  function mergeStoredOnlyNode(previous) {
+    const merged = { ...previous };
+    if (Array.isArray(previous?.children)) {
+      merged.children = previous.children
+        .filter((child) => child && child.slug)
+        .map((child) => mergeStoredOnlyNode(child));
+    } else {
+      merged.children = [];
+    }
+    return merged;
+  }
 
   function mergeNode(reference, previous) {
     const merged = { ...reference };
@@ -870,9 +924,62 @@ function reconcilePublicHierarchy(stored) {
       if (Array.isArray(previous.products)) merged.products = previous.products;
     }
     const previousChildren = new Map((previous?.children || []).map((n) => [n?.slug, n]));
-    merged.children = (reference.children || []).map((child) =>
+    const referenceChildren = reference.children || [];
+
+    // Birthday had an older `Popular Birthday Themes` branch. Treat it as a
+    // legacy alias of the canonical `Theme Party` node instead of exposing
+    // two theme containers. This keeps admin-created themes (including new
+    // themes added to the legacy branch) in the public Theme Party tree while
+    // preventing duplicate Jungle/Car/etc. cards.
+    if (reference.slug === "birthday-types") {
+      const canonicalThemeParty = referenceChildren.find((child) => child?.slug === "theme-party");
+      const legacyThemeParty = previousChildren.get("popular-birthday-themes");
+      const storedCanonicalThemeParty = previousChildren.get("theme-party");
+      if (canonicalThemeParty && legacyThemeParty) {
+        const canonicalChildren = Array.isArray(storedCanonicalThemeParty?.children)
+          ? storedCanonicalThemeParty.children
+          : [];
+        const legacyChildren = Array.isArray(legacyThemeParty?.children)
+          ? legacyThemeParty.children
+          : [];
+        const bySlug = new Map(canonicalChildren.filter((child) => child?.slug).map((child) => [child.slug, child]));
+        const mergedLegacyChildren = [...canonicalChildren];
+        legacyChildren.forEach((child) => {
+          if (!child?.slug || bySlug.has(child.slug)) return;
+          bySlug.set(child.slug, child);
+          mergedLegacyChildren.push(child);
+        });
+        if (mergedLegacyChildren.length) {
+          previousChildren.set("theme-party", {
+            ...(storedCanonicalThemeParty || {}),
+            children: mergedLegacyChildren,
+          });
+        }
+      }
+    }
+
+    const mergedReferenceChildren = referenceChildren.map((child) =>
       mergeNode(child, previousChildren.get(child.slug))
     );
+
+    // Keep administrator-created children that are not part of the built-in
+    // reference tree. The reference tree provides the stable baseline, but it
+    // must never hide a category/theme that an admin added in the Catalog.
+    // Legacy Popular Birthday Themes is deliberately excluded because its
+    // children are merged into Theme Party above.
+    const referenceSlugs = new Set(referenceChildren.map((child) => child.slug));
+    const adminAddedChildren = (previous?.children || [])
+      .filter((child) => child && child.slug && child.slug !== "popular-birthday-themes" && !referenceSlugs.has(child.slug))
+      .map((child) => mergeStoredOnlyNode(child));
+
+    merged.children = [...mergedReferenceChildren, ...adminAddedChildren];
+    // Theme Party is the single canonical theme container. Two children with
+    // the same slug inside it are the same logical node (for example a theme
+    // present in both the stored tree and a migrated legacy branch): keep the
+    // first one and fold any missing children/products of the repeat into it.
+    // Slug identity is scoped to this one parent, so same-named nodes under
+    // other parents (e.g. Wedding -> Jungle) are never touched.
+    if (reference.slug === "theme-party") merged.children = dedupeSiblingsBySlug(merged.children);
     return merged;
   }
 
@@ -896,13 +1003,52 @@ function reconcilePublicHierarchy(stored) {
 
 function normalizeLegacyProductPath(prod) {
   const p = Array.isArray(prod?.categoryPath) ? [...prod.categoryPath] : null;
-  if (!p || p.length < 2) return p;
+  if (!p || p.length === 0) return p;
+
+  // Older Admin Catalog versions stored several public categories at a
+  // different depth. Normalize those saved paths to the current reference
+  // hierarchy so existing products remain visible after the navigation tree
+  // was reorganized. This changes routing only; it does not modify the saved
+  // product record.
+  if (p[0] === "kids-family") {
+    const directFamilyCategories = new Set(["baby-shower", "annaprashan", "mundan-ceremony", "naming-ceremony"]);
+    if (directFamilyCategories.has(p[1])) return ["kids-family", "family-celebrations", ...p.slice(1)];
+  }
+  if (p[0] === "anniversary") {
+    const anniversaryAliases = {
+      "surprise-setups": "anniversary-surprise",
+      "candlelight-celebrations": "romantic-anniversary",
+    };
+    if (anniversaryAliases[p[1]]) return ["anniversary", "anniversary-types", anniversaryAliases[p[1]], ...p.slice(2)];
+    if (p[1] === "milestone-jubilees") return ["anniversary", "anniversary-types", ...p.slice(2)];
+  }
+  if (p[0] === "festivals-culture") {
+    const festivalAliases = {
+      "diwali-festive-decor": ["festivals", "diwali"],
+      "navratri-holi-cultural": ["festivals", "navratri"],
+    };
+    if (festivalAliases[p[1]]) return ["festivals-culture", ...festivalAliases[p[1]], ...p.slice(2)];
+  }
+  if (p[0] === "annaprashan") {
+    return ["kids-family", "family-celebrations", "annaprashan", ...p.slice(1)];
+  }
 
   // Legacy birthday URLs/categories omitted the Birthday Types wrapper.
-  if (p[0] === "birthday" && p[1] !== "birthday-types") {
+  if (p[0] === "birthday") {
+    // Older catalog builds stored Birthday themes under a legacy
+    // `popular-birthday-themes` branch. Theme Party is now the single
+    // canonical public container, so normalize both old flattened URLs and
+    // old nested product paths to it.
+    if (p[1] === "birthday-types" && p[2] === "popular-birthday-themes") {
+      return ["birthday", "birthday-types", "theme-party", ...p.slice(3)];
+    }
+    if (p[1] === "popular-birthday-themes") {
+      return ["birthday", "birthday-types", "theme-party", ...p.slice(2)];
+    }
+
     const birthdayTypeChildren = new Set([
       "kids-birthday", "teen-birthday", "adult-birthday", "milestone-birthday",
-      "surprise-birthday", "theme-party", "popular-birthday-themes",
+      "surprise-birthday", "theme-party",
     ]);
     const birthdayThemes = new Set([
       "cocomelon-theme", "jungle-theme", "princess-theme", "superhero-theme",
@@ -994,8 +1140,26 @@ function getLiveOccasions() {
       // product and renders CategoryTemplate on it instead — a blank
       // product page.
       const prodBase = rawProd.type === "product" ? rawProd : { ...rawProd, type: "product" };
-      const legacyPath = normalizeLegacyProductPath(prodBase);
-      const prod = legacyPath ? { ...prodBase, categoryPath: legacyPath } : prodBase;
+      const rawCategoryPaths = Array.isArray(prodBase.categoryPaths) && prodBase.categoryPaths.length
+        ? prodBase.categoryPaths
+        : (Array.isArray(prodBase.categoryPath) && prodBase.categoryPath.length ? [prodBase.categoryPath] : []);
+      const normalizedCategoryPaths = rawCategoryPaths
+        .filter(Array.isArray)
+        .map((path) => normalizeLegacyProductPath({ ...prodBase, categoryPath: path }))
+        .filter((path) => Array.isArray(path) && path.length);
+      const uniqueCategoryPaths = [];
+      const seenCategoryPaths = new Set();
+      normalizedCategoryPaths.forEach((path) => {
+        const key = path.join("/");
+        if (!seenCategoryPaths.has(key)) {
+          seenCategoryPaths.add(key);
+          uniqueCategoryPaths.push(path);
+        }
+      });
+      const legacyPath = uniqueCategoryPaths[0] || null;
+      const prod = legacyPath
+        ? { ...prodBase, categoryPath: legacyPath, categoryPaths: uniqueCategoryPaths }
+        : prodBase;
       // A legacy catalog may have a navigation label such as "Haldi" saved
       // as a product. If the same slug/name is now a category/theme node,
       // never render that marker as a sellable package.
@@ -1020,14 +1184,18 @@ function getLiveOccasions() {
       }
 
       let placed = false;
-      const targetByPath = findNodeByCategoryPath(clone, prod.categoryPath);
-      if (targetByPath) {
+      const categoryPaths = Array.isArray(prod.categoryPaths) && prod.categoryPaths.length
+        ? prod.categoryPaths
+        : (Array.isArray(prod.categoryPath) ? [prod.categoryPath] : []);
+      categoryPaths.forEach((categoryPath) => {
+        const targetByPath = findNodeByCategoryPath(clone, categoryPath);
+        if (!targetByPath) return;
         targetByPath.products = targetByPath.products || [];
         const idx = targetByPath.products.findIndex((p) => p.slug === prod.slug || p.id === prod.id);
         if (idx !== -1) targetByPath.products[idx] = { ...targetByPath.products[idx], ...prod };
-        else targetByPath.products.push(prod);
+        else targetByPath.products.push({ ...prod, categoryPath, categoryPaths });
         placed = true;
-      }
+      });
       function inject(node) {
         if (!node || placed) return;
         if (node.slug === prod.categorySlug || (!prod.categorySlug && node.slug === prod.occasionSlug)) {
@@ -1040,7 +1208,19 @@ function getLiveOccasions() {
         }
         if (node.children) node.children.forEach(inject);
       }
-      if (!placed) clone.forEach(inject);
+      if (!placed) {
+        // If a product was saved against an older category path, its
+        // categorySlug is still the stable identifier. Prefer a match inside
+        // the selected occasion before considering any other occasion. This
+        // prevents products from disappearing after a category hierarchy was
+        // reorganized, while never placing them into an unrelated occasion.
+        const normalizedOccasion = String(prod?.categoryPath?.[0] || prod?.occasionSlug || "");
+        const occasionRoot = clone.find((occasion) => occasion?.slug === normalizedOccasion);
+        if (occasionRoot) inject(occasionRoot);
+      }
+      if (!placed && prod?.categorySlug) {
+        clone.forEach(inject);
+      }
       // Never place an orphaned product into an unrelated occasion. If its
       // admin-selected category/occasion was deleted, keep the product in
       // the admin catalog for re-categorisation, but do not expose it under
@@ -1544,7 +1724,11 @@ export function allQuickLinksFor(node, trail) {
     if (siblingLinks.length > 0) return siblingLinks;
   }
 
-  const links = flattenQuickLinkNodes(node, base);
+  let links = flattenQuickLinkNodes(node, base);
+  if (base.map((n) => n?.slug).join("/") === "birthday/birthday-types/theme-party") {
+    const keep = new Set(uniqueThemeChildren(node.children).map((child) => child.slug));
+    links = links.filter((link) => keep.has(link.slug));
+  }
 
   // Kids Special is a catalogue-style theme collection. Keep the named
   // category/theme nodes first, then include every sellable item underneath
@@ -1585,29 +1769,36 @@ export function quickLinksFor(node, trail) {
 // exact theme route instead of sending the visitor back to /occasion/birthday.
 // Only real theme nodes are included here; each theme route then renders only
 // the products attached to that theme.
-export function birthdayThemeLinks(limit = 8) {
+const themeLinksCache = new WeakMap();
+
+export function birthdayThemeLinks(limit = Infinity) {
   const birthday = findOccasion("birthday");
   if (!birthday) return [];
 
-  const out = [];
-  function walk(node, trail) {
-    if (!node || out.length >= limit) return;
-    const nextTrail = [...trail, node];
-    if (node.type === "theme") {
-      out.push({
-        label: node.label,
-        image: node.image || node.heroImg,
-        href: pathFor(nextTrail),
-        slug: node.slug,
-        type: node.type,
-      });
-      return;
-    }
-    (node.children || []).forEach((child) => walk(child, nextTrail));
+  // Birthday themes have one canonical public source: Birthday -> Birthday
+  // Types -> Theme Party. The list is derived once per live-catalog snapshot
+  // (getLiveOccasions returns the same object until the catalog changes) and
+  // memoized, so every card rail shares one pass instead of re-walking the tree.
+  let entry = themeLinksCache.get(birthday);
+  if (!entry) {
+    const birthdayTypes = (birthday.children || []).find((node) => node?.slug === "birthday-types");
+    const themeParty = (birthdayTypes?.children || []).find((node) => node?.slug === "theme-party");
+    const all = themeParty
+      ? uniqueThemeChildren(themeParty.children).map((node) => ({
+          label: node.label,
+          image: node.image || node.heroImg,
+          href: pathFor([birthday, birthdayTypes, themeParty, node]),
+          slug: node.slug,
+          type: node.type,
+        }))
+      : [];
+    entry = { all, byLimit: new Map() };
+    themeLinksCache.set(birthday, entry);
   }
-
-  walk(birthday, []);
-  return out;
+  const max = Number.isFinite(limit) && limit >= 0 ? limit : entry.all.length;
+  let sliced = entry.byLimit.get(max);
+  if (!sliced) { sliced = entry.all.slice(0, max); entry.byLimit.set(max, sliced); }
+  return sliced;
 }
 
 // Images for the auto-playing hero carousel at the top of a category page.

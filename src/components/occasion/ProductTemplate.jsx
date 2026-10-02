@@ -27,12 +27,13 @@ import { trackServiceView } from "../../lib/siteEvents";
 // products need only be added to data/occasions.js, nothing here changes.
 import ProductSearchBar from "./ProductSearchBar";
 export default function ProductTemplate({ node: product, trail }) {
+  const shortDescription = product.shortDesc || product.shortDescription || "";
   const { city } = useCity();
   const isDesktop = useIsDesktop(900);
 
   usePageMeta(
     product.name + " — Next Level Events",
-    product.shortDesc || (product.name + " decor package from Next Level Events."),
+    shortDescription || (product.name + " decor package from Next Level Events."),
   );
   useReveal([product.slug]);
 
@@ -128,7 +129,6 @@ export default function ProductTemplate({ node: product, trail }) {
             <div className="pd-conversion-main">
               <span className="eyebrow">{parentNode ? parentNode.label : "Curated package"}</span>
               <h1>{product.name}</h1>
-              <p>{product.shortDesc}</p>
             </div>
             <div className="pd-trust-points" aria-label="Booking benefits">
               <span><Icon name="check" /> {Number(product.rating).toFixed(1)} rated</span>
@@ -146,6 +146,9 @@ export default function ProductTemplate({ node: product, trail }) {
 
               <div className="reveal pd-info-block">
                 <h1 className="pd-title">{product.name}</h1>
+                {shortDescription && (
+                  <p style={{ color: "var(--text-secondary)", maxWidth: "68ch", lineHeight: 1.6, marginTop: 8, marginBottom: 12 }}>{shortDescription}</p>
+                )}
                 <div className="pd-rating-line">
                   <RatingStars rating={product.rating} />
                   <span className="pd-rating-num">{Number(product.rating).toFixed(1)}</span>
@@ -258,6 +261,7 @@ export default function ProductTemplate({ node: product, trail }) {
                 {parentNode ? parentNode.label : "Curated package"}
               </Link>
               <h1 className="pd-title">{product.name}</h1>
+              {shortDescription && <p style={{ color: "var(--text-secondary)", maxWidth: "68ch", lineHeight: 1.6, marginTop: 8, marginBottom: 12 }}>{shortDescription}</p>}
               <div className="pd-rating-line">
                 <RatingStars rating={product.rating} />
                 <span className="pd-rating-num">{Number(product.rating).toFixed(1)}</span>

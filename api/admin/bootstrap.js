@@ -6,7 +6,8 @@ export default async function handler(req, res) {
   const result = await requireAdmin(process.env, req.headers.authorization);
   if (!result.user) return res.status(401).json({ ok: false, error: result.error });
   try {
-    const inserted = await writeMissingStates(process.env, req.body?.state || {}, result.user.id);
+    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const inserted = await writeMissingStates(process.env, req.body?.state || {}, result.user.id, token);
     return res.status(200).json({ ok: true, inserted });
   } catch (err) {
     console.error("Admin bootstrap API error:", err);
