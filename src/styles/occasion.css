@@ -1691,3 +1691,139 @@
 .wedding-addon-card { display: flex; flex-direction: column; height: 100%; text-align: left; }
 .wedding-addon-card .wedding-addon-copy { flex: 1 1 auto; display: flex; flex-direction: column; }
 .wedding-addon-card .wedding-addon-copy > strong { margin-top: auto; }
+
+/* ---------- Refined global catalog filters (Products + Packages only) ---------- */
+.listing-controls--catalog{
+  margin:18px 0 28px;
+  padding:0;
+  border:1px solid var(--border-soft);
+  border-radius:18px;
+  background:var(--surface);
+  box-shadow:0 12px 34px -28px rgba(3,21,45,.42);
+  overflow:hidden;
+}
+.listing-controls--catalog .listing-toolbar{
+  margin:0;
+  padding:16px 18px;
+  border-bottom:1px solid var(--border-soft);
+  background:linear-gradient(180deg,var(--surface),color-mix(in srgb,var(--surface-secondary) 24%,var(--surface)));
+}
+.listing-controls--catalog .listing-count{
+  color:var(--text-primary);
+  font-size:13px;
+  font-weight:800;
+}
+.listing-controls--catalog .listing-sort{ color:var(--text-secondary); }
+.listing-controls--catalog .listing-sort select{
+  min-width:168px;
+  min-height:38px;
+  padding:8px 34px 8px 12px;
+  border-radius:11px;
+  border:1px solid var(--border-soft);
+  background:var(--surface);
+  color:var(--text-primary);
+  font-weight:700;
+  outline:none;
+}
+.listing-controls--catalog .listing-sort select:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent);
+}
+.listing-controls--catalog .listing-filters{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  align-items:end;
+  padding:16px 18px 18px;
+  overflow:visible;
+  flex-wrap:initial;
+}
+.listing-controls--catalog .listing-filter-heading{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding-bottom:2px;
+}
+.listing-controls--catalog .listing-filter-heading > div{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.listing-controls--catalog .listing-filter-heading strong{
+  font-size:13px;
+  color:var(--text-primary);
+  letter-spacing:-.01em;
+}
+.listing-controls--catalog .listing-filter-heading span{
+  font-size:11px;
+  color:var(--text-secondary);
+}
+.listing-controls--catalog .listing-filter-select{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:6px;
+  font-size:10px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  color:var(--text-secondary);
+}
+.listing-controls--catalog .listing-filter-select select{
+  width:100%;
+  min-height:43px;
+  padding:9px 34px 9px 12px;
+  border-radius:12px;
+  border:1px solid var(--border-soft);
+  background:var(--background);
+  color:var(--text-primary);
+  font-family:inherit;
+  font-size:12.5px;
+  font-weight:700;
+  outline:none;
+  cursor:pointer;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.listing-controls--catalog .listing-filter-select select:hover{ border-color:var(--border); }
+.listing-controls--catalog .listing-filter-select select:focus{
+  border-color:var(--accent);
+  background:var(--surface);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent);
+}
+.listing-controls--catalog .listing-filter-chips{
+  min-width:0;
+  flex-wrap:wrap;
+}
+.listing-controls--catalog .listing-filters > .occ-chip{
+  min-height:40px;
+  border-radius:11px;
+}
+.listing-controls--catalog .listing-reset--catalog{
+  justify-self:end;
+  padding:7px 2px;
+  color:var(--accent-strong);
+  text-decoration:none;
+}
+.listing-controls--catalog .listing-reset--catalog:hover{ color:var(--text-primary); }
+
+@media (max-width:980px){
+  .listing-controls--catalog .listing-filters{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:700px){
+  .listing-controls--catalog .listing-toolbar{ align-items:flex-start; }
+  .listing-controls--catalog .listing-sort{ width:100%; justify-content:space-between; }
+  .listing-controls--catalog .listing-sort select{ flex:1; max-width:220px; }
+  .listing-controls--catalog .listing-filters{ grid-template-columns:repeat(2,minmax(0,1fr)); padding:14px; gap:10px; }
+  .listing-controls--catalog .listing-filter-heading{ padding-bottom:3px; }
+}
+@media (max-width:480px){
+  .listing-controls--catalog{ border-radius:15px; }
+  .listing-controls--catalog .listing-toolbar{ padding:14px; }
+  .listing-controls--catalog .listing-filters{ grid-template-columns:1fr; }
+  .listing-controls--catalog .listing-filter-heading{ align-items:flex-start; }
+  .listing-controls--catalog .listing-reset--catalog{ padding-top:0; }
+}

@@ -10,7 +10,7 @@ import {
   getAddonCategoryTree,
   getAddonProducts,
   getServiceScopeOptions,
-  saveCategory,
+  saveCategoryToCloud,
   deleteCategory,
 } from "../../lib/catalogStore";
 import { fmtINR } from "../../lib/pricing";
@@ -130,7 +130,7 @@ export default function AdminAddons() {
     const cat = editingCategory?.cat;
     if (!cat?.label?.trim()) return setError("Service category name is required.");
     try {
-      saveCategory("event-services", { ...cat, slug: sanitizeSlug(cat.slug || cat.label), parentCategorySlug: editingCategory.parentCategorySlug || null });
+      await saveCategoryToCloud("event-services", { ...cat, slug: sanitizeSlug(cat.slug || cat.label), parentCategorySlug: editingCategory.parentCategorySlug || null });
       refresh();
       setEditingCategory(null);
       flash(`Saved service category "${cat.label}".`);

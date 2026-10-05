@@ -1161,7 +1161,6 @@ function normalizeProductCategoryPaths(product, catalogKind) {
     if (!seen.has(key)) { seen.add(key); unique.push(path); }
   });
   if (catalogKind === "service") return unique.slice(0, 1);
-  if (catalogKind === "package") return unique.slice(0, 1);
   return unique;
 }
 
@@ -1540,6 +1539,8 @@ function repairEventServiceCategoryTree() {
     const list = getOccasions().filter((occasion) => occasion?.slug !== "event-services");
     const next = [...list, sanitizeCategoryNode(repaired)];
     persist(KEYS.occasions, next);
+    occasionsCacheValue = null;
+    occasionsCacheRaw = "";
     dispatchCatalogUpdate();
   }
   return repaired;
@@ -1889,6 +1890,8 @@ export function saveCategory(parentOccasionSlug, category) {
     const idx = siblings.indexOf(existingById);
     siblings[idx] = next;
     persist(KEYS.occasions, occasions);
+    occasionsCacheValue = null;
+    occasionsCacheRaw = "";
     dispatchCatalogUpdate();
     return next;
   }
@@ -1907,6 +1910,8 @@ export function saveCategory(parentOccasionSlug, category) {
   }
 
   persist(KEYS.occasions, occasions);
+  occasionsCacheValue = null;
+  occasionsCacheRaw = "";
   dispatchCatalogUpdate();
   return safeCat;
 }

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { onImgError } from "../../lib/imageFallback";
 import AutoScrollRail from "../AutoScrollRail";
 import { EVENT_SERVICES, eventServiceHref } from "../../data/eventServices";
-import { getServiceProductsForContext, getAddonsForOccasion } from "../../lib/catalogStore";
+import { getServiceProductsForContext, getAddonCategoryTree } from "../../lib/catalogStore";
 import { trackServiceCategoryClick } from "../../lib/siteEvents";
 
 function availableServiceSlugs(contextPath = []) {
@@ -33,26 +33,22 @@ export default function EventServicesSection({ contextPath = [] }) {
     return () => window.removeEventListener("nle-catalog-updated", refresh);
   }, [contextKey]);
 
-  const liveServiceCards = (() => {
+  // The homepage service rail must use the persisted Event Services category
+  // node as its image source. This avoids falling back to legacy/static service
+  // card data after an image is changed in Admin.
+  const liveServiceCategories = (() => {
     try {
-      const topSlug = Array.isArray(contextPath) && contextPath.length ? contextPath[0] : "event-services";
-      return getAddonsForOccasion(topSlug, contextPath).reduce((map, item) => {
-        if (item?.slug) map.set(item.slug, item);
-        return map;
-      }, new Map());
+      const tree = getAddonCategoryTree();
+      return new Map((tree?.children || []).map((node) => [node?.slug, node]));
     } catch {
       return new Map();
     }
   })();
 
-  // Keep the canonical service list/order/labels, but use the admin-managed
-  // category image when one exists. Previously this rail always used the
-  // static EVENT_SERVICES image, so changing a service category image in
-  // Admin -> Event Services never reached the public website.
   const visibleServices = EVENT_SERVICES
     .filter((service) => visibleSlugs.has(service.slug))
     .map((service) => {
-      const live = liveServiceCards.get(service.slug);
+      const live = liveServiceCategories.get(service.slug);
       return live?.image ? { ...service, image: live.image } : service;
     });
   if (!visibleServices.length) return null;

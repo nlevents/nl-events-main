@@ -57,6 +57,41 @@ function walkOptions(occasions) {
   return result;
 }
 
+function walkAllCatalogOptions(occasions, serviceOptions = []) {
+  const result = [];
+  occasions.forEach((occasion) => {
+    result.push({
+      value: occasion.slug,
+      label: occasion.label,
+      occasionSlug: occasion.slug,
+      categorySlug: occasion.slug,
+      nodeLabel: occasion.label,
+    });
+    flattenTree(occasion.children || []).forEach(({ node, trail }) => {
+      result.push({
+        value: [occasion.slug, ...trail.map((n) => n.slug)].join("/"),
+        label: `${occasion.label} › ${trail.map((n) => n.label).join(" › ")}`,
+        occasionSlug: occasion.slug,
+        categorySlug: trail[trail.length - 1]?.slug || "",
+        nodeLabel: trail[trail.length - 1]?.label || "",
+      });
+    });
+  });
+  serviceOptions.forEach((option) => {
+    const path = Array.isArray(option.path) ? option.path : String(option.value || "").split("/").filter(Boolean);
+    if (!path.length) return;
+    result.push({
+      ...option,
+      value: path.join("/"),
+      label: option.displayLabel || option.label || path.join(" › "),
+      occasionSlug: "event-services",
+      categorySlug: path[path.length - 1],
+      nodeLabel: option.nodeLabel || option.label?.split(" › ").pop() || path[path.length - 1],
+    });
+  });
+  return result;
+}
+
 function getProductCategoryPaths(product) {
   const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
     ? product.categoryPaths
@@ -352,6 +387,7 @@ export default function AdminCatalog() {
   const currentOccasion = occasions.find((o) => o.slug === activeOccasion) || occasions[0];
   const displayOccasions = tab === "services" ? occasions.filter((o) => o.addonOnly) : occasions.filter((o) => !o.addonOnly);
   const allCategoryOptions = useMemo(() => walkOptions(occasions), [occasions]);
+  const allPackageCategoryOptions = useMemo(() => walkAllCatalogOptions(occasions, getAddonCategoryOptions()), [occasions, products]);
   const activeCategory = useMemo(() => {
     let node = currentOccasion;
     for (const slug of activeCategoryPath) node = (node?.children || []).find((c) => c.slug === slug);
@@ -369,11 +405,6 @@ export default function AdminCatalog() {
     });
     if (showAllCatalog) return catalogProducts;
     return catalogProducts.filter((p) => {
-      if (tab === "packages") {
-        const packageOccasions = Array.isArray(p.packageOccasions) ? p.packageOccasions : [];
-        const packageMatchesOccasion = packageOccasions.includes(activeOccasion) || p.occasionSlug === activeOccasion;
-        if (!packageMatchesOccasion) return false;
-      }
       return productMatchesCatalogPath(p, activeOccasion, activeCategoryPath);
     });
   }, [products, activeOccasion, activeCategoryPath, showAllCatalog, tab]);
@@ -430,12 +461,10 @@ export default function AdminCatalog() {
     // catalog category is a navigation/filter context, not a mandatory assignment.
     // Services and packages keep their existing defaults because their placement
     // rules are different.
-    item.categoryPath = kind === "service" ? ((getAddonCategoryOptions()[0]?.path) || ["event-services"]) : kind === "package" ? [activeOccasion || "wedding"] : [];
+    item.categoryPath = kind === "service" ? ((getAddonCategoryOptions()[0]?.path) || ["event-services"]) : kind === "package" ? (activeCategoryPath.length ? [activeOccasion || "wedding", ...activeCategoryPath] : [activeOccasion || "wedding"]) : [];
     item.categoryPaths = kind === "service" || kind === "package" ? [item.categoryPath] : [];
     if (kind === "package") {
-      item.packageOccasions = [activeOccasion || "wedding"];
-      item.categoryPath = [activeOccasion || "wedding"];
-      item.categoryPaths = [item.categoryPath];
+      item.packageOccasions = Array.from(new Set([activeOccasion || "wedding"]));
     }
     setModal({ mode: "create", kind, item });
   }
@@ -446,21 +475,23 @@ export default function AdminCatalog() {
       : (Array.isArray(product.occasions) && product.occasions.length ? product.occasions : [product.occasionSlug || "wedding"]);
     const legacyPaths = Array.isArray(product.categoryPaths) && product.categoryPaths.length
       ? product.categoryPaths
-      : (Array.isArray(product.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+      : (Array.isArray(product.categoryPath) && product.categoryPath.length
+        ? [product.categoryPath]
+        : (kind === "package" ? packageOccasions.map((slug) => [slug]) : []));
     setModal({ mode: "edit", kind, item: { ...initialItem(kind), ...product, categoryPaths: legacyPaths, packageItems: product.packageItems || [], packageOccasions } });
   }
   async function saveItem(item) {
     setError("");
     if (!item.name.trim()) return setError("Name is required.");
     if (!item.price || Number(item.price) <= 0) return setError("Enter a valid price.");
-    const selectedCategoryPaths = modal.kind === "service" || modal.kind === "package"
-      ? (Array.isArray(item.categoryPath) && item.categoryPath.length ? [item.categoryPath] : [])
-      : (Array.isArray(item.categoryPaths) ? item.categoryPaths.filter((path) => Array.isArray(path) && path.length) : []);
-    if (modal.kind !== "package" && !selectedCategoryPaths.length) return setError(modal.kind === "service" ? "Choose a service category." : "Choose at least one category or theme.");
+    const selectedCategoryPaths = Array.isArray(item.categoryPaths) && item.categoryPaths.length
+      ? item.categoryPaths.filter((path) => Array.isArray(path) && path.length)
+      : (Array.isArray(item.categoryPath) && item.categoryPath.length ? [item.categoryPath] : []);
+    if (!selectedCategoryPaths.length) return setError(modal.kind === "service" ? "Choose a service category." : "Choose at least one package location.");
+    if (modal.kind === "service" && selectedCategoryPaths.length !== 1) return setError("Choose one service category.");
     if (modal.kind === "service" && selectedCategoryPaths[0]?.[0] !== "event-services") return setError("Choose a category from Event Services.");
     if (modal.kind === "product" && selectedCategoryPaths.some((path) => path[0] !== item.occasionSlug)) return setError("All selected categories/themes must belong to the selected occasion.");
     if (modal.kind === "package" && !item.packageItems?.length) return setError("Add at least one product or service to this package.");
-    if (modal.kind === "package" && (!Array.isArray(item.packageOccasions) || !item.packageOccasions.length)) return setError("Select at least one occasion for this package.");
     try {
       const ordered = Array.from(new Set([
         ...(Array.isArray(item.images) && item.images.length ? item.images : (Array.isArray(item.gallery) ? item.gallery : [])),
@@ -472,10 +503,12 @@ export default function AdminCatalog() {
         slug: sanitizeSlug(item.slug || item.name),
         catalogKind: modal.kind,
         isAddon: modal.kind === "service",
-        occasionSlug: modal.kind === "service" ? "event-services" : (modal.kind === "package" ? (item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding") : item.categoryPath[0]),
-        categoryPath: modal.kind === "service" ? item.categoryPath : (modal.kind === "package" ? [item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding"] : (selectedCategoryPaths[0] || [])),
-        categoryPaths: modal.kind === "service" || modal.kind === "package" ? [modal.kind === "service" ? item.categoryPath : [item.packageOccasions?.[0] || item.categoryPath?.[0] || "wedding"]] : selectedCategoryPaths,
-        packageOccasions: modal.kind === "package" ? item.packageOccasions : [],
+        occasionSlug: modal.kind === "service" ? "event-services" : (selectedCategoryPaths[0]?.[0] || item.occasionSlug || "wedding"),
+        categoryPath: selectedCategoryPaths[0] || [],
+        categoryPaths: selectedCategoryPaths,
+        packageOccasions: modal.kind === "package"
+          ? Array.from(new Set(selectedCategoryPaths.map((path) => path[0]).filter((slug) => slug && slug !== "event-services")))
+          : [],
         categorySlug: (selectedCategoryPaths[0] || item.categoryPath || [])[((selectedCategoryPaths[0] || item.categoryPath || []).length - 1)],
         image: primaryImg,
         images: gallery,
@@ -585,10 +618,6 @@ export default function AdminCatalog() {
       if (isService !== isServiceTab) return false;
       if (tab === "products" && kind !== "product") return false;
       if (tab === "packages" && kind !== "package") return false;
-      if (tab === "packages" && categoryPath.length) {
-        const packageOccasions = Array.isArray(p.packageOccasions) ? p.packageOccasions : [];
-        if (!packageOccasions.includes(occasionSlug) && p.occasionSlug !== occasionSlug) return false;
-      }
       return productMatchesCatalogPath(p, occasionSlug, categoryPath);
     }).length;
   }
@@ -852,7 +881,7 @@ function ProductRow({ p, onEdit, onDelete, onDuplicate }) {
 }
 function ProductCard({ p, onEdit, onDelete, onDuplicate }) { const kind = p.catalogKind || (p.isAddon ? "service" : "product"); return <article className="catalog-card"><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><div><span className={`catalog-type-badge ${kind}`}>{KIND_LABELS[kind]}</span><h3>{p.name}</h3><p>{p.shortDescription || p.description}</p><strong>{fmtINR(p.price)}</strong><div><button onClick={() => onEdit(p)}>Edit</button><button onClick={() => onDuplicate(p)}>Duplicate</button><button onClick={() => onDelete(p)}>Delete</button></div></div></article>; }
 
-function buildCategoryTree(options = [], labelKey = "label") {
+function buildCategoryTree(options = [], labelKey = "label", includeRootOptions = false) {
   const roots = [];
   const byKey = new Map();
   options.forEach((option) => {
@@ -860,6 +889,17 @@ function buildCategoryTree(options = [], labelKey = "label") {
     if (!path.length) return;
     let parent = null;
     let trail = [path[0]];
+    if (includeRootOptions) {
+      const rootKey = path[0];
+      let root = byKey.get(rootKey);
+      if (!root) {
+        root = { key: rootKey, path: [rootKey], option: null, children: [] };
+        byKey.set(rootKey, root);
+        roots.push(root);
+      }
+      if (path.length === 1) root.option = option;
+      parent = root;
+    }
     path.slice(1).forEach((slug, index) => {
       trail = [...trail, slug];
       const key = trail.join("/");
@@ -877,12 +917,12 @@ function buildCategoryTree(options = [], labelKey = "label") {
   return roots;
 }
 
-function CategoryMultiPicker({ options, selectedPaths, onToggle, occasionLabel }) {
+function CategoryMultiPicker({ options, selectedPaths, onToggle, occasionLabel, allowRootSelection = false }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(() => new Set());
   const selectedKeys = new Set((selectedPaths || []).map((path) => path.join("/")));
   const normalizedQuery = query.trim().toLowerCase();
-  const tree = useMemo(() => buildCategoryTree(options), [options]);
+  const tree = useMemo(() => buildCategoryTree(options, "label", allowRootSelection), [options, allowRootSelection]);
   const descendantKeys = (node) => {
     const keys = [];
     (node.children || []).forEach((child) => {
@@ -974,13 +1014,12 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
   // Normalize both shapes here so every saved service category is selectable.
   const selectedOccasion = occasions.find((occasion) => occasion.slug === item.occasionSlug);
   const normalCategoryOptions = categoryOptions.filter((x) => x.occasionSlug === item.occasionSlug && x.occasionSlug !== "event-services");
-  const options = isService
-    ? categoryOptions.filter((x) => (
-        x.occasionSlug === "event-services"
-        || String(x.value || "").startsWith("event-services/")
-        || (Array.isArray(x.path) && x.path[0] === "event-services")
-      ))
-    : normalCategoryOptions;
+  const serviceCategoryOptions = categoryOptions.filter((x) => (
+    x.occasionSlug === "event-services"
+    || String(x.value || "").startsWith("event-services/")
+    || (Array.isArray(x.path) && x.path[0] === "event-services")
+  ));
+  const options = isService ? serviceCategoryOptions : normalCategoryOptions;
   const selectedCategoryPaths = Array.isArray(item.categoryPaths) && item.categoryPaths.length
     ? item.categoryPaths
     : (Array.isArray(item.categoryPath) && item.categoryPath.length ? [item.categoryPath] : []);
@@ -1014,7 +1053,7 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
       <div className="catalog-form-tabs"><span className="active">Basic Details</span><span>{isPackage ? "Package Contents" : isService ? "Service Details" : "Pricing & Inventory"}</span><span>Media</span><span>SEO & Display</span><span>Additional Info</span></div>
       <section className="catalog-form-section"><h3>1. Basic Information</h3><div className="catalog-form-grid two"><Field label={`${KIND_LABELS[modal.kind]} Name`} required><input value={item.name} onChange={(e) => { const name = e.target.value; setItem((p) => ({ ...p, name, slug: !p.slug ? sanitizeSlug(name) : p.slug })); }} placeholder="e.g. Floral Stage Setup" /></Field><Field label="SKU"><input value={item.sku || ""} onChange={(e) => set("sku", e.target.value)} placeholder="e.g. NLE-DEC-001" /></Field></div><Field label="Short Description" required><textarea rows="2" maxLength={200} value={item.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="A short catchy description shown in list view" /></Field><Field label="Full Description"><textarea rows="4" value={item.description} onChange={(e) => set("description", e.target.value)} placeholder="Write detailed description, dimensions, materials, inclusions, deliverables, etc." /></Field></section>
       {!isPackage && <section className="catalog-form-section"><h3>2. {isService ? "Service category" : "Occasion, Category & Theme"}</h3><div className={`catalog-form-grid ${isService ? "two" : "two"}`}>{!isService && <Field label="Occasion" required><select value={item.occasionSlug || "wedding"} onChange={(e) => setItem((p) => ({ ...p, occasionSlug: e.target.value, categoryPath: [], categoryPaths: [], categorySlug: "", serviceCategory: "" }))}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field>}<Field label={isService ? "What service is this?" : `Categories / Themes${selectedCategoryPaths.length ? ` (${selectedCategoryPaths.length} selected)` : ""}`} required>{isService ? <ServiceCategoryPicker options={options} value={item.categoryPath} onChange={(path) => { const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === path.join("/")); setItem((p) => ({ ...p, categoryPath: path, categoryPaths: path.length ? [path] : [], occasionSlug: "event-services", serviceCategory: selected?.label || selected?.displayLabel || "" })); }} /> : <CategoryMultiPicker options={options} selectedPaths={selectedCategoryPaths} onToggle={toggleCategoryPath} occasionLabel={selectedOccasion?.label || item.occasionSlug} />}{isService && <small className="catalog-field-help">Pick the category that describes this service. This is where the service belongs in the catalog.</small>}</Field></div></section>}
-      {isPackage && <section className="catalog-form-section"><h3>2. Package Occasions</h3><Field label="Show this package for occasions"><div className="catalog-occasion-checks" role="group" aria-label="Package occasions">{occasions.filter((o) => !o.addonOnly).map((occasion) => { const selected = Array.isArray(item.packageOccasions) && item.packageOccasions.includes(occasion.slug); return <label className={`catalog-occasion-check ${selected ? "selected" : ""}`} key={occasion.slug}><input type="checkbox" checked={selected} onChange={(e) => { const current = Array.isArray(item.packageOccasions) ? item.packageOccasions : []; const next = e.target.checked ? Array.from(new Set([...current, occasion.slug])) : current.filter((slug) => slug !== occasion.slug); set("packageOccasions", next); }} /><span className="catalog-check-box" aria-hidden="true">{selected ? "✓" : ""}</span><span>{occasion.label}</span></label>; })}</div><small className="catalog-field-help">Select every occasion where this package should be available.</small></Field></section>}
+      {isPackage && <section className="catalog-form-section"><h3>2. Package Locations</h3><Field label={`Show this package in ${selectedCategoryPaths.length ? `(${selectedCategoryPaths.length} selected)` : ""}`} required><CategoryMultiPicker options={categoryOptions} selectedPaths={selectedCategoryPaths} onToggle={toggleCategoryPath} occasionLabel="All catalog locations" allowRootSelection /><small className="catalog-field-help">Select any occasions, categories, themes, or service categories. The same package can appear in multiple places.</small></Field></section>}
       {isPackage && <section className="catalog-form-section"><h3>3. Package Contents</h3><div className="catalog-package-picker"><input placeholder="Search products or services to add…" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />{packageSearch && <div>{products.filter((p) => p.catalogKind !== "package" && p.status === "active" && p.name.toLowerCase().includes(packageSearch.toLowerCase())).slice(0, 8).map((p) => { const isAdded = item.packageItems.some((x) => (x.productId || x.id) === p.id); return <button type="button" key={p.id} className={isAdded ? "added" : ""} onClick={() => addPackageItem(p)} disabled={isAdded}><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><span>{p.name}<small style={{ display: "block", opacity: 0.65 }}>{p.catalogKind === "service" || p.isAddon ? "Service" : "Product"}</small></span>{isAdded ? <strong className="catalog-package-added-label">Added</strong> : <strong>{fmtINR(p.price)}</strong>}</button>; })}</div>}</div><div className="catalog-package-table">{item.packageItems.length ? item.packageItems.map((x) => <div key={x.id}><span>{x.name}</span><input type="number" min="1" value={x.qty} onChange={(e) => updatePackageItem(x.id, "qty", e.target.value)} /><span>{fmtINR(Number(x.price) * Number(x.qty))}</span><button type="button" onClick={() => removePackageItem(x.id)}>×</button></div>) : <p>No items added yet.</p>}</div><div className="catalog-package-total"><span>Items Total</span><strong>{fmtINR(packageItemsTotal)}</strong></div></section>}
       {isService && <section className="catalog-form-section"><div className="service-visibility-heading"><div><h3>3. Customer visibility</h3><p className="service-simple-intro">Choose where customers will find this service. Select a whole occasion to include every function, or pick specific functions.</p></div><span className="service-visibility-badge">Shown on customer pages</span></div><ServiceContextPicker occasions={occasions} value={item.serviceScopes} onChange={(value) => set("serviceScopes", value)} /></section>}
       {isService && <section className="catalog-form-section"><h3>4. Optional service details</h3><div className="catalog-form-grid three"><Field label="Service Type"><input value={item.serviceType} onChange={(e) => set("serviceType", e.target.value)} placeholder="e.g. Photography" /></Field><Field label="Coverage Duration"><input value={item.coverageDuration} onChange={(e) => set("coverageDuration", e.target.value)} placeholder="e.g. 8 Hours / Full Day" /></Field><Field label="Team Size"><input value={item.teamSize} onChange={(e) => set("teamSize", e.target.value)} placeholder="e.g. 2 People" /></Field></div><div className="catalog-form-grid two"><Field label="Deliverables"><textarea rows="3" value={item.deliverables} onChange={(e) => set("deliverables", e.target.value)} /></Field><Field label="Process / Workflow"><textarea rows="3" value={item.workflow} onChange={(e) => set("workflow", e.target.value)} /></Field></div></section>}

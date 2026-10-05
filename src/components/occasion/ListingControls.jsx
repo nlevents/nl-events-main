@@ -8,9 +8,13 @@ import { SORT_OPTIONS } from "../../data/occasions";
 // "toggle"  -> a single on/off pill (e.g. "Available in my city", "Top rated only")
 // Reused by the global Packages listing and every occasion/category/theme
 // page so sorting + filtering behaves identically everywhere.
-export default function ListingControls({ resultCount, sortKey, onSortChange, filters, onReset }) {
+export default function ListingControls({ resultCount, sortKey, onSortChange, filters, onReset, variant = "default" }) {
+  const activeCount = Array.isArray(filters)
+    ? filters.filter((f) => f.kind === "toggle" ? Boolean(f.value) : f.value !== "all").length
+    : 0;
+
   return (
-    <div className="listing-controls reveal">
+    <div className={`listing-controls reveal${variant === "catalog" ? " listing-controls--catalog" : ""}`}>
       <div className="listing-toolbar">
         <p className="listing-count">{resultCount} option{resultCount === 1 ? "" : "s"}</p>
         <label className="listing-sort">
@@ -23,6 +27,17 @@ export default function ListingControls({ resultCount, sortKey, onSortChange, fi
 
       {Array.isArray(filters) && filters.length > 0 && (
         <div className="listing-filters">
+          {variant === "catalog" && (
+            <div className="listing-filter-heading">
+              <div>
+                <strong>Refine your selection</strong>
+                <span>{activeCount ? `${activeCount} filter${activeCount === 1 ? "" : "s"} active` : "Choose what you need"}</span>
+              </div>
+              {onReset && activeCount > 0 ? (
+                <button type="button" className="listing-reset listing-reset--catalog" onClick={onReset}>Clear all</button>
+              ) : null}
+            </div>
+          )}
           {filters.map((f) => {
             if (f.kind === "select") {
               return (
@@ -65,7 +80,7 @@ export default function ListingControls({ resultCount, sortKey, onSortChange, fi
             }
             return null;
           })}
-          {onReset ? <button type="button" className="listing-reset" onClick={onReset}>Reset Filters</button> : null}
+          {variant !== "catalog" && onReset ? <button type="button" className="listing-reset" onClick={onReset}>Reset Filters</button> : null}
         </div>
       )}
     </div>

@@ -1165,28 +1165,17 @@ function getLiveOccasions() {
       // never render that marker as a sellable package.
       if (isCategoryMarkerProduct(prod, clone)) return;
 
-      // Packages are occasion-scoped bundles. A package may be offered for
-      // several occasions, so expose a lightweight product copy at each
-      // selected occasion root. The package itself remains a single record
-      // in the admin catalog; these copies only provide the correct storefront
-      // route/context for each selected occasion.
-      if (prod.catalogKind === "package" && Array.isArray(prod.packageOccasions) && prod.packageOccasions.length) {
-        prod.packageOccasions.forEach((occasionSlug) => {
-          const targetOccasion = clone.find((occasion) => occasion?.slug === occasionSlug && !occasion?.addonOnly);
-          if (!targetOccasion) return;
-          targetOccasion.products = targetOccasion.products || [];
-          const scopedProd = { ...prod, categoryPath: [occasionSlug], occasionSlug };
-          const idx = targetOccasion.products.findIndex((p) => p.slug === scopedProd.slug || p.id === scopedProd.id);
-          if (idx !== -1) targetOccasion.products[idx] = { ...targetOccasion.products[idx], ...scopedProd };
-          else targetOccasion.products.push(scopedProd);
-        });
-        return;
-      }
-
+      // Packages now use the same multi-location categoryPaths mechanism as
+      // other catalog items. packageOccasions is retained only for legacy
+      // records; when categoryPaths exist they are the source of truth.
       let placed = false;
       const categoryPaths = Array.isArray(prod.categoryPaths) && prod.categoryPaths.length
         ? prod.categoryPaths
-        : (Array.isArray(prod.categoryPath) ? [prod.categoryPath] : []);
+        : (Array.isArray(prod.categoryPath) && prod.categoryPath.length
+          ? [prod.categoryPath]
+          : (prod.catalogKind === "package" && Array.isArray(prod.packageOccasions)
+            ? prod.packageOccasions.map((occasionSlug) => [occasionSlug])
+            : []));
       categoryPaths.forEach((categoryPath) => {
         const targetByPath = findNodeByCategoryPath(clone, categoryPath);
         if (!targetByPath) return;
