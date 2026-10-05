@@ -3,7 +3,7 @@
 // COUPONS, INQUIRIES, AVAILABILITY & GALLERY
 // ============================================================================
 
-import { OCCASIONS as SEED_OCCASIONS, flattenCategoryTree, categoryByPath, pathFor, allProductsOf } from "../data/occasions";
+import { OCCASIONS as SEED_OCCASIONS, flattenCategoryTree, categoryByPath, resolvePath, pathFor, allProductsOf } from "../data/occasions";
 import { GALLERY_ITEMS as SEED_GALLERY } from "../data/categories";
 import { IMAGES, CATALOG_IMAGES } from "../data/images";
 import { EVENT_SERVICES } from "../data/eventServices";
@@ -11,6 +11,7 @@ import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
 import { queueCloudSync, syncCloudState, syncCloudStateWithConflictResolver, hydratePublicState, hydrateAdminState, waitForCloudWrites } from "./cloudStore";
 import { serviceMatchesContext, resolveScopeOnSave, getScopeMode, SCOPE_MODE } from "./serviceContext";
+import { normalizeDisplayPlacements } from "./catalogPlacement";
 import { uploadImageBlob, uploadImageUrl, extractManagedCloudinaryPublicId, cleanupUnusedCloudinaryAssets } from "./cloudinary";
 
 const STORE_KEY_PREFIX = "nle_catalog_v2_";
@@ -2641,7 +2642,9 @@ export function getServiceProductsForContext(contextPath = []) {
     .filter((product) => product?.status !== "archived" && product?.status !== "draft")
     .filter((product) => {
       const categoryPath = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
-      if (!categoryPath.length || categoryPath[0] !== "event-services") return false;
+      const naturalService = categoryPath[0] === "event-services";
+      const crossListedService = normalizeDisplayPlacements(product?.displayPlacements).some((placement) => placement.catalog === "services");
+      if (!naturalService && !crossListedService) return false;
       return serviceProductMatchesContext(product, normalizedContext);
     })
     .map((product) => ({
@@ -2739,6 +2742,52 @@ export function getAddonCategories() {
 
 export function getAddonCategoryOptions() {
   return getAddonCategories();
+}
+
+export function getDisplayPlacementOptions() {
+  initializeSeedsIfNeeded();
+  const normal = flattenCategoryTree()
+    .filter((item) => !item.addonOnly && Array.isArray(item.path) && item.path.length)
+    .map((item) => ({
+      catalog: "normal",
+      path: item.path,
+      label: item.label,
+      productCount: item.productCount,
+    }));
+  const services = getAddonCategories().map((item) => ({
+    catalog: "service",
+    path: item.path,
+    label: item.label,
+    productCount: item.productCount,
+  }));
+  return [...normal, ...services];
+}
+
+export function getDisplayPlacementEntries(catalog) {
+  const wanted = String(catalog || "").toLowerCase();
+  if (!["products", "packages"].includes(wanted)) return [];
+  const out = [];
+  const seen = new Set();
+  getProducts().forEach((product) => {
+    const placements = normalizeDisplayPlacements(product.displayPlacements)
+      .filter((placement) => placement.catalog === wanted);
+    placements.forEach((placement) => {
+      const resolved = placement.path.length ? resolvePath(placement.path) : null;
+      const trail = resolved?.trail?.length ? [...resolved.trail, product] : null;
+      if (!trail) return;
+      const key = `${product.id || product.slug}:${placement.path.join("/")}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({
+        product,
+        occasion: trail[0],
+        theme: trail[trail.length - 2],
+        trail,
+        displayPlacement: placement,
+      });
+    });
+  });
+  return out;
 }
 
 export function getAddonProducts() {

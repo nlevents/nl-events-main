@@ -194,6 +194,10 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
     filterServiceProducts(liveProducts, { contextPath }).forEach((product) => {
       const path = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
       if (path[0] === "event-services" && path[1]) available.add(path[1]);
+      (Array.isArray(product?.displayPlacements) ? product.displayPlacements : []).forEach((placement) => {
+        const placementPath = Array.isArray(placement?.path) ? placement.path : [];
+        if (placement?.catalog === "services" && placementPath[0] === "event-services" && placementPath[1]) available.add(placementPath[1]);
+      });
     });
     return EVENT_SERVICES
       .filter((service) => available.has(service.slug))

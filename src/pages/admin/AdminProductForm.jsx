@@ -1,7 +1,8 @@
 import { cloudinaryAsset } from "../../lib/cloudinaryAssets";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
-import { getProduct, saveProductToCloud, getOccasions, getAddonCategoryOptions } from "../../lib/catalogStore";
+import { getProduct, saveProductToCloud, getOccasions, getAddonCategoryOptions, getDisplayPlacementOptions } from "../../lib/catalogStore";
+import { DISPLAY_CATALOGS, normalizeDisplayPlacements } from "../../lib/catalogPlacement";
 import { sanitizeSlug } from "../../lib/sanitize";
 import { fmtINR } from "../../lib/pricing";
 import { CITIES } from "../../data/cities";
@@ -111,6 +112,141 @@ function AdminProductCategoryMultiPicker({ options, selectedPaths, onToggle }) {
   </div>;
 }
 
+function buildDisplayPlacementTree(options = []) {
+  const roots = [];
+  const byKey = new Map();
+  options.forEach((option) => {
+    const path = Array.isArray(option.path) ? option.path.filter(Boolean) : [];
+    if (!path.length) return;
+    let parent = null;
+    let trail = [];
+    path.forEach((part, index) => {
+      trail = [...trail, part];
+      const key = trail.join("/");
+      let node = byKey.get(key);
+      if (!node) {
+        node = { key, path: [...trail], option: null, children: [] };
+        byKey.set(key, node);
+        if (parent) parent.children.push(node);
+        else roots.push(node);
+      }
+      if (index === path.length - 1) node.option = option;
+      parent = node;
+    });
+  });
+  return roots;
+}
+
+function DisplayPlacementPicker({ value, onChange }) {
+  const [catalog, setCatalog] = useState(DISPLAY_CATALOGS.PRODUCTS);
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(() => new Set());
+  const options = getDisplayPlacementOptions();
+  const selected = normalizeDisplayPlacements(value);
+  const selectedKeys = new Set(selected.map((item) => `${item.catalog}:${item.path.join("/")}`));
+  const q = query.trim().toLowerCase();
+
+  const visibleOptions = options.filter((option) => {
+    const allowed = catalog === DISPLAY_CATALOGS.SERVICES
+      ? option.catalog === "service"
+      : option.catalog === "normal";
+    if (!allowed) return false;
+    return !q || option.label.toLowerCase().includes(q) || option.path.join("/").includes(q);
+  });
+
+  const tree = buildDisplayPlacementTree(visibleOptions);
+
+  function toggle(option) {
+    const placement = { catalog, path: option.path };
+    const key = `${placement.catalog}:${placement.path.join("/")}`;
+    const next = selectedKeys.has(key)
+      ? selected.filter((item) => `${item.catalog}:${item.path.join("/")}` !== key)
+      : [...selected, placement];
+    onChange(next);
+  }
+
+  const labels = {
+    [DISPLAY_CATALOGS.PRODUCTS]: "Products",
+    [DISPLAY_CATALOGS.SERVICES]: "Services",
+    [DISPLAY_CATALOGS.PACKAGES]: "Packages",
+  };
+
+  const toggleExpanded = (key) => setExpanded((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  const matchesNode = (node) => {
+    if (!q) return true;
+    const label = String(node.option?.label || node.path[node.path.length - 1] || "").toLowerCase();
+    return label.includes(q) || node.key.toLowerCase().includes(q) || node.children.some(matchesNode);
+  };
+
+  const renderNode = (node, depth = 0) => {
+    if (!matchesNode(node)) return null;
+    const hasChildren = node.children.length > 0;
+    const open = hasChildren && (q ? node.children.some(matchesNode) : expanded.has(node.key));
+    const option = node.option;
+    const key = option ? `${catalog}:${option.path.join("/")}` : null;
+    const checked = Boolean(key && selectedKeys.has(key));
+    const label = option?.label || node.path[node.path.length - 1] || "Location";
+
+    return (
+      <div key={node.key} className="admin-display-tree-node" data-depth={depth}>
+        <div className={`admin-display-tree-row ${checked ? "selected" : ""}`}>
+          {hasChildren ? (
+            <button
+              type="button"
+              className="admin-display-tree-caret"
+              onClick={() => toggleExpanded(node.key)}
+              aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+            >
+              {open ? "▾" : "▸"}
+            </button>
+          ) : <span className="admin-display-tree-caret-spacer" />}
+          {option ? (
+            <label className="admin-display-tree-option">
+              <input type="checkbox" checked={checked} onChange={() => toggle(option)} />
+              <span className={`admin-product-category-check ${checked ? "checked" : ""}`}>{checked ? "✓" : ""}</span>
+              <span title={label}>{label}</span>
+            </label>
+          ) : (
+            <button type="button" className="admin-display-tree-parent" onClick={() => hasChildren && toggleExpanded(node.key)} title={label}>
+              {label}
+            </button>
+          )}
+        </div>
+        {open ? <div className="admin-display-tree-children">{node.children.map((child) => renderNode(child, depth + 1))}</div> : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="admin-product-category-multi">
+      <div className="admin-product-category-tabs" role="tablist" aria-label="Display catalog">
+        {Object.values(DISPLAY_CATALOGS).map((key) => (
+          <button key={key} type="button" className={`admin-product-category-tab ${catalog === key ? "active" : ""}`} onClick={() => { setCatalog(key); setQuery(""); setExpanded(new Set()); }}>
+            {labels[key]}
+          </button>
+        ))}
+      </div>
+      <div className="admin-product-category-search">
+        <Icon name="search" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search where this item should appear…" />
+      </div>
+      <div className="admin-product-category-list admin-display-tree-list" role="tree">
+        {tree.length ? tree.map((node) => renderNode(node)) : <p className="admin-field-help">No display locations found.</p>}
+      </div>
+      <div className="admin-product-category-summary">
+        <strong>{selected.length}</strong> selected
+        {selected.length ? <button type="button" onClick={() => onChange([])}>Clear</button> : null}
+      </div>
+      <p className="admin-field-help">One item can be selected in multiple locations. This does not create duplicate records.</p>
+    </div>
+  );
+}
+
 export default function AdminProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -155,6 +291,7 @@ export default function AdminProductForm() {
     cities: [],
     serviceScopes: [],
     serviceScopeMode: undefined,
+    displayPlacements: [],
   });
 
   const [newInclusion, setNewInclusion] = useState("");
@@ -200,6 +337,7 @@ export default function AdminProductForm() {
           categoryPaths: Array.isArray(p.categoryPaths) && p.categoryPaths.length ? p.categoryPaths : (Array.isArray(p.categoryPath) && p.categoryPath.length ? [p.categoryPath] : (p.categorySlug ? [[p.occasionSlug, p.categorySlug]] : [])),
           serviceScopes: Array.isArray(p.serviceScopes) ? p.serviceScopes : [],
           serviceScopeMode: p.serviceScopeMode,
+          displayPlacements: normalizeDisplayPlacements(p.displayPlacements),
         });
       } else {
         setError(`Product with ID/slug "${id}" not found.`);
@@ -346,6 +484,7 @@ export default function AdminProductForm() {
         ...(isAddonMode ? { isAddon: true, occasionSlug: "event-services" } : {}),
         categoryPaths: isAddonMode ? [formData.categoryPath] : selectedCategoryPaths,
         categoryPath: isAddonMode ? formData.categoryPath : (selectedCategoryPaths[0] || []),
+        displayPlacements: normalizeDisplayPlacements(formData.displayPlacements),
         id: formData.id || (isEditing ? id : undefined),
       });
 
@@ -831,6 +970,14 @@ export default function AdminProductForm() {
                 {availableCategories.length > 0 && <div className="admin-form-group"><label className="admin-form-label">Categories / Themes {selectedCategoryPaths.length ? `(${selectedCategoryPaths.length} selected)` : ""}</label><AdminProductCategoryMultiPicker options={availableCategories} selectedPaths={selectedCategoryPaths} onToggle={toggleCategoryPath} /></div>}
               </>
             )}
+            <div className="admin-form-group">
+              <label className="admin-form-label">Display In</label>
+              <p className="admin-hint">Choose every Products, Services, or Packages location where this same item should appear.</p>
+              <DisplayPlacementPicker
+                value={formData.displayPlacements}
+                onChange={(displayPlacements) => setFormData((prev) => ({ ...prev, displayPlacements }))}
+              />
+            </div>
             <div className="admin-form-group"><label className="admin-form-label">Publishing Status</label><select className="admin-select" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="active">Active (Visible to customers)</option><option value="draft">Draft (Hidden)</option><option value="featured">Featured (Top of listings)</option><option value="archived">Archived</option></select></div>
           </section>
 

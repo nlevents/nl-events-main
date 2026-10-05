@@ -19,6 +19,7 @@ import {
 } from "../data/occasions";
 import { useLiveEntries } from "../hooks/useLiveCatalog";
 import { onImgError } from "../lib/imageFallback";
+import { getDisplayPlacementEntries } from "../lib/catalogStore";
 
 const BANNER_SLIDES = [
   { eyebrow: "Wedding Season", title: "Dream Weddings, Sorted", sub: "Décor, catering & staging — from ₹99,999", img: IMAGES.pkgDreamWedding, href: "/weddings", bg: "linear-gradient(135deg,#fff4e0,#ffe4c4)" },
@@ -59,7 +60,14 @@ export default function Products() {
   const [sortKey, setSortKey] = useState("popular");
 
   const [occasions, setOccasions] = useState(listOccasions);
-  const entries = useLiveEntries();
+  const liveEntries = useLiveEntries();
+  const entries = useMemo(() => {
+    const base = [...liveEntries];
+    getDisplayPlacementEntries("products").forEach((entry) => {
+      if (entry?.product) base.push(entry);
+    });
+    return base;
+  }, [liveEntries]);
 
   useEffect(() => {
     const onUpdate = () => setOccasions(listOccasions());
@@ -67,10 +75,17 @@ export default function Products() {
     return () => window.removeEventListener("nle-catalog-updated", onUpdate);
   }, []);
 
-  const spotlight = useMemo(
-    () => sortProducts(entries.map((e) => e.product), "popular").slice(0, 8),
-    [entries]
-  );
+  const spotlight = useMemo(() => {
+    const unique = [];
+    const seen = new Set();
+    entries.forEach((entry) => {
+      const key = String(entry?.product?.id || entry?.product?.slug || "");
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      unique.push(entry.product);
+    });
+    return sortProducts(unique, "popular").slice(0, 8);
+  }, [entries]);
   const spotlightHref = (p) => {
     const entry = entries.find((e) => e.product.slug === p.slug || e.product.id === p.id);
     return entry ? pathFor(entry.trail) : "/shop-by-occasion";
@@ -134,9 +149,17 @@ export default function Products() {
 
   const filtered = useMemo(() => {
     const list = filteredForFacets.filter((entry) => entry.product.price >= bucket.min && entry.product.price <= bucket.max);
-    const sorted = sortProducts(list.map((e) => e.product), sortKey);
+    const unique = [];
+    const seen = new Set();
+    list.forEach((entry) => {
+      const key = String(entry?.product?.id || entry?.product?.slug || "");
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      unique.push(entry);
+    });
+    const sorted = sortProducts(unique.map((e) => e.product), sortKey);
     return sorted.map((p) => {
-      const entry = list.find((e) => e.product.slug === p.slug || e.product.id === p.id);
+      const entry = unique.find((e) => e.product.slug === p.slug || e.product.id === p.id);
       return { product: p, href: entry ? pathFor(entry.trail) : "/shop-by-occasion" };
     });
   }, [filteredForFacets, bucket, sortKey]);

@@ -1052,3 +1052,25 @@
 
 .admin-icon-spin{ animation:admin-icon-spin .8s linear infinite; }
 @keyframes admin-icon-spin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+
+/* Cross-catalog display picker: compact tabs only; existing admin styles remain unchanged. */
+.admin-product-category-tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+.admin-product-category-tab{border:1px solid var(--border-soft);background:var(--surface);color:var(--text-secondary);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer;white-space:nowrap}
+.admin-product-category-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.admin-product-category-option.selected{background:var(--surface-muted,rgba(0,0,0,.03))}
+
+/* Compact hierarchical Display In picker for Services and Packages. */
+.admin-display-tree-list{padding:6px 7px}
+.admin-display-tree-node{min-width:0}
+.admin-display-tree-row{display:flex;align-items:center;min-height:34px;border-radius:7px}
+.admin-display-tree-row:hover{background:#f7f9fb}
+.admin-display-tree-row.selected{background:#fff8e8}
+.admin-display-tree-caret,.admin-display-tree-caret-spacer{width:25px;height:29px;flex:0 0 25px}
+.admin-display-tree-caret{border:0;background:transparent;color:#7f8b99;font-size:12px;display:grid;place-items:center;cursor:pointer;border-radius:5px}
+.admin-display-tree-caret:hover{background:#edf2f6;color:#203b59}
+.admin-display-tree-option,.admin-display-tree-parent{min-width:0;flex:1;display:flex;align-items:center;gap:8px;border:0;background:transparent;text-align:left;padding:6px 7px;color:#30425a;font:inherit;font-size:11px;cursor:pointer}
+.admin-display-tree-option span:last-child,.admin-display-tree-parent{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-display-tree-option:hover,.admin-display-tree-parent:hover{color:#203b59}
+.admin-display-tree-parent{font-weight:750;color:#53657a}
+.admin-display-tree-children{margin-left:13px;padding-left:8px;border-left:1px solid #e8edf2}
+.admin-display-tree-row .admin-product-category-check.checked{background:#d7a12c;border-color:#d7a12c;color:#fff}

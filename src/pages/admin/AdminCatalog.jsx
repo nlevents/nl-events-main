@@ -19,9 +19,11 @@ import {
   duplicateProduct,
   uploadMediaFile,
   refreshAdminCatalogFromCloud,
+  getDisplayPlacementOptions,
 } from "../../lib/catalogStore";
 import { fmtINR } from "../../lib/pricing";
 import { sanitizeSlug } from "../../lib/sanitize";
+import { DISPLAY_CATALOGS, normalizeDisplayPlacements } from "../../lib/catalogPlacement";
 
 const KIND_LABELS = { product: "Product", package: "Package", service: "Service" };
 const DEFAULT_IMAGE = cloudinaryAsset("/assets/images/categories/wedding.webp");
@@ -150,6 +152,7 @@ function initialItem(kind = "product") {
     exclusionsText: "",
     packageItems: [],
     packageOccasions: ["wedding"],
+    displayPlacements: [],
   };
 }
 
@@ -518,6 +521,7 @@ export default function AdminCatalog() {
         includes: modal.kind === "package" ? item.packageItems.map((x) => x.name) : String(item.inclusionsText || "").split("\n").map((x) => x.trim()).filter(Boolean),
         notIncluded: String(item.exclusionsText || "").split("\n").map((x) => x.trim()).filter(Boolean),
         description: item.description || item.shortDescription,
+        displayPlacements: normalizeDisplayPlacements(item.displayPlacements),
       });
       refresh(); setModal(null); flash(`${KIND_LABELS[modal.kind]} "${saved.name}" saved successfully.`);
     } catch (err) { setError(err.message || "Unable to save item."); }
@@ -1002,6 +1006,118 @@ function CategoryMultiPicker({ options, selectedPaths, onToggle, occasionLabel, 
     <div className="catalog-category-multi-summary"><strong>{selectedPaths?.length || 0}</strong> selected{selectedPaths?.length ? <button type="button" onClick={() => selectedPaths.forEach((path) => onToggle(path))}>Clear</button> : null}</div>
   </div>;
 }
+
+function CatalogDisplayPlacementPicker({ value, onChange }) {
+  const [catalog, setCatalog] = useState(DISPLAY_CATALOGS.PRODUCTS);
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState({});
+  const selected = normalizeDisplayPlacements(value);
+  const selectedKeys = new Set(selected.map((item) => `${item.catalog}:${item.path.join("/")}`));
+  const options = getDisplayPlacementOptions();
+  const q = query.trim().toLowerCase();
+  const visible = options.filter((option) => {
+    if (catalog === DISPLAY_CATALOGS.SERVICES) return option.catalog === "service";
+    return option.catalog === "normal";
+  }).filter((option) => !q || option.label.toLowerCase().includes(q) || option.path.join("/").includes(q));
+
+  function toggle(option) {
+    const placement = { catalog, path: option.path };
+    const key = `${placement.catalog}:${placement.path.join("/")}`;
+    const next = selectedKeys.has(key)
+      ? selected.filter((item) => `${item.catalog}:${item.path.join("/")}` !== key)
+      : [...selected, placement];
+    onChange(next);
+  }
+
+  const labels = {
+    [DISPLAY_CATALOGS.PRODUCTS]: "Products",
+    [DISPLAY_CATALOGS.SERVICES]: "Services",
+    [DISPLAY_CATALOGS.PACKAGES]: "Packages",
+  };
+
+  // All catalog destinations use the same compact tree hierarchy.
+  // Products intentionally use the exact same tree treatment as Packages.
+  const tree = useMemo(() => {
+    const root = { key: "__root__", path: [], label: catalog === DISPLAY_CATALOGS.SERVICES ? "Event Services" : "Catalog", option: null, children: [] };
+    const byKey = new Map([[root.key, root]]);
+    visible.forEach((option) => {
+      const path = option.path || [];
+      const start = catalog === DISPLAY_CATALOGS.SERVICES && path[0] === "event-services" ? 1 : 0;
+      let parent = root;
+      for (let i = start; i < path.length; i += 1) {
+        const segmentPath = path.slice(0, i + 1);
+        const key = segmentPath.join("/");
+        let node = byKey.get(key);
+        if (!node) {
+          const matching = visible.find((candidate) => candidate.path.join("/") === key);
+          const fallbackLabel = matching?.label?.split(" › ").pop() || segmentPath[i];
+          node = { key, path: segmentPath, label: fallbackLabel, option: matching || null, children: [] };
+          byKey.set(key, node);
+          parent.children.push(node);
+        }
+        parent = node;
+      }
+    });
+    return root.children;
+  }, [catalog, visible]);
+
+  const selectedPathIsCovered = (path) => {
+    const key = path.join("/");
+    if (selectedKeys.has(`${catalog}:${key}`)) return true;
+    return selected.some((item) => item.catalog === catalog && item.path.length <= path.length && item.path.every((part, i) => part === path[i]));
+  };
+
+  function toggleTreeNode(node) {
+    if (!node.option) return;
+    const path = node.option.path;
+    const key = `${catalog}:${path.join("/")}`;
+    const exactSelected = selectedKeys.has(key);
+    const ancestor = selected.find((item) => item.catalog === catalog && item.path.length < path.length && item.path.every((part, i) => part === path[i]));
+    let next;
+    if (exactSelected) {
+      next = selected.filter((item) => `${item.catalog}:${item.path.join("/")}` !== key);
+    } else if (ancestor) {
+      // Replace a broader placement with this specific child instead of
+      // creating a redundant assignment that can never change the result.
+      next = selected.filter((item) => !(item.catalog === catalog && item.path.every((part, i) => part === path[i])))
+        .concat({ catalog, path });
+    } else {
+      next = [...selected, { catalog, path }];
+    }
+    onChange(normalizeDisplayPlacements(next));
+  }
+
+  function renderTree(nodes, depth = 0) {
+    return nodes.map((node) => {
+      const hasChildren = node.children.length > 0;
+      const open = q ? true : expanded[node.key] !== false;
+      const checked = node.option ? selectedPathIsCovered(node.path) : false;
+      return <div key={node.key} className="admin-display-tree-node" data-depth={depth}>
+        <div className={`admin-display-tree-row ${checked ? "selected" : ""}`}>
+          {hasChildren ? <button type="button" className="admin-display-tree-caret" onClick={() => setExpanded((current) => ({ ...current, [node.key]: !open }))} aria-label={`${open ? "Collapse" : "Expand"} ${node.label}`}>{open ? "▾" : "▸"}</button> : <span className="admin-display-tree-caret-spacer" />}
+          {node.option ? <button type="button" className="admin-display-tree-option" onClick={() => toggleTreeNode(node)} role="checkbox" aria-checked={checked}>
+            <span className={`admin-product-category-check ${checked ? "checked" : ""}`}>{checked ? "✓" : ""}</span>
+            <span title={node.label}>{node.label}</span>
+          </button> : <button type="button" className="admin-display-tree-parent" onClick={() => hasChildren && setExpanded((current) => ({ ...current, [node.key]: !open }))}>{node.label}</button>}
+        </div>
+        {open && hasChildren ? <div className="admin-display-tree-children">{renderTree(node.children, depth + 1)}</div> : null}
+      </div>;
+    });
+  }
+
+  return <div className="admin-product-category-multi">
+    <div className="admin-product-category-tabs" role="tablist" aria-label="Display catalog">
+      {Object.values(DISPLAY_CATALOGS).map((key) => <button key={key} type="button" className={`admin-product-category-tab ${catalog === key ? "active" : ""}`} onClick={() => { setCatalog(key); setQuery(""); setExpanded({}); }}>{labels[key]}</button>)}
+    </div>
+    <div className="admin-product-category-search"><Icon name="search" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search where this item should appear…" /></div>
+    <div className="admin-product-category-list admin-display-tree-list" role="tree">
+      {tree.length ? renderTree(tree) : <p className="admin-field-help">No display locations found.</p>}
+    </div>
+    <div className="admin-product-category-summary"><strong>{selected.length}</strong> selected{selected.length ? <button type="button" onClick={() => onChange([])}>Clear</button> : null}</div>
+    <p className="admin-field-help">Select every location where this same item should appear. This does not create duplicate records.</p>
+  </div>;
+}
+
 function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error, setError }) {
   const [item, setItem] = useState(modal.item);
   const [packageSearch, setPackageSearch] = useState("");
@@ -1053,6 +1169,7 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
       <div className="catalog-form-tabs"><span className="active">Basic Details</span><span>{isPackage ? "Package Contents" : isService ? "Service Details" : "Pricing & Inventory"}</span><span>Media</span><span>SEO & Display</span><span>Additional Info</span></div>
       <section className="catalog-form-section"><h3>1. Basic Information</h3><div className="catalog-form-grid two"><Field label={`${KIND_LABELS[modal.kind]} Name`} required><input value={item.name} onChange={(e) => { const name = e.target.value; setItem((p) => ({ ...p, name, slug: !p.slug ? sanitizeSlug(name) : p.slug })); }} placeholder="e.g. Floral Stage Setup" /></Field><Field label="SKU"><input value={item.sku || ""} onChange={(e) => set("sku", e.target.value)} placeholder="e.g. NLE-DEC-001" /></Field></div><Field label="Short Description" required><textarea rows="2" maxLength={200} value={item.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="A short catchy description shown in list view" /></Field><Field label="Full Description"><textarea rows="4" value={item.description} onChange={(e) => set("description", e.target.value)} placeholder="Write detailed description, dimensions, materials, inclusions, deliverables, etc." /></Field></section>
       {!isPackage && <section className="catalog-form-section"><h3>2. {isService ? "Service category" : "Occasion, Category & Theme"}</h3><div className={`catalog-form-grid ${isService ? "two" : "two"}`}>{!isService && <Field label="Occasion" required><select value={item.occasionSlug || "wedding"} onChange={(e) => setItem((p) => ({ ...p, occasionSlug: e.target.value, categoryPath: [], categoryPaths: [], categorySlug: "", serviceCategory: "" }))}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field>}<Field label={isService ? "What service is this?" : `Categories / Themes${selectedCategoryPaths.length ? ` (${selectedCategoryPaths.length} selected)` : ""}`} required>{isService ? <ServiceCategoryPicker options={options} value={item.categoryPath} onChange={(path) => { const selected = options.find((o) => (o.value || (Array.isArray(o.path) ? o.path.join("/") : "")) === path.join("/")); setItem((p) => ({ ...p, categoryPath: path, categoryPaths: path.length ? [path] : [], occasionSlug: "event-services", serviceCategory: selected?.label || selected?.displayLabel || "" })); }} /> : <CategoryMultiPicker options={options} selectedPaths={selectedCategoryPaths} onToggle={toggleCategoryPath} occasionLabel={selectedOccasion?.label || item.occasionSlug} />}{isService && <small className="catalog-field-help">Pick the category that describes this service. This is where the service belongs in the catalog.</small>}</Field></div></section>}
+      <section className="catalog-form-section"><h3>{isPackage ? "3" : isService ? "4" : "3"}. Display In</h3><Field label="Choose where this same item should appear"><CatalogDisplayPlacementPicker value={item.displayPlacements} onChange={(displayPlacements) => set("displayPlacements", displayPlacements)} /></Field></section>
       {isPackage && <section className="catalog-form-section"><h3>2. Package Locations</h3><Field label={`Show this package in ${selectedCategoryPaths.length ? `(${selectedCategoryPaths.length} selected)` : ""}`} required><CategoryMultiPicker options={categoryOptions} selectedPaths={selectedCategoryPaths} onToggle={toggleCategoryPath} occasionLabel="All catalog locations" allowRootSelection /><small className="catalog-field-help">Select any occasions, categories, themes, or service categories. The same package can appear in multiple places.</small></Field></section>}
       {isPackage && <section className="catalog-form-section"><h3>3. Package Contents</h3><div className="catalog-package-picker"><input placeholder="Search products or services to add…" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />{packageSearch && <div>{products.filter((p) => p.catalogKind !== "package" && p.status === "active" && p.name.toLowerCase().includes(packageSearch.toLowerCase())).slice(0, 8).map((p) => { const isAdded = item.packageItems.some((x) => (x.productId || x.id) === p.id); return <button type="button" key={p.id} className={isAdded ? "added" : ""} onClick={() => addPackageItem(p)} disabled={isAdded}><img src={p.image || DEFAULT_IMAGE} alt={p.name || "Product"} /><span>{p.name}<small style={{ display: "block", opacity: 0.65 }}>{p.catalogKind === "service" || p.isAddon ? "Service" : "Product"}</small></span>{isAdded ? <strong className="catalog-package-added-label">Added</strong> : <strong>{fmtINR(p.price)}</strong>}</button>; })}</div>}</div><div className="catalog-package-table">{item.packageItems.length ? item.packageItems.map((x) => <div key={x.id}><span>{x.name}</span><input type="number" min="1" value={x.qty} onChange={(e) => updatePackageItem(x.id, "qty", e.target.value)} /><span>{fmtINR(Number(x.price) * Number(x.qty))}</span><button type="button" onClick={() => removePackageItem(x.id)}>×</button></div>) : <p>No items added yet.</p>}</div><div className="catalog-package-total"><span>Items Total</span><strong>{fmtINR(packageItemsTotal)}</strong></div></section>}
       {isService && <section className="catalog-form-section"><div className="service-visibility-heading"><div><h3>3. Customer visibility</h3><p className="service-simple-intro">Choose where customers will find this service. Select a whole occasion to include every function, or pick specific functions.</p></div><span className="service-visibility-badge">Shown on customer pages</span></div><ServiceContextPicker occasions={occasions} value={item.serviceScopes} onChange={(value) => set("serviceScopes", value)} /></section>}

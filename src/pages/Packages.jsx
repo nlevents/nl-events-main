@@ -24,7 +24,13 @@ export default function Packages() {
   );
   const { city } = useCity();
   const liveEntries = useLiveEntries();
-  const ALL_ENTRIES = useMemo(() => liveEntries.filter((entry) => entry?.product?.catalogKind === "package"), [liveEntries]);
+  const ALL_ENTRIES = useMemo(() => {
+    const base = liveEntries.filter((entry) => entry?.product?.catalogKind === "package");
+    getDisplayPlacementEntries("packages").forEach((entry) => {
+      if (entry?.product) base.push(entry);
+    });
+    return base;
+  }, [liveEntries]);
   const [sortKey, setSortKey] = useState("popular");
   const [occasionFilter, setOccasionFilter] = useState("all");
   const [themeFilter, setThemeFilter] = useState("all");
@@ -33,6 +39,7 @@ export default function Packages() {
   const [priceFilter, setPriceFilter] = useState("all");
   const [cityOnly, setCityOnly] = useState(false);
   const [topRatedOnly, setTopRatedOnly] = useState(false);
+  const uniquePackageCount = useMemo(() => new Set(ALL_ENTRIES.map((entry) => entry?.product?.id || entry?.product?.slug)).size, [ALL_ENTRIES]);
   useReveal([sortKey, occasionFilter, categoryFilter, subcategoryFilter, themeFilter, priceFilter, cityOnly, topRatedOnly]);
 
   const occasionOptions = useMemo(
@@ -96,8 +103,16 @@ export default function Packages() {
   }, [filteredForFacets, priceFilter, cityOnly, topRatedOnly, city]);
 
   const sortedEntries = useMemo(() => {
-    const order = sortProducts(filteredEntries.map((e) => e.product), sortKey);
-    return order.map((p) => filteredEntries.find((e) => e.product.slug === p.slug));
+    const unique = [];
+    const seen = new Set();
+    filteredEntries.forEach((entry) => {
+      const key = String(entry?.product?.id || entry?.product?.slug || "");
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      unique.push(entry);
+    });
+    const order = sortProducts(unique.map((e) => e.product), sortKey);
+    return order.map((p) => unique.find((e) => e.product.slug === p.slug || e.product.id === p.id));
   }, [filteredEntries, sortKey]);
 
   function resetFilters() {
@@ -121,20 +136,21 @@ export default function Packages() {
   ];
 
   const popularRail = useMemo(
-    () => sortProducts(ALL_ENTRIES.map((e) => e.product), "popular").slice(0, 8)
+    () => sortProducts(Array.from(new Map(ALL_ENTRIES.map((e) => [e.product.id || e.product.slug, e.product])).values()), "popular").slice(0, 8)
       .map((p) => { const e = ALL_ENTRIES.find((e) => e.product.slug === p.slug); return e ? toRailItem(p, e.trail) : null; })
       .filter(Boolean),
     [ALL_ENTRIES],
   );
   const newestRail = useMemo(
-    () => sortProducts(ALL_ENTRIES.map((e) => e.product), "newest").slice(0, 8)
+    () => sortProducts(Array.from(new Map(ALL_ENTRIES.map((e) => [e.product.id || e.product.slug, e.product])).values()), "newest").slice(0, 8)
       .map((p) => { const e = ALL_ENTRIES.find((e) => e.product.slug === p.slug); return e ? toRailItem(p, e.trail) : null; })
       .filter(Boolean),
     [ALL_ENTRIES],
   );
   const cityRail = useMemo(() => {
     const inCity = ALL_ENTRIES.filter((e) => isAvailableInCity(e.product, city));
-    return sortProducts(inCity.map((e) => e.product), "popular").slice(0, 8)
+    const unique = Array.from(new Map(inCity.map((e) => [e.product.id || e.product.slug, e])).values());
+    return sortProducts(unique.map((e) => e.product), "popular").slice(0, 8)
       .map((p) => { const e = inCity.find((e) => e.product.slug === p.slug); return e ? toRailItem(p, e.trail) : null; })
       .filter(Boolean);
   }, [ALL_ENTRIES, city]);
@@ -172,7 +188,7 @@ export default function Packages() {
       <section className="section-tight container">
         <div className="section-head reveal">
           <h2>Browse All Packages</h2>
-          <p>{ALL_ENTRIES.length} packages across {occasionOptions.length - 1} occasions — narrow it down below.</p>
+          <p>{uniquePackageCount} packages across {occasionOptions.length - 1} occasions — narrow it down below.</p>
         </div>
 
         <ListingControls

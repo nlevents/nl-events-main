@@ -1,3 +1,4 @@
+import { hasDisplayPlacement, DISPLAY_CATALOGS, normalizePlacementPath } from "./catalogPlacement";
 // Pure, dependency-free service-context matching. Single source of truth for
 // "does this service product belong in this occasion/function context?".
 //
@@ -74,6 +75,11 @@ function legacyContains(scope, context) {
 export function serviceMatchesContext(product, contextPath) {
   const context = normalizePath(contextPath);
   if (!context.length) return true; // no context selected = unfiltered browse
+
+  // A cross-listed item may be explicitly assigned to a service context.
+  // This is additive: existing serviceScopes continue to work unchanged.
+  if (hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES, context)) return true;
+
   const mode = getScopeMode(product);
 
   if (mode === SCOPE_MODE.GLOBAL) return true;
@@ -109,9 +115,16 @@ export function filterServiceProducts(products, { service = "", contextPath = []
     const categoryPath = Array.isArray(product.categoryPath)
       ? product.categoryPath.map(slugPart).filter(Boolean)
       : [];
-    if (categoryPath[0] !== "event-services") return false;
+    const naturalService = categoryPath[0] === "event-services";
+    const explicitServiceCategory = selectedServicePath.length
+      ? hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES, ["event-services", ...selectedServicePath])
+      : hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES);
+    const anyServicePlacement = hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES);
+    if (!naturalService && !anyServicePlacement) return false;
 
     if (selectedServicePath.length) {
+      if (explicitServiceCategory) return true;
+      if (!naturalService) return false;
       const productServicePath = categoryPath.slice(1);
       const isSameOrDescendant = selectedServicePath.length <= productServicePath.length
         && selectedServicePath.every((part, index) => part === productServicePath[index]);

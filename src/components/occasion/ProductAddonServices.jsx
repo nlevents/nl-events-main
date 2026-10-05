@@ -19,6 +19,7 @@ export default function ProductAddonServices({ product }) {
   const { city } = useCity();
   const [services, setServices] = useState([]);
   const [selected, setSelected] = useState([]);
+  const [showAll, setShowAll] = useState(false);
   const pathKey = JSON.stringify(product?.categoryPath || []);
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export default function ProductAddonServices({ product }) {
   return (
     <div className="pd-market-section reveal" id="product-addon-services">
       <div className="pd-section-heading"><h2>Add-on Services</h2></div>
-      <div className="addon-list">
+      <div className={"addon-list" + (showAll ? " addon-list-expanded" : "")}>
         {services.map((service) => {
           const added = selected.includes(service.name);
           return (
@@ -72,6 +73,17 @@ export default function ProductAddonServices({ product }) {
           );
         })}
       </div>
+      {services.length > 5 && (
+        <button
+          type="button"
+          className="addon-show-toggle"
+          onClick={() => setShowAll((value) => !value)}
+          aria-expanded={showAll}
+        >
+          <span>{showAll ? "Show Less" : `Show All ${services.length} Services`}</span>
+          <span aria-hidden="true" className={"addon-show-chevron" + (showAll ? " is-open" : "")}>⌄</span>
+        </button>
+      )}
     </div>
   );
 }
