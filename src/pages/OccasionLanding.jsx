@@ -329,7 +329,7 @@ export default function OccasionLanding({ type }) {
 
   return <main className={`occasion-pro-page occasion-pro-page-${type}`}>
     <Hero config={config.hero} type={type} />
-    {config.tabs && <section className="occasion-pro-section occasion-pro-tabs"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><div className="occasion-pro-tab-rail">{config.tabs.map((label, i) => {
+    {config.tabs && type !== "anniversary" && <section className="occasion-pro-section occasion-pro-tabs"><div className="occasion-pro-container"><SectionHead eyebrow={config.intro[0]} title={config.intro[1]} text={config.intro[2]} /><div className="occasion-pro-tab-rail">{config.tabs.map((label, i) => {
         const href = findCatalogPathByLabel(label, ["anniversary"]);
         return <Link to={href || "/occasion/anniversary"} key={label}><span>{ICONS[i % ICONS.length]}</span>{label}</Link>;
       })}</div></div></section>}

@@ -11,7 +11,7 @@ import { CITIES_DATA as SEED_CITIES } from "../data/cities";
 import { sanitizeText, sanitizeSlug, sanitizeUrl, sanitizeShortVideoUrl, sanitizeNumber, cleanObject } from "./sanitize";
 import { queueCloudSync, syncCloudState, syncCloudStateWithConflictResolver, hydratePublicState, hydrateAdminState, waitForCloudWrites } from "./cloudStore";
 import { serviceMatchesContext, resolveScopeOnSave, getScopeMode, SCOPE_MODE } from "./serviceContext";
-import { normalizeDisplayPlacements } from "./catalogPlacement";
+import { normalizeDisplayPlacements, DISPLAY_CATALOGS, hasDisplayPlacement } from "./catalogPlacement";
 import { uploadImageBlob, uploadImageUrl, extractManagedCloudinaryPublicId, cleanupUnusedCloudinaryAssets } from "./cloudinary";
 
 const STORE_KEY_PREFIX = "nle_catalog_v2_";
@@ -1171,8 +1171,12 @@ export function saveProduct(product) {
   const catalogKind = ["product", "package", "service"].includes(product?.catalogKind)
     ? product.catalogKind
     : (product?.isAddon ? "service" : "product");
+  const catalogKinds = Array.from(new Set([
+    ...(Array.isArray(product?.catalogKinds) ? product.catalogKinds : []),
+    catalogKind,
+  ].filter((kind) => ["product", "package", "service"].includes(kind))));
 
-  if (catalogKind === "package") {
+  if (catalogKinds.includes("package")) {
     const items = Array.isArray(product?.packageItems) ? product.packageItems : [];
     if (!items.length) throw new Error("A package must contain at least one product or service.");
     const sourceIds = new Set(list.filter((p) => p.catalogKind !== "package").map((p) => String(p.id)));
@@ -1190,11 +1194,16 @@ export function saveProduct(product) {
     const safeProduct = {
       ...product,
       catalogKind,
+      catalogKinds,
       type: "product",
       slug: sanitizeSlug(product.slug || product.name || "package"),
       name: sanitizeText(product.name || "Untitled Package"),
       price: sanitizeNumber(product.price, 0, 10000000, 9999),
       originalPrice: product.originalPrice ? sanitizeNumber(product.originalPrice, 0, 10000000) : null,
+      costPrice: product.costPrice == null || product.costPrice === "" ? null : sanitizeNumber(product.costPrice, 0, 10000000, 0),
+      discountPrice: product.discountPrice == null || product.discountPrice === "" ? null : sanitizeNumber(product.discountPrice, 0, 10000000, 0),
+      profitAmount: product.costPrice == null || product.costPrice === "" ? null : sanitizeNumber(product.price, 0, 10000000, 0) - sanitizeNumber(product.costPrice, 0, 10000000, 0),
+      profitMarginPercent: product.costPrice == null || product.costPrice === "" || !(Number(product.price) > 0) ? null : Math.round((((sanitizeNumber(product.price, 0, 10000000, 0) - sanitizeNumber(product.costPrice, 0, 10000000, 0)) / sanitizeNumber(product.price, 0, 10000000, 1)) * 1000)) / 10,
       rating: sanitizeNumber(product.rating, 1, 5, 4.8),
       reviewCount: sanitizeNumber(product.reviewCount, 0, 10000, 0),
       description: sanitizeText(product.description || ""),
@@ -1212,7 +1221,7 @@ export function saveProduct(product) {
     addons: Array.isArray(product.addons)
       ? product.addons.map((a) => ({ name: sanitizeText(a.name), price: sanitizeNumber(a.price) }))
       : [],
-    packageItems: catalogKind === "package"
+    packageItems: catalogKinds.includes("package")
       ? (Array.isArray(product.packageItems) ? product.packageItems.map((item) => {
           const productId = sanitizeText(item?.productId || item?.id || "");
           const source = list.find((entry) => String(entry?.id || "") === productId);
@@ -1253,7 +1262,7 @@ export function saveProduct(product) {
   const existingIdx = list.findIndex((p) => (safeProduct.id && p.id === safeProduct.id) || (safeProduct.slug && p.slug === safeProduct.slug));
   // Services must carry an explicit context decision. A missing/empty
   // selection on a NEW service is rejected instead of silently going global.
-  if (safeProduct.isAddon || catalogKind === "service") {
+  if (safeProduct.isAddon || catalogKinds.includes("service")) {
     const resolved = resolveScopeOnSave(product, existingIdx !== -1 ? list[existingIdx] : null);
     safeProduct.serviceScopes = resolved.serviceScopes;
     if (resolved.serviceScopeMode) safeProduct.serviceScopeMode = resolved.serviceScopeMode;
@@ -2633,16 +2642,95 @@ export function getServiceScopeOptions() {
 // Returns the actual admin-created service products that are available for a
 // particular occasion/category context. This is the single source used by
 // booking panels; there is deliberately no hardcoded fallback service list.
+export function getDecorationProductsForContext(contextPath = []) {
+  const context = Array.isArray(contextPath)
+    ? contextPath.map((part) => sanitizeSlug(part)).filter(Boolean)
+    : String(contextPath || "").split("/").map((part) => sanitizeSlug(part)).filter(Boolean);
+  if (!context.length || context[0] === "event-services") return [];
+
+  const isRelatedPath = (path) => {
+    if (!path.length) return false;
+    const shorter = path.length <= context.length ? path : context;
+    const longer = path.length <= context.length ? context : path;
+    return shorter.every((part, index) => part === longer[index]);
+  };
+
+  return getProducts()
+    .filter((product) => product?.catalogKind === "product")
+    .filter((product) => product?.status !== "archived" && product?.status !== "draft")
+    .filter((product) => {
+      const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+        ? product.categoryPaths
+        : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+
+      // A product can reach Decor either through its normal occasion/category
+      // assignment or through an explicit cross-display placement. The latter
+      // is important for decoration themes: an item may be assigned directly
+      // to Floral Haldi / Boho Haldi without changing its primary category.
+      const categoryMatch = paths.some((path) => {
+        const normalized = Array.isArray(path) ? path.map((part) => sanitizeSlug(part)).filter(Boolean) : [];
+        return normalized[0] !== "event-services" && isRelatedPath(normalized, context);
+      });
+      if (categoryMatch) return true;
+
+      return hasDisplayPlacement(product, DISPLAY_CATALOGS.PRODUCTS, context)
+        || hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES, context);
+    });
+}
+
+// Products belonging to ONE Birthday theme (a child of Birthday -> Birthday
+// Types -> Theme Party). Matching is done on the stored category hierarchy and
+// display placements, never on product names. Older saves are recognised too:
+// the Birthday Types / Theme Party wrapper segments (and the legacy
+// "popular-birthday-themes" wrapper) may be absent in a stored path, so they
+// are skipped before comparing the theme slug. A product counts when it is a
+// sellable product (kind may be recorded in catalogKind OR catalogKinds).
+export function getBirthdayThemeProducts(themeSlug) {
+  const slug = sanitizeSlug(themeSlug);
+  if (!slug) return [];
+  const WRAPPERS = new Set(["birthday-types", "theme-party", "popular-birthday-themes"]);
+  const hit = (rawPath) => {
+    const parts = (Array.isArray(rawPath) ? rawPath : []).map((part) => sanitizeSlug(part)).filter(Boolean);
+    if (parts[0] !== "birthday") return false;
+    let i = 1;
+    while (i < parts.length && WRAPPERS.has(parts[i])) i += 1;
+    return parts[i] === slug;
+  };
+  return getProducts()
+    .filter((product) => {
+      const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
+        ? product.catalogKinds
+        : [product?.catalogKind || "product"];
+      return (product?.catalogKind === "product" || kinds.includes("product")) && product?.isAddon !== true;
+    })
+    .filter((product) => product?.status !== "archived" && product?.status !== "draft")
+    .filter((product) => {
+      const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+        ? product.categoryPaths
+        : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+      if (paths.some(hit)) return true;
+      return normalizeDisplayPlacements(product?.displayPlacements).some((placement) =>
+        (placement.catalog === DISPLAY_CATALOGS.PRODUCTS || placement.catalog === DISPLAY_CATALOGS.SERVICES)
+        && hit(placement.path));
+    });
+}
+
 export function getServiceProductsForContext(contextPath = []) {
   const normalizedContext = Array.isArray(contextPath)
     ? contextPath.map((part) => sanitizeSlug(part)).filter(Boolean)
     : String(contextPath || "").split("/").map((part) => sanitizeSlug(part)).filter(Boolean);
   return getProducts()
-    .filter((product) => product?.catalogKind === "service" || product?.isAddon === true)
+    .filter((product) => {
+      const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
+        ? product.catalogKinds
+        : [product?.catalogKind || (product?.isAddon ? "service" : "product")];
+      return kinds.includes("service") || product?.isAddon === true;
+    })
     .filter((product) => product?.status !== "archived" && product?.status !== "draft")
     .filter((product) => {
       const categoryPath = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
-      const naturalService = categoryPath[0] === "event-services";
+      const serviceCategoryPath = Array.isArray(product?.serviceCategoryPath) ? product.serviceCategoryPath : [];
+      const naturalService = categoryPath[0] === "event-services" || serviceCategoryPath[0] === "event-services";
       const crossListedService = normalizeDisplayPlacements(product?.displayPlacements).some((placement) => placement.catalog === "services");
       if (!naturalService && !crossListedService) return false;
       return serviceProductMatchesContext(product, normalizedContext);
@@ -2655,7 +2743,7 @@ export function getServiceProductsForContext(contextPath = []) {
       slug: product.slug,
       serviceType: product.serviceType || "",
       coverageDuration: product.coverageDuration || "",
-      categoryPath: product.categoryPath,
+      categoryPath: Array.isArray(product.serviceCategoryPath) && product.serviceCategoryPath.length ? product.serviceCategoryPath : product.categoryPath,
     }));
 }
 
@@ -2792,12 +2880,19 @@ export function getDisplayPlacementEntries(catalog) {
 
 export function getAddonProducts() {
   return getProducts()
-    .filter((p) => p && (p.isAddon === true || p.occasionSlug === "event-services" || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")))
+    .filter((p) => p && (
+      p.isAddon === true
+      || p.occasionSlug === "event-services"
+      || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")
+      || (Array.isArray(p.serviceCategoryPath) && p.serviceCategoryPath[0] === "event-services")
+      || (Array.isArray(p.catalogKinds) && p.catalogKinds.includes("service"))
+    ))
     .map((p) => {
-      const category = categoryByPath(p.categoryPath);
+      const servicePath = Array.isArray(p.serviceCategoryPath) && p.serviceCategoryPath.length ? p.serviceCategoryPath : p.categoryPath;
+      const category = categoryByPath(servicePath);
       return {
         ...p,
-        addonCategoryLabel: category && Array.isArray(p.categoryPath) ? p.categoryPath.slice(1).join(" / ") : (p.categorySlug || "General"),
+        addonCategoryLabel: category && Array.isArray(servicePath) ? servicePath.slice(1).join(" / ") : (p.categorySlug || "General"),
       };
     });
 }

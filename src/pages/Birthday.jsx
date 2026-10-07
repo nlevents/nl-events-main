@@ -66,7 +66,7 @@ function BirthdayHero() {
   );
 }
 
-function BirthdayCategories() {
+export function BirthdayCategories() {
   const [categories, setCategories] = useState(BIRTHDAY_AGE_CATEGORIES);
 
   useEffect(() => {
@@ -94,6 +94,16 @@ function BirthdayCategories() {
   }, []);
 
   const visibleCategories = categories.filter((item) => item.active !== false);
+  const birthdayFilterHref = (item) => {
+    const params = new URLSearchParams();
+    params.set("service", "decor");
+    params.set("context", "birthday");
+    // Reuse the existing catalog route slug from the live/admin-managed card.
+    // The card id is only an internal key and is not always the public slug.
+    const slug = String(item?.href || "").split("/").filter(Boolean).pop() || "";
+    if (slug) params.set("theme", slug);
+    return `/occasion/event-services?${params.toString()}`;
+  };
 
   return (
     <section className="birthday-white-section">
@@ -102,7 +112,7 @@ function BirthdayCategories() {
         <p className="birthday-intro">From kids' theme parties to milestone celebrations, we bring your ideas to life.</p>
         <Rail>
           {visibleCategories.map((item) => (
-            <Link to={item.href} className="birthday-category-card" key={item.id} onPointerEnter={() => import("./OccasionBrowser").catch(() => {})} onFocus={() => import("./OccasionBrowser").catch(() => {})}>
+            <Link to={birthdayFilterHref(item)} className="birthday-category-card" key={item.id} onPointerEnter={() => import("./OccasionBrowser").catch(() => {})} onFocus={() => import("./OccasionBrowser").catch(() => {})}>
               <img src={item.image} alt={item.title} loading="lazy" decoding="async" />
               <strong>{item.title}</strong>
               <span>{item.subtitle}</span>
@@ -308,7 +318,6 @@ export default function Birthday() {
   return (
     <main className="birthday-page">
       <BirthdayHero />
-      <BirthdayCategories />
       <BirthdayServices />
       <BirthdayCatalogSections />
       <PopularThemes />

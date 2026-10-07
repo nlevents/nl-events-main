@@ -73,7 +73,7 @@ export default function AdminDashboard() {
           <p className="admin-hint">Complete control over products, categories, media, operations, and billing.</p>
         </div>
         <div className="admin-head-actions">
-          <Link to="/admin/products/new" className="btn btn-primary">
+          <Link to="/admin/products?add=item" className="btn btn-primary">
             <Icon name="plus" /> Add Product
           </Link>
           <Link to="/admin/invoices/new" className="btn btn-outline">
@@ -84,7 +84,7 @@ export default function AdminDashboard() {
 
       {/* Quick Actions Action Bar */}
       <div className="admin-quick-actions-bar">
-        <Link to="/admin/products/new" className="admin-quick-action-item">
+        <Link to="/admin/products?add=item" className="admin-quick-action-item">
           <div className="admin-quick-icon"><Icon name="package" /></div>
           <span>Add Product</span>
         </Link>

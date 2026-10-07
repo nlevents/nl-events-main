@@ -1398,3 +1398,22 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
     font-size:29px;
   }
 }
+
+/* Homepage package rail uses the same visual rhythm as the reference home sections. */
+.product-rail--home{padding:34px 0 40px!important;background:#fff}
+.product-rail--home>.container{max-width:1220px!important;padding-left:0;padding-right:0}
+.product-rail--home .shop-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:22px}
+.product-rail--home .shop-head h2{font-family:var(--font-display);font-size:34px;font-weight:600;line-height:1.05;letter-spacing:-.025em;color:#071a2d;margin:0}
+.product-rail--home .shop-head a{display:inline-flex;align-items:center;color:#bd8e2d;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.product-rail--home .rail-track{gap:13px;padding:2px 2px 9px}
+.product-rail--home .rail-card{flex:0 0 calc((100% - 52px)/5);min-width:0;border:1px solid #e7e1d5;border-radius:6px;background:#fff;box-shadow:0 4px 14px rgba(8,27,48,.07);overflow:hidden;display:flex;flex-direction:column}
+.product-rail--home .rail-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(8,27,48,.11)}
+.product-rail--home .rail-card-media{aspect-ratio:1.18/1;background:#f5f3ee}
+.product-rail--home .rail-card-body{padding:11px 11px 12px;display:flex;flex-direction:column;flex:1;min-height:92px}
+.product-rail--home .rail-card-body h4{font-family:var(--font-body);font-size:12px;font-weight:700;line-height:1.3;color:#13253a;margin:0;min-height:31px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.product-rail--home .rail-card-price{margin-top:auto;padding-top:8px;font-size:12px;display:flex;align-items:baseline;gap:6px}
+.product-rail--home .rail-card-price b{font-family:var(--font-display);font-size:14px;font-weight:700;color:#bd8e2d}
+.product-rail--home .rail-card-price s{font-size:10px;color:#9aa1aa;margin-left:0}
+.product-rail--home .special-badge{top:8px;left:8px;padding:4px 7px;font-size:8px}
+@media (max-width:1199px){.product-rail--home>.container{padding-left:20px;padding-right:20px}.product-rail--home .rail-card{flex-basis:calc((100% - 39px)/4)}}
+@media (max-width:800px){.product-rail--home{padding:28px 0 34px!important}.product-rail--home .shop-head{margin-bottom:16px}.product-rail--home .shop-head h2{font-size:28px}.product-rail--home .rail-card{flex-basis:170px}.product-rail--home .rail-card-body{min-height:86px}}

@@ -6,7 +6,7 @@ import { allQuickLinksFor } from "../../data/occasions";
 // Theme/category picker. Keep the first row compact, but when the visitor
 // chooses "View all" the section itself expands and renders the complete
 // theme list in the same grid. Nothing opens over the content below.
-export default function OccasionQuickLinks({ title, items, node, trail }) {
+export default function OccasionQuickLinks({ title, items, node, trail, slider = false }) {
   const [expanded, setExpanded] = useState(false);
   const allItems = useMemo(() => {
     if (node) return allQuickLinksFor(node, trail);
@@ -16,7 +16,9 @@ export default function OccasionQuickLinks({ title, items, node, trail }) {
   if (!Array.isArray(items) || items.length === 0) return null;
 
   const visibleItems = expanded ? allItems : items;
-  const hasMore = allItems.length > items.length;
+  // Slider mode: the collapsed state is one horizontally scrollable row holding
+  // every item; "View all" opens the full grid.
+  const hasMore = slider ? allItems.length > 1 : allItems.length > items.length;
 
   return (
     <div className={`occ-block occ-quicklinks${expanded ? " occ-quicklinks-expanded" : ""}`}>
@@ -35,7 +37,7 @@ export default function OccasionQuickLinks({ title, items, node, trail }) {
         )}
       </div>
 
-      <div className={`cat9-grid${expanded ? " cat9-grid-expanded" : ""}`}>
+      <div className={`cat9-grid${expanded ? " cat9-grid-expanded" : slider ? " cat9-grid-slider" : ""}`}>
         {visibleItems.map((it, index) => {
           const label = it?.label || it?.name || "Theme";
           const href = it?.href || "#";

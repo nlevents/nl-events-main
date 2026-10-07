@@ -60,6 +60,41 @@ const AdminInvoiceView = lazyWithRetry(() => import("./pages/admin/AdminInvoiceV
 const AdminSettings = lazyWithRetry(() => import("./pages/admin/AdminSettings"));
 const AdminPlaceholder = lazyWithRetry(() => import("./pages/admin/AdminPlaceholder"));
 
+function HorizontalWheelSupport() {
+  React.useEffect(() => {
+    const onWheel = (event) => {
+      if (event.defaultPrevented || event.ctrlKey || event.deltaX !== 0 || event.deltaY === 0) return;
+
+      const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+      if (!target) return;
+
+      let el = target;
+      while (el && el !== document.body) {
+        const style = window.getComputedStyle(el);
+        const canScrollX = el.scrollWidth > el.clientWidth + 1 && /^(auto|scroll)$/.test(style.overflowX);
+        if (canScrollX) {
+          const maxScrollLeft = el.scrollWidth - el.clientWidth;
+          const nextScrollLeft = Math.max(0, Math.min(maxScrollLeft, el.scrollLeft + event.deltaY));
+          if (Math.abs(nextScrollLeft - el.scrollLeft) > 0.5) {
+            el.scrollLeft = nextScrollLeft;
+            event.preventDefault();
+          }
+          return;
+        }
+
+        // Do not take over a nested vertical scrolling area.
+        if (el.scrollHeight > el.clientHeight + 1 && /^(auto|scroll)$/.test(style.overflowY)) return;
+        el = el.parentElement;
+      }
+    };
+
+    document.addEventListener("wheel", onWheel, { passive: false });
+    return () => document.removeEventListener("wheel", onWheel);
+  }, []);
+
+  return null;
+}
+
 function AnalyticsTracker() {
   const location = useLocation();
 
@@ -141,6 +176,7 @@ export default function App() {
             <ChatbotProvider>
             <BrowserRouter>
               <AnalyticsTracker />
+              <HorizontalWheelSupport />
               <RouteBoundary>
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
@@ -148,7 +184,7 @@ export default function App() {
                   <Route path="/admin" element={<AdminAuthProvider><AdminLayout /></AdminAuthProvider>}>
                     <Route index element={<AdminDashboard />} />
                     <Route path="products" element={<AdminCatalog />} />
-                    <Route path="products/new" element={<AdminProductForm />} />
+                    <Route path="products/new" element={<Navigate to="/admin/products?add=item" replace />} />
                     <Route path="products/:id/edit" element={<AdminProductForm />} />
                     <Route path="categories" element={<AdminCategories />} />
                     <Route path="birthday-age-categories" element={<AdminBirthdayAgeCategories />} />
@@ -157,8 +193,8 @@ export default function App() {
                     <Route path="coupons" element={<AdminCoupons />} />
                     <Route path="services" element={<Navigate to="/admin/products?tab=services" replace />} />
                     <Route path="addons" element={<Navigate to="/admin/products?tab=services" replace />} />
-                    <Route path="services/products/new" element={<AdminProductForm />} />
-                    <Route path="addons/products/new" element={<AdminProductForm />} />
+                    <Route path="services/products/new" element={<Navigate to="/admin/products?tab=services&add=item&kind=service" replace />} />
+                    <Route path="addons/products/new" element={<Navigate to="/admin/products?tab=services&add=item&kind=service" replace />} />
                     <Route path="services/products/:id/edit" element={<AdminProductForm />} />
                     <Route path="addons/products/:id/edit" element={<AdminProductForm />} />
                     <Route path="availability" element={<AdminAvailability />} />

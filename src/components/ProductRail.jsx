@@ -9,7 +9,7 @@ import useAutoRail from "../hooks/useAutoRail";
 // mobile, arrow buttons on desktop, keyboard accessible. `items` must be
 // plain objects (no HTML strings) — nothing here is ever rendered via
 // dangerouslySetInnerHTML, so any text is auto-escaped by React.
-export default function ProductRail({ title, viewAllHref, items, tone }) {
+export default function ProductRail({ title, viewAllHref, items, tone, variant = "default" }) {
   const { city } = useCity();
   const trackRef = useRef(null);
   const [canPrev, setCanPrev] = useState(false);
@@ -44,7 +44,7 @@ export default function ProductRail({ title, viewAllHref, items, tone }) {
   if (!Array.isArray(items) || items.length === 0) return null;
 
   return (
-    <section className={"shop-section" + (tone === "surface" ? "" : "")} style={tone === "surface" ? { background: "var(--surface)" } : undefined}>
+    <section className={`shop-section product-rail product-rail--${variant}` + (tone === "surface" ? "" : "")} style={tone === "surface" ? { background: "var(--surface)" } : undefined}>
       <div className="container">
         <div className="shop-head">
           <h2>{title}</h2>

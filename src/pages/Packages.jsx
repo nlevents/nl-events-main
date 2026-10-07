@@ -15,6 +15,7 @@ import {
 } from "../data/occasions";
 import { useLiveEntries } from "../hooks/useLiveCatalog";
 import { onImgError } from "../lib/imageFallback";
+import { getDisplayPlacementEntries } from "../lib/catalogStore";
 
 
 export default function Packages() {

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { onImgError } from "../../lib/imageFallback";
 import AutoScrollRail from "../AutoScrollRail";
 import { EVENT_SERVICES, eventServiceHref } from "../../data/eventServices";
-import { getServiceProductsForContext, getAddonCategoryTree } from "../../lib/catalogStore";
+import { getServiceProductsForContext, getDecorationProductsForContext, getAddonCategoryTree } from "../../lib/catalogStore";
 import { trackServiceCategoryClick } from "../../lib/siteEvents";
 
 function availableServiceSlugs(contextPath = []) {
@@ -13,6 +13,10 @@ function availableServiceSlugs(contextPath = []) {
       const path = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
       if (path[0] === "event-services" && path[1]) slugs.add(path[1]);
     });
+    // Occasion/function decoration themes are automatically available through
+    // the Décor service. This is derived from the existing catalog hierarchy;
+    // it does not create or duplicate catalog records.
+    if (getDecorationProductsForContext(contextPath).length) slugs.add("decor");
   } catch {
     // Keep the storefront safe if catalog hydration is temporarily unavailable.
   }

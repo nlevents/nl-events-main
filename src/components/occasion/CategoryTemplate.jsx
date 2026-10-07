@@ -11,15 +11,17 @@ import EventServicesSection from "./EventServicesSection";
 import HeroImageCarousel from "../HeroImageCarousel";
 import ListingControls from "./ListingControls";
 import ProductRail from "../ProductRail";
-import { serviceProductMatchesContext } from "../../lib/catalogStore";
+import { getBirthdayThemeProducts, getDecorationProductsForContext, getAddonCategoryTree, getAddonProducts, getOccasion, hydrateCatalogFromCloud, serviceProductMatchesContext } from "../../lib/catalogStore";
+import { DISPLAY_CATALOGS, normalizeDisplayPlacements } from "../../lib/catalogPlacement";
 import { filterServiceProducts } from "../../lib/serviceContext";
 import { EVENT_SERVICES } from "../../data/eventServices";
+import { BirthdayCategories } from "../../pages/Birthday";
 import { useCity } from "../../context/CityContext";
 import { trackEvent } from "../../lib/siteEvents";
 import {
   childrenOf, pathFor, countProducts,
   sortProducts, isAvailableInCity, PRICE_BUCKETS, toRailItem, collectProductEntries,
-  quickLinksFor, heroGalleryFor, OCCASIONS,
+  quickLinksFor, allQuickLinksFor, heroGalleryFor, OCCASIONS, findOccasion,
 } from "../../data/occasions";
 
 const SHOP_REVIEWS = {
@@ -85,10 +87,11 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
   const [serviceFilter, setServiceFilter] = useState("");
   const [occasionFilter, setOccasionFilter] = useState("");
   const [functionFilter, setFunctionFilter] = useState("");
+  const [themeFilter, setThemeFilter] = useState("");
   const [priceFilter, setPriceFilter] = useState("all");
   const [sortKey, setSortKey] = useState("popular");
 
-  useReveal([liveTree, liveProducts, loading, serviceFilter, occasionFilter, functionFilter, priceFilter, sortKey]);
+  useReveal([liveTree, liveProducts, loading, serviceFilter, occasionFilter, functionFilter, themeFilter, priceFilter, sortKey]);
 
   const syncFromUrl = () => {
     try {
@@ -97,10 +100,12 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
       setServiceFilter(params.get("service") || "");
       setOccasionFilter(context[0] || "");
       setFunctionFilter(context.slice(1).join("/") || "");
+      setThemeFilter(params.get("theme") || "");
     } catch {
       setServiceFilter("");
       setOccasionFilter("");
       setFunctionFilter("");
+      setThemeFilter("");
     }
   };
 
@@ -114,16 +119,17 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
     const nextService = next.service !== undefined ? next.service : serviceFilter;
     const nextOccasion = next.occasion !== undefined ? next.occasion : occasionFilter;
     const nextFunction = next.functionPath !== undefined ? next.functionPath : functionFilter;
+    const nextTheme = next.theme !== undefined ? next.theme : themeFilter;
     const params = new URLSearchParams();
     if (nextService) params.set("service", nextService);
     const context = [nextOccasion, nextFunction].filter(Boolean).join("/");
     if (context) params.set("context", context);
+    if (nextTheme && nextService === "decor") params.set("theme", nextTheme);
     navigate({ pathname: "/occasion/event-services", search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
   };
 
   const refreshServiceCatalog = async () => {
     try {
-      const { hydrateCatalogFromCloud, getAddonCategoryTree, getAddonProducts } = await import("../../lib/catalogStore");
       await hydrateCatalogFromCloud();
       setLiveTree(getAddonCategoryTree() || null);
       setLiveProducts(Array.isArray(getAddonProducts()) ? getAddonProducts() : []);
@@ -145,7 +151,6 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
     let cancelled = false;
     const refresh = async () => {
       try {
-        const { getAddonCategoryTree, getAddonProducts, hydrateCatalogFromCloud } = await import("../../lib/catalogStore");
         if (!cancelled) {
           setLiveTree(getAddonCategoryTree() || null);
           setLiveProducts(getAddonProducts() || []);
@@ -199,6 +204,7 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
         if (placement?.catalog === "services" && placementPath[0] === "event-services" && placementPath[1]) available.add(placementPath[1]);
       });
     });
+    if (contextPath.length && getDecorationProductsForContext(contextPath).length) available.add("decor");
     return EVENT_SERVICES
       .filter((service) => available.has(service.slug))
       .map((service) => ({ path: service.slug, label: service.label }));
@@ -218,10 +224,97 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
   }, [loading, serviceFilter, serviceCategories, location.search, navigate]);
 
   const orderedProducts = useMemo(() => {
+    // Once a decoration theme is selected, it is a filter inside the Decor
+    // catalog — not a new service/category page. Only the decoration products
+    // belonging to that theme are shown; the generic service list is hidden.
+    if (serviceFilter === "decor" && contextPath.length && themeFilter) {
+      // Birthday age cards live inside Decor but the canonical catalog path
+      // keeps the Birthday Types wrapper. Resolve the filter to that exact
+      // catalog path so selecting an age/theme returns the matching products.
+      const liveBirthday = contextPath[0] === "birthday" ? getOccasion("birthday") : null;
+      const birthdayTypes = liveBirthday
+        ? childrenOf(liveBirthday).find((child) => child?.slug === "birthday-types")
+        : null;
+      const themePartyNode = birthdayTypes?.children?.find((child) => child?.slug === "theme-party");
+      const isBirthdayTheme = Boolean(themePartyNode?.children?.some((child) => child?.slug === themeFilter));
+
+      const liveAnniversary = contextPath[0] === "anniversary" ? getOccasion("anniversary") : null;
+      const anniversaryTypes = liveAnniversary
+        ? childrenOf(liveAnniversary).find((child) => child?.slug === "anniversary-types")
+        : null;
+      const isAnniversaryType = Boolean(anniversaryTypes?.children?.some((child) => child?.slug === themeFilter));
+
+      const themeContext = contextPath[0] === "birthday"
+        ? (isBirthdayTheme
+          ? ["birthday", "birthday-types", "theme-party", themeFilter]
+          : ["birthday", "birthday-types", themeFilter])
+        : contextPath[0] === "anniversary" && isAnniversaryType
+          ? ["anniversary", "anniversary-types", themeFilter]
+          : [...contextPath, themeFilter];
+      const matchesThemePath = (product) => {
+        const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
+          ? product.categoryPaths
+          : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+        const categoryMatch = paths.some((rawPath) => {
+          const path = rawPath.map((part) => String(part || "").toLowerCase().trim()).filter(Boolean);
+          return path.length >= themeContext.length && themeContext.every((part, index) => path[index] === part);
+        });
+        if (categoryMatch) return true;
+
+        // Theme cards behave like filters. A product explicitly placed at the
+        // selected decoration theme should match even when its primary
+        // category remains elsewhere in the catalog. The placement must sit AT
+        // or BELOW the selected theme: a placement on a parent node (for
+        // example Theme Party itself) belongs to no single theme and must not
+        // leak into every sibling theme's result.
+        return normalizeDisplayPlacements(product?.displayPlacements).some((placement) =>
+          (placement.catalog === DISPLAY_CATALOGS.PRODUCTS || placement.catalog === DISPLAY_CATALOGS.SERVICES)
+          && placement.path.length >= themeContext.length
+          && themeContext.every((part, index) => placement.path[index] === part));
+      };
+      // A Birthday theme (child of Theme Party) is resolved by the shared
+      // theme matcher so older saved paths and product-kind variants are not
+      // silently dropped; every other filter keeps the original matcher.
+      let list = (isBirthdayTheme
+        ? getBirthdayThemeProducts(themeFilter)
+        : getDecorationProductsForContext(themeContext).filter(matchesThemePath))
+        .map((product) => ({
+          ...product,
+          __decorationContextProduct: true,
+        }));
+
+      if (priceFilter !== "all") {
+        const bucket = PRICE_BUCKETS.find((bucketItem) => bucketItem.key === priceFilter);
+        if (bucket) list = list.filter((product) => Number(product.price) >= bucket.min && Number(product.price) < bucket.max);
+      }
+
+      return sortProducts(list, sortKey).map((product) => ({
+        ...product,
+        __contextPath: themeContext,
+        __trail: Array.isArray(product.categoryPath) && product.categoryPath.length
+          ? [...product.categoryPath.map((slug) => ({ slug, label: slug })), product]
+          : [node, product],
+      }));
+    }
+
     let list = filterServiceProducts(liveProducts, {
       service: serviceFilter,
       contextPath,
     });
+
+    // Décor is also the storefront home for the decoration/theme products
+    // belonging to the selected occasion/function. Reuse the existing
+    // catalog records; never create a second copy just for the service view.
+    if (serviceFilter === "decor" && contextPath.length) {
+      const decorationProducts = getDecorationProductsForContext(contextPath);
+      const existingIds = new Set(list.map((product) => String(product?.id || product?.slug || "")));
+      decorationProducts.forEach((product) => {
+        const key = String(product?.id || product?.slug || "");
+        if (!key || existingIds.has(key)) return;
+        existingIds.add(key);
+        list.push({ ...product, __decorationContextProduct: true });
+      });
+    }
 
     if (priceFilter !== "all") {
       const bucket = PRICE_BUCKETS.find((bucketItem) => bucketItem.key === priceFilter);
@@ -231,9 +324,129 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
     return sortProducts(list, sortKey).map((product) => ({
       ...product,
       __contextPath: contextPath,
-      __trail: [node, ...(Array.isArray(product.categoryPath) ? product.categoryPath.slice(1).map((slug) => ({ slug, label: slug })) : []), product],
+      __trail: product.__decorationContextProduct && Array.isArray(product.categoryPath) && product.categoryPath.length
+        ? [...product.categoryPath.map((slug) => ({ slug, label: slug })), product]
+        : [node, ...(Array.isArray(product.categoryPath) ? product.categoryPath.slice(1).map((slug) => ({ slug, label: slug })) : []), product],
     }));
-  }, [liveProducts, serviceFilter, contextPath, priceFilter, sortKey, node]);
+  }, [liveProducts, serviceFilter, contextPath, themeFilter, priceFilter, sortKey, node]);
+
+  // Theme Party is a parent filter, not a product-less browser page.
+  // Keep its child-theme links visible, but allow the normal Decor product
+  // listing to render all products under Birthday → Birthday Types → Theme Party.
+  const isThemePartyBrowser = false;
+
+  const decorationContext = useMemo(() => {
+    if (serviceFilter !== "decor" || !contextPath.length) return null;
+    const root = OCCASIONS.find((item) => item.slug === contextPath[0]);
+    if (!root) return null;
+    const trail = [root];
+    let current = root;
+    for (const slug of contextPath.slice(1)) {
+      const next = childrenOf(current).find((child) => child.slug === slug);
+      if (!next) return null;
+      trail.push(next);
+      current = next;
+    }
+    return { node: current, trail };
+  }, [serviceFilter, contextPath]);
+
+  const decorationThemeLinks = useMemo(() => {
+    if (!decorationContext) return [];
+
+    // Theme Party is a parent filter. Opening it should show its live child
+    // themes first; selecting one of those children then filters products.
+    const liveBirthday = contextPath[0] === "birthday" ? getOccasion("birthday") : null;
+    const birthdayTypes = liveBirthday
+      ? childrenOf(liveBirthday).find((child) => child?.slug === "birthday-types")
+      : null;
+    const themePartyNode = birthdayTypes?.children?.find((child) => child?.slug === "theme-party");
+    const isBirthdayThemeChild = Boolean(themePartyNode?.children?.some((child) => child?.slug === themeFilter));
+
+    // Anniversary milestones live under the structural Anniversary Types
+    // node. On the Decor service page, expose those direct children as filters
+    // rather than sending the visitor to separate category pages.
+    const liveAnniversary = contextPath[0] === "anniversary" ? getOccasion("anniversary") : null;
+    const anniversaryTypes = liveAnniversary
+      ? childrenOf(liveAnniversary).find((child) => child?.slug === "anniversary-types")
+      : null;
+    let sourceNode = decorationContext.node;
+    let sourceTrail = decorationContext.trail;
+    let includeAllAnniversaries = false;
+
+    if ((themeFilter === "theme-party" || isBirthdayThemeChild) && themePartyNode) {
+      sourceNode = themePartyNode;
+      sourceTrail = [liveBirthday || decorationContext.trail[0], birthdayTypes, themePartyNode];
+    } else if (contextPath[0] === "anniversary" && anniversaryTypes) {
+      sourceNode = anniversaryTypes;
+      sourceTrail = [liveAnniversary || decorationContext.trail[0], anniversaryTypes];
+      includeAllAnniversaries = true;
+    }
+
+    const links = allQuickLinksFor(sourceNode, sourceTrail).map((item) => {
+      const params = new URLSearchParams();
+      params.set("service", "decor");
+      params.set("context", contextPath.join("/"));
+      if (item.slug) params.set("theme", item.slug);
+      return { ...item, href: `/occasion/event-services?${params.toString()}` };
+    });
+
+    if (includeAllAnniversaries && sourceNode === anniversaryTypes) {
+      const allParams = new URLSearchParams();
+      allParams.set("service", "decor");
+      allParams.set("context", contextPath.join("/"));
+      links.unshift({
+        label: "All Anniversaries",
+        image: liveAnniversary?.image || liveAnniversary?.heroImg || decorationContext.trail[0]?.image,
+        type: "category",
+        slug: "",
+        href: `/occasion/event-services?${allParams.toString()}`,
+      });
+    }
+
+    return links;
+    // liveTree/liveProducts change on every catalog refresh (including the
+    // existing nle-catalog-updated event), so the list is never stale.
+  }, [decorationContext, contextPath, themeFilter, liveTree, liveProducts]);
+
+  // The theme list is shown for Theme Party itself and while one of its child
+  // themes is selected (so another theme can be chosen without going back).
+  const showBirthdayThemeList = useMemo(() => {
+    if (serviceFilter !== "decor" || contextPath[0] !== "birthday" || !themeFilter) return false;
+    if (themeFilter === "theme-party") return true;
+    const types = childrenOf(getOccasion("birthday")).find((child) => child?.slug === "birthday-types");
+    const party = types?.children?.find((child) => child?.slug === "theme-party");
+    return Boolean(party?.children?.some((child) => child?.slug === themeFilter));
+  }, [serviceFilter, contextPath, themeFilter, liveTree, liveProducts]);
+
+  const showAnniversaryFilterList = useMemo(() => {
+    if (serviceFilter !== "decor" || contextPath[0] !== "anniversary") return false;
+    const anniversary = getOccasion("anniversary");
+    const types = anniversary ? childrenOf(anniversary).find((child) => child?.slug === "anniversary-types") : null;
+    return Boolean(types?.children?.length);
+  }, [serviceFilter, contextPath, liveTree, liveProducts]);
+
+  useEffect(() => {
+    const birthdayThemeIsValid = contextPath[0] === "birthday"
+      && decorationContext?.node?.slug === "birthday"
+      && Boolean((decorationContext.node.children || [])
+        .find((child) => child?.slug === "birthday-types")
+        ?.children?.some((child) => child?.slug === themeFilter));
+    const liveBirthday = contextPath[0] === "birthday" ? getOccasion("birthday") : null;
+    const liveBirthdayTypes = liveBirthday ? childrenOf(liveBirthday).find((child) => child?.slug === "birthday-types") : null;
+    const liveThemeParty = liveBirthdayTypes?.children?.find((child) => child?.slug === "theme-party");
+    const birthdayThemeChildIsValid = Boolean(liveThemeParty?.children?.some((child) => child?.slug === themeFilter));
+    const liveAnniversary = contextPath[0] === "anniversary" ? getOccasion("anniversary") : null;
+    const liveAnniversaryTypes = liveAnniversary ? childrenOf(liveAnniversary).find((child) => child?.slug === "anniversary-types") : null;
+    const anniversaryTypeIsValid = Boolean(liveAnniversaryTypes?.children?.some((child) => child?.slug === themeFilter));
+    const themeIsValid = themeFilter === ""
+      || decorationThemeLinks.some((item) => item.slug === themeFilter)
+      || birthdayThemeIsValid
+      || birthdayThemeChildIsValid
+      || anniversaryTypeIsValid;
+    if (themeFilter && (serviceFilter !== "decor" || !themeIsValid)) {
+      updateFilters({ theme: "" });
+    }
+  }, [themeFilter, serviceFilter, decorationThemeLinks, contextPath, decorationContext]);
 
   const filterDescriptors = useMemo(() => [
     {
@@ -272,26 +485,61 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
 
   function resetFilters() {
     setPriceFilter("all");
-    updateFilters({ service: "", occasion: "", functionPath: "" });
+    updateFilters({ service: "", occasion: "", functionPath: "", theme: "" });
   }
 
   return (
     <>
-      <div className="occ-block" style={{ paddingTop: 0, marginTop: 0, borderTop: 0 }}>
-        <div className="section-head reveal">
-          <h2>All Services</h2>
-          <p>Choose a service, occasion and function to see exactly what is available.</p>
-        </div>
-        <ListingControls
-          resultCount={orderedProducts.length}
-          sortKey={sortKey}
-          onSortChange={setSortKey}
-          filters={filterDescriptors}
-          onReset={resetFilters}
+      {decorationContext && contextPath.length === 1 && contextPath[0] === "birthday" ? (
+        <>
+          <BirthdayCategories />
+          {/* Theme Party is a parent filter: keep the Birthday filters visible and
+              list every live child theme beneath them. Choosing one filters the
+              products below; the list stays so another theme can be picked. */}
+          {showBirthdayThemeList && (
+            <OccasionQuickLinks
+              title="Birthday Themes"
+              items={decorationThemeLinks}
+              slider
+            />
+          )}
+        </>
+      ) : showAnniversaryFilterList ? (
+        <OccasionQuickLinks
+          title="Anniversary Celebrations"
+          items={decorationThemeLinks}
+          slider
         />
-      </div>
+      ) : isThemePartyBrowser ? (
+        <OccasionQuickLinks
+          title="Birthday Themes"
+          items={decorationThemeLinks}
+          slider
+        />
+      ) : decorationContext ? (
+        <OccasionQuickLinks
+          title={`${decorationContext.node.label} Decoration Themes`}
+          items={decorationThemeLinks}
+        />
+      ) : null}
 
-      {orderedProducts.length > 0 && (
+      {!themeFilter && !isThemePartyBrowser && (
+        <div className="occ-block" style={{ paddingTop: 0, marginTop: 0, borderTop: 0 }}>
+          <div className="section-head reveal">
+            <h2>All Services</h2>
+            <p>Choose a service, occasion and function to see exactly what is available.</p>
+          </div>
+          <ListingControls
+            resultCount={orderedProducts.length}
+            sortKey={sortKey}
+            onSortChange={setSortKey}
+            filters={filterDescriptors}
+            onReset={resetFilters}
+          />
+        </div>
+      )}
+
+      {!isThemePartyBrowser && orderedProducts.length > 0 && (
         <div className="occ-block">
           <div className="occ-prod-grid reveal">
             {orderedProducts.map((product, index) => (
@@ -306,16 +554,16 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
         </div>
       )}
 
-      {!loading && !orderedProducts.length && (
+      {!loading && !isThemePartyBrowser && !orderedProducts.length && (
         <div className="occ-block">
           <div className="occ-empty reveal">
-            <strong>No services match these filters.</strong>
-            <p>Try another service, occasion, function or price range.</p>
+            <strong>{themeFilter ? "No decoration items match this theme." : "No services match these filters."}</strong>
+            <p>{themeFilter ? "Try another decoration theme." : "Try another service, occasion, function or price range."}</p>
           </div>
         </div>
       )}
 
-      {loading && !orderedProducts.length && (
+      {loading && !isThemePartyBrowser && !orderedProducts.length && (
         <div className="occ-block">
           <div className="occ-empty reveal">
             <strong>Loading services…</strong>
@@ -553,8 +801,6 @@ export default function CategoryTemplate({ node, trail }) {
         {node.description && (
           <p className="occ-lead reveal">{node.description}</p>
         )}
-
-        <OccasionQuickLinks title={node.label + " Decoration Themes"} items={quickLinks} node={node} trail={trail} />
 
         {!node.addonOnly && <EventServicesSection contextPath={serviceContextPath} />}
 

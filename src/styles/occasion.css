@@ -1586,7 +1586,7 @@
 .occ-services-rail{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 0 3px;scrollbar-width:none}
 .occ-services-rail::-webkit-scrollbar{display:none}
 .occ-service-card{flex:0 0 190px;scroll-snap-align:start;display:block;overflow:hidden;background:#fff;border:1px solid #ebe8e0;border-radius:5px;color:#13253a;text-decoration:none}
-.occ-service-card img{display:block;width:100%;height:132px;object-fit:cover}
+.occ-service-card img{display:block;width:100%;height:132px;object-fit:contain;object-position:center}
 .occ-service-card strong{display:block;font-size:12px;padding:9px 10px 2px;line-height:1.2}
 .occ-service-card span{display:block;padding:0 10px 11px;color:#7c8792;font-size:10px;line-height:1.3}
 
@@ -1826,4 +1826,19 @@
   .listing-controls--catalog .listing-filters{ grid-template-columns:1fr; }
   .listing-controls--catalog .listing-filter-heading{ align-items:flex-start; }
   .listing-controls--catalog .listing-reset--catalog{ padding-top:0; }
+}
+
+/* Theme Party list: one horizontally scrollable row; "View all" opens the grid. */
+.cat9-grid-slider {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+}
+.cat9-grid-slider .cat9-item { flex: 0 0 96px; scroll-snap-align: start; }
+@media (min-width: 900px) {
+  .cat9-grid-slider .cat9-item { flex-basis: 112px; }
 }

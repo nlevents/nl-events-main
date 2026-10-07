@@ -292,6 +292,7 @@ function PopularPackagesSection() {
       title="Popular Packages"
       viewAllHref="/packages"
       items={popularPackages}
+      variant="home"
     />
   );
 }

@@ -115,7 +115,13 @@ export function filterServiceProducts(products, { service = "", contextPath = []
     const categoryPath = Array.isArray(product.categoryPath)
       ? product.categoryPath.map(slugPart).filter(Boolean)
       : [];
-    const naturalService = categoryPath[0] === "event-services";
+    const serviceCategoryPath = Array.isArray(product.serviceCategoryPath)
+      ? product.serviceCategoryPath.map(slugPart).filter(Boolean)
+      : [];
+    const kinds = Array.isArray(product.catalogKinds) && product.catalogKinds.length
+      ? product.catalogKinds
+      : [product.catalogKind || (product.isAddon ? "service" : "product")];
+    const naturalService = categoryPath[0] === "event-services" || serviceCategoryPath[0] === "event-services" || kinds.includes("service");
     const explicitServiceCategory = selectedServicePath.length
       ? hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES, ["event-services", ...selectedServicePath])
       : hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES);
@@ -125,7 +131,7 @@ export function filterServiceProducts(products, { service = "", contextPath = []
     if (selectedServicePath.length) {
       if (explicitServiceCategory) return true;
       if (!naturalService) return false;
-      const productServicePath = categoryPath.slice(1);
+      const productServicePath = (serviceCategoryPath[0] === "event-services" ? serviceCategoryPath.slice(1) : categoryPath.slice(1));
       const isSameOrDescendant = selectedServicePath.length <= productServicePath.length
         && selectedServicePath.every((part, index) => part === productServicePath[index]);
       if (!isSameOrDescendant) return false;
