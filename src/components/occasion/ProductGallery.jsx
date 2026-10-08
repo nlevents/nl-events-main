@@ -36,6 +36,13 @@ export default function ProductGallery({ images, alt }) {
     if (dialog && !dialog.open) dialog.showModal();
     const previousOverflow = document.body.style.overflow;
     const previousTouchAction = document.body.style.touchAction;
+    const viewport = window.visualViewport;
+    const syncLightboxViewport = () => {
+      const height = viewport?.height || window.innerHeight;
+      const width = viewport?.width || window.innerWidth;
+      document.documentElement.style.setProperty("--pd-lightbox-vh", `${height}px`);
+      document.documentElement.style.setProperty("--pd-lightbox-vw", `${width}px`);
+    };
     function onKey(e) {
       if (e.key === "Escape") closeLightbox();
       if (e.key === "ArrowLeft") { resetLightboxZoom(); prev(); }
@@ -44,11 +51,18 @@ export default function ProductGallery({ images, alt }) {
       if (e.key === "-" || e.key === "_") changeLightboxZoom(lightboxZoom - 0.5);
       if (e.key === "0") resetLightboxZoom();
     }
+    syncLightboxViewport();
     document.addEventListener("keydown", onKey);
+    viewport?.addEventListener("resize", syncLightboxViewport);
+    window.addEventListener("resize", syncLightboxViewport);
     document.body.style.overflow = "hidden";
     document.body.style.touchAction = "none";
     return () => {
       document.removeEventListener("keydown", onKey);
+      viewport?.removeEventListener("resize", syncLightboxViewport);
+      window.removeEventListener("resize", syncLightboxViewport);
+      document.documentElement.style.removeProperty("--pd-lightbox-vh");
+      document.documentElement.style.removeProperty("--pd-lightbox-vw");
       document.body.style.overflow = previousOverflow;
       document.body.style.touchAction = previousTouchAction;
     };

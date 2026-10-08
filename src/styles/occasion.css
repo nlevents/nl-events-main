@@ -400,8 +400,8 @@
 .pd-thumb:hover{ opacity:1; transform:translateY(-2px); }
 
 .pd-lightbox{
-  position:fixed; inset:0; z-index:200; width:100vw; height:100dvh; max-width:none; max-height:none;
-  margin:0; border:0; padding:0; background:#000; color:#fff;
+  position:fixed; inset:0; z-index:200; width:var(--pd-lightbox-vw, 100vw); height:var(--pd-lightbox-vh, 100dvh); min-width:100%; min-height:100%; max-width:none; max-height:none;
+  margin:0; border:0; padding:0; box-sizing:border-box; background:#000; color:#fff;
   display:flex; align-items:center; justify-content:center; overflow:hidden; overscroll-behavior:none;
   isolation:isolate;
 }
@@ -462,15 +462,34 @@
 .pd-lightbox-controls .pd-lightbox-zoom-level{ width:68px; border-radius:999px; font-size:12px; font-weight:800; letter-spacing:.02em; }
 
 @media (max-width:640px){
-  .pd-lightbox-stage{ padding:72px 10px 90px; }
-  .pd-lightbox-close{ width:50px; height:50px; top:max(12px, env(safe-area-inset-top)); right:max(12px, env(safe-area-inset-right)); }
+  .pd-lightbox{
+    inset:0; width:var(--pd-lightbox-vw, 100%); height:var(--pd-lightbox-vh, 100dvh);
+    min-width:100%; min-height:100%; max-width:none; max-height:none;
+  }
+  .pd-lightbox-stage{
+    inset:0; padding:calc(68px + env(safe-area-inset-top)) 8px calc(86px + env(safe-area-inset-bottom));
+  }
+  .pd-lightbox-close{
+    width:50px; height:50px; top:max(10px, env(safe-area-inset-top)); right:max(10px, env(safe-area-inset-right));
+  }
   .pd-lightbox-nav{ width:44px; height:44px; }
   .pd-lightbox-nav.prev{ left:max(8px, env(safe-area-inset-left)); }
   .pd-lightbox-nav.next{ right:max(8px, env(safe-area-inset-right)); }
-  .pd-lightbox-image{ max-width:96vw; max-height:72vh; }
-  .pd-lightbox-controls{ bottom:max(12px, env(safe-area-inset-bottom)); }
+  .pd-lightbox-image{
+    max-width:calc(100vw - 20px);
+    max-height:calc(var(--pd-lightbox-vh, 100svh) - 156px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  .pd-lightbox-controls{ bottom:max(10px, env(safe-area-inset-bottom)); }
   .pd-lightbox-controls button{ width:46px; height:46px; }
   .pd-lightbox-controls .pd-lightbox-zoom-level{ width:62px; }
+}
+
+@media (max-width:640px) and (orientation:landscape){
+  .pd-lightbox-stage{ padding:58px 58px calc(72px + env(safe-area-inset-bottom)); }
+  .pd-lightbox-image{
+    max-width:calc(100vw - 116px);
+    max-height:calc(var(--pd-lightbox-vh, 100svh) - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
 }
 
 /* ---------- Rating stars ---------- */
