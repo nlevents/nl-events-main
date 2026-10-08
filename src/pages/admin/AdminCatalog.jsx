@@ -3,6 +3,7 @@ import { CATALOG_IMAGES } from "../../data/images";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Icon from "../../components/Icon";
+import ImageCropperModal from "../../components/admin/ImageCropperModal";
 import ServiceContextPicker from "../../components/admin/ServiceContextPicker";
 import ServiceCategoryPicker from "../../components/admin/ServiceCategoryPicker";
 import usePageMeta from "../../hooks/usePageMeta";
@@ -148,6 +149,7 @@ function initialItem(kind = "product") {
     price: "",
     originalPrice: "",
     discountPrice: "",
+    quantity: "",
     unit: "Per Event",
     status: "active",
     occasions: ["wedding"],
@@ -164,7 +166,6 @@ function initialItem(kind = "product") {
     packageItems: [],
     packageOccasions: ["wedding"],
     displayPlacements: [],
-    originalPrice: "",
     costPrice: "",
     discountPrice: "",
   };
@@ -185,6 +186,7 @@ function MultiImagePicker({ images, onChange, max = MAX_PRODUCT_IMAGES }) {
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState("");
   const [urlInput, setUrlInput] = useState("");
+  const [cropFiles, setCropFiles] = useState([]);
 
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || []).filter((f) => f.type?.startsWith("image/"));
@@ -193,26 +195,10 @@ function MultiImagePicker({ images, onChange, max = MAX_PRODUCT_IMAGES }) {
     if (room <= 0) return window.alert(`You can add up to ${max} images per product. Remove one first.`);
     const batch = files.slice(0, room);
     const skipped = files.length - batch.length;
-    setBusy(true);
-    const added = [];
-    const failed = [];
-    for (let i = 0; i < batch.length; i++) {
-      setProgress(`Uploading ${i + 1} of ${batch.length}…`);
-      try {
-        const saved = await uploadMediaFile(batch[i], batch[i].name);
-        added.push(saved.url);
-      } catch (err) {
-        failed.push(`${batch[i].name}: ${err.message || "upload failed"}`);
-      }
-    }
-    if (added.length) onChange(Array.from(new Set([...list, ...added])).slice(0, max));
-    setBusy(false);
-    setProgress("");
-    const notes = [];
-    if (skipped > 0) notes.push(`${skipped} file(s) skipped — maximum is ${max} images.`);
-    if (failed.length) notes.push(`Could not upload:\n${failed.join("\n")}`);
-    if (notes.length) window.alert(notes.join("\n\n"));
+    setCropFiles(batch);
+    if (skipped > 0) window.alert(`${skipped} file(s) skipped — maximum is ${max} images.`);
   }
+
   function addUrl() {
     const url = urlInput.trim();
     if (!url) return;
@@ -231,7 +217,33 @@ function MultiImagePicker({ images, onChange, max = MAX_PRODUCT_IMAGES }) {
   }
 
   return (
-    <div className={`catalog-image-uploader ${dragging ? "is-dragging" : ""}`}>
+    <>
+      <ImageCropperModal
+        isOpen={cropFiles.length > 0}
+        files={cropFiles}
+        recommendedRatio="1:1"
+        onCancel={() => setCropFiles([])}
+        onComplete={async (croppedFiles) => {
+          setCropFiles([]);
+          setBusy(true);
+          const added = [];
+          const failed = [];
+          for (let i = 0; i < croppedFiles.length; i++) {
+            setProgress(`Uploading ${i + 1} of ${croppedFiles.length}…`);
+            try {
+              const saved = await uploadMediaFile(croppedFiles[i], croppedFiles[i].name);
+              added.push(saved.url);
+            } catch (err) {
+              failed.push(`${croppedFiles[i].name}: ${err.message || "upload failed"}`);
+            }
+          }
+          if (added.length) onChange(Array.from(new Set([...list, ...added])).slice(0, max));
+          setBusy(false);
+          setProgress("");
+          if (failed.length) window.alert("Could not upload:\n" + failed.join("\n"));
+        }}
+      />
+      <div className={`catalog-image-uploader ${dragging ? "is-dragging" : ""}`}>
       <label
         className="catalog-image-dropzone"
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -280,25 +292,19 @@ function MultiImagePicker({ images, onChange, max = MAX_PRODUCT_IMAGES }) {
         />
         <button type="button" className="catalog-image-clear" style={{ width: "auto", padding: "0 10px" }} onClick={addUrl}>Add</button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
-function ImagePicker({ value, onChange }) {
+function ImagePicker({ value, onChange, recommendedRatio = "5:4" }) {
   const [busy, setBusy] = useState(false);
+  const [cropFiles, setCropFiles] = useState([]);
   const [dragging, setDragging] = useState(false);
   async function uploadFile(file) {
     if (!file) return;
     if (!file.type?.startsWith("image/")) return window.alert("Please choose an image file.");
-    setBusy(true);
-    try {
-      const saved = await uploadMediaFile(file, file.name);
-      onChange(saved.url);
-    } catch (err) {
-      window.alert(err.message || "Unable to upload image.");
-    } finally {
-      setBusy(false);
-    }
+    setCropFiles([file]);
   }
   function onFileChange(e) {
     const file = e.target.files?.[0];
@@ -306,7 +312,26 @@ function ImagePicker({ value, onChange }) {
     e.target.value = "";
   }
   return (
-    <div className={`catalog-image-uploader ${dragging ? "is-dragging" : ""}`}>
+    <>
+      <ImageCropperModal
+        isOpen={cropFiles.length > 0}
+        files={cropFiles}
+        recommendedRatio={recommendedRatio}
+        onCancel={() => setCropFiles([])}
+        onComplete={async (croppedFiles) => {
+          setCropFiles([]);
+          setBusy(true);
+          try {
+            const saved = await uploadMediaFile(croppedFiles[0], croppedFiles[0].name);
+            onChange(saved.url);
+          } catch (err) {
+            window.alert(err.message || "Unable to upload image.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+      <div className={`catalog-image-uploader ${dragging ? "is-dragging" : ""}`}>
       <label
         className="catalog-image-dropzone"
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -321,7 +346,8 @@ function ImagePicker({ value, onChange }) {
         <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder="Or paste an image URL" aria-label="Image URL" />
         {value && <button type="button" className="catalog-image-clear" onClick={() => onChange("")} title="Remove image"><Icon name="close" /></button>}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -573,9 +599,11 @@ export default function AdminCatalog() {
         image: primaryImg,
         images: gallery,
         gallery,
-        originalPrice: item.originalPrice ? Number(item.originalPrice) : null,
+        originalPrice: item.originalPrice === "" || item.originalPrice == null ? null : Math.max(0, Number(item.originalPrice) || 0),
         costPrice: item.costPrice === "" || item.costPrice == null ? null : Math.max(0, Number(item.costPrice) || 0),
         discountPrice: item.discountPrice === "" || item.discountPrice == null ? null : Math.max(0, Number(item.discountPrice) || 0),
+        quantity: item.quantity === "" || item.quantity == null ? null : Math.max(0, Number(item.quantity) || 0),
+        unit: String(item.unit || "").trim(),
         profitAmount: item.costPrice === "" || item.costPrice == null ? null : (Number(item.price) || 0) - (Number(item.costPrice) || 0),
         profitMarginPercent: item.costPrice === "" || item.costPrice == null || !(Number(item.price) > 0) ? null : Math.round((((Number(item.price) || 0) - (Number(item.costPrice) || 0)) / (Number(item.price) || 1)) * 1000) / 10,
         packageItems: kinds.includes("package") ? item.packageItems : [],
@@ -1225,7 +1253,7 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
   const productCategoryPaths = Array.isArray(item.productCategoryPaths) && item.productCategoryPaths.length
     ? item.productCategoryPaths
     : (item.catalogKind === "product" ? (Array.isArray(item.categoryPaths) && item.categoryPaths.length ? item.categoryPaths : []) : []);
-  const packageCategoryPaths = Array.isArray(item.packageCategoryPaths) && item.packageCategoryPaths.length
+  const packageCategoryPaths = Array.isArray(item.packageCategoryPaths)
     ? item.packageCategoryPaths
     : (item.catalogKind === "package" ? (Array.isArray(item.categoryPaths) && item.categoryPaths.length ? item.categoryPaths : []) : []);
   const serviceCategoryPath = Array.isArray(item.serviceCategoryPath) && item.serviceCategoryPath.length
@@ -1340,16 +1368,17 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
 
       <section className="catalog-form-section"><h3>{(hasProduct || hasService || hasPackage) ? (hasPackage ? "5" : "4") : "3"}. Pricing & Media</h3>
         <div className="catalog-form-grid three">
-          <Field label="Selling Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field>
-          <Field label="Cost Price (₹)"><input type="number" min="0" value={item.costPrice ?? ""} onChange={(e) => set("costPrice", e.target.value)} placeholder="Your internal cost" /></Field>
-          <Field label="Unit"><select value={item.unit} onChange={(e) => set("unit", e.target.value)}><option>Per Event</option><option>Per Piece</option><option>Per Day</option><option>Per Hour</option></select></Field>
+          <Field label="Discounted Price / Selling Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field>
+          <Field label="Original MRP (₹)"><input type="number" min="0" value={item.originalPrice ?? ""} onChange={(e) => set("originalPrice", e.target.value)} placeholder="e.g. 30000" /></Field>
+          <Field label="Quantity"><input type="number" min="0" step="0.01" value={item.quantity ?? ""} onChange={(e) => set("quantity", e.target.value)} placeholder="e.g. 32" /></Field>
+          <Field label="Unit"><select value={item.unit} onChange={(e) => set("unit", e.target.value)}><option value="">Select unit</option><option>Piece</option><option>Set</option><option>Pair</option><option>Pack</option><option>Box</option><option>Unit</option><option>Kg</option><option>Gram</option><option>Litre</option><option>Millilitre</option><option>Meter</option><option>Centimeter</option><option>Square Feet</option><option>Square Meter</option><option>Cubic Feet</option><option>Cubic Meter</option><option>Running Feet</option><option>Hour</option><option>Day</option><option>Person / Guest</option><option>Plate</option><option>Table</option><option>Per Event</option><option>Custom</option></select></Field>
         </div>
         <div className="catalog-margin-summary">
-          <span>Margin</span>
-          <strong>{item.costPrice !== "" && Number(item.price) > 0 ? `${Math.round((((Number(item.price) || 0) - (Number(item.costPrice) || 0)) / (Number(item.price) || 1)) * 1000) / 10}%` : "—"}</strong>
-          <small>{item.costPrice !== "" && Number(item.price) > 0 ? `Profit ${fmtINR((Number(item.price) || 0) - (Number(item.costPrice) || 0))}` : "Add a cost price to calculate"}</small>
+          <span>Discount</span>
+          <strong>{item.originalPrice !== "" && Number(item.originalPrice) > Number(item.price) && Number(item.price) > 0 ? `${Math.round(((Number(item.originalPrice) - Number(item.price)) / Number(item.originalPrice)) * 100)}% OFF` : "—"}</strong>
+          <small>{item.originalPrice !== "" && Number(item.originalPrice) > Number(item.price) && Number(item.price) > 0 ? `Customer saves ${fmtINR(Number(item.originalPrice) - Number(item.price))}` : "Add an MRP higher than the selling price"}</small>
         </div>
-        <p className="catalog-field-help">Selling Price is what the customer pays. Cost Price is internal. Margin is calculated automatically.</p>
+        <p className="catalog-field-help">The discounted price is what the customer pays. Original MRP is shown crossed out when it is higher than the selling price.</p>
         <MultiImagePicker images={item.images && item.images.length ? item.images : (item.gallery && item.gallery.length ? item.gallery : (item.image ? [item.image] : []))} onChange={chooseImages} />
       </section>
       <section className="catalog-form-section"><h3>Publication Status</h3><div className="catalog-status-control"><div><strong>Where should this item be in the catalog?</strong><small>Active items can appear on customer-facing pages. Draft and archived items remain available in Admin.</small></div><select value={item.status || "draft"} onChange={(e) => set("status", e.target.value)} aria-label="Publication status"><option value="active">Active — publish</option><option value="draft">Draft — keep hidden</option><option value="archived">Archived — keep for records</option></select></div></section>
@@ -1369,5 +1398,5 @@ function CategoryModal({ data, setData, onSave, error }) {
     },
   }));
   const isOccasion = Boolean(data.isOccasion);
-  return <div className="catalog-modal-backdrop" onMouseDown={() => setData(null)}><div className="catalog-modal catalog-category-modal" onMouseDown={(e) => e.stopPropagation()}><div className="catalog-modal-head"><div><h2>{data.mode === "edit" ? `Edit ${cat.label}` : "Add Category / Theme"}</h2><p>{isOccasion ? "Edit this top-level occasion." : "Create categories at any depth. Every node can have children."}</p></div><button onClick={() => setData(null)}><Icon name="close" /></button></div>{error && <div className="admin-alert admin-alert--error">{error}</div>}<form onSubmit={onSave}><Field label="Parent"><div className="catalog-parent-box">{data.parentLabel || "Top level"}</div></Field><Field label={isOccasion ? "Occasion Name" : "Category / Theme Name"} required><input value={cat.label || ""} onChange={(e) => update("label", e.target.value)} placeholder={isOccasion ? "e.g. Annaprashan" : "e.g. Haldi"} /></Field><Field label="Slug" required><input value={data.mode === "edit" ? (cat.slug || "") : sanitizeSlug(cat.label || "")} placeholder={isOccasion ? "annaprashan" : "haldi"} readOnly aria-describedby="catalog-slug-help" /><small id="catalog-slug-help" className="catalog-field-help">{data.mode === "edit" ? "Slug is locked after creation so existing product links and category assignments stay intact." : "Automatically generated from the name."}</small></Field>{!isOccasion && <Field label="Node Type"><select value={cat.type || "category"} onChange={(e) => update("type", e.target.value)}><option value="category">Category</option><option value="theme">Theme</option></select></Field>}<Field label="Description"><textarea rows="3" value={cat.description || ""} onChange={(e) => update("description", e.target.value)} /></Field><Field label={isOccasion ? "Occasion Image" : "Category Image"}><ImagePicker value={cat.image} onChange={(url) => update("image", url)} /></Field>{isOccasion && <><Field label="Tagline"><input value={cat.tagline || ""} onChange={(e) => update("tagline", e.target.value)} /></Field><Field label="Hero Image"><ImagePicker value={cat.heroImg || cat.image || ""} onChange={(url) => update("heroImg", url)} /></Field></>}<div className="catalog-modal-footer"><button type="button" className="btn btn-outline" onClick={() => setData(null)}>Cancel</button><button className="btn btn-primary">Save {isOccasion ? "Occasion" : "Category"}</button></div></form></div></div>;
+  return <div className="catalog-modal-backdrop" onMouseDown={() => setData(null)}><div className="catalog-modal catalog-category-modal" onMouseDown={(e) => e.stopPropagation()}><div className="catalog-modal-head"><div><h2>{data.mode === "edit" ? `Edit ${cat.label}` : "Add Category / Theme"}</h2><p>{isOccasion ? "Edit this top-level occasion." : "Create categories at any depth. Every node can have children."}</p></div><button onClick={() => setData(null)}><Icon name="close" /></button></div>{error && <div className="admin-alert admin-alert--error">{error}</div>}<form onSubmit={onSave}><Field label="Parent"><div className="catalog-parent-box">{data.parentLabel || "Top level"}</div></Field><Field label={isOccasion ? "Occasion Name" : "Category / Theme Name"} required><input value={cat.label || ""} onChange={(e) => update("label", e.target.value)} placeholder={isOccasion ? "e.g. Annaprashan" : "e.g. Haldi"} /></Field><Field label="Slug" required><input value={data.mode === "edit" ? (cat.slug || "") : sanitizeSlug(cat.label || "")} placeholder={isOccasion ? "annaprashan" : "haldi"} readOnly aria-describedby="catalog-slug-help" /><small id="catalog-slug-help" className="catalog-field-help">{data.mode === "edit" ? "Slug is locked after creation so existing product links and category assignments stay intact." : "Automatically generated from the name."}</small></Field>{!isOccasion && <Field label="Node Type"><select value={cat.type || "category"} onChange={(e) => update("type", e.target.value)}><option value="category">Category</option><option value="theme">Theme</option></select></Field>}<Field label="Description"><textarea rows="3" value={cat.description || ""} onChange={(e) => update("description", e.target.value)} /></Field><Field label={isOccasion ? "Occasion Image" : "Category Image"}><ImagePicker value={cat.image} onChange={(url) => update("image", url)} /></Field>{isOccasion && <><Field label="Tagline"><input value={cat.tagline || ""} onChange={(e) => update("tagline", e.target.value)} /></Field><Field label="Hero Image"><ImagePicker value={cat.heroImg || cat.image || ""} onChange={(url) => update("heroImg", url)} recommendedRatio="16:9" /></Field></>}<div className="catalog-modal-footer"><button type="button" className="btn btn-outline" onClick={() => setData(null)}>Cancel</button><button className="btn btn-primary">Save {isOccasion ? "Occasion" : "Category"}</button></div></form></div></div>;
 }

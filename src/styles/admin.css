@@ -1127,3 +1127,19 @@
 .catalog-status-control small{font-size:8px;color:#8995a4;line-height:1.4}
 .catalog-status-control select{min-width:190px;border:1px solid #dce3ea;border-radius:6px;background:#fff;padding:8px 10px;color:#273a53;font:inherit;font-size:10px}
 @media(max-width:600px){.catalog-status-control{align-items:stretch;flex-direction:column}.catalog-status-control select{width:100%;min-width:0}}
+
+/* Image cropper: isolated admin-only upload workflow; no public UI styles are changed. */
+.image-cropper-backdrop{z-index:120;}
+.image-cropper-modal{width:min(820px,100%);}
+.image-cropper-body{padding:16px 22px 8px;}
+.image-cropper-stage{position:relative;margin:0 auto;background:#101820;border-radius:8px;overflow:hidden;touch-action:none;user-select:none;}
+.image-cropper-preview{position:absolute;max-width:none;display:block;user-select:none;pointer-events:none;}
+.image-cropper-controls{margin-top:14px;}
+.image-cropper-ratios{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.image-cropper-controls input[type="range"]{display:block;width:100%;margin:6px 0 4px;}
+.image-cropper-help{font-size:10px;color:#8995a5;margin-top:4px;}
+@media (max-width:640px){
+  .image-cropper-body{padding:12px 14px 6px;}
+  .image-cropper-ratios{gap:5px;}
+  .image-cropper-ratios .btn{font-size:10px;padding:6px 8px;}
+}

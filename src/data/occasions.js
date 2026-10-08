@@ -21,6 +21,16 @@ function nextId(prefix) {
   uid += 1;
   return prefix + "-" + uid;
 }
+function generatedReviewCount(product) {
+  const key = String(product?.id || product?.slug || product?.name || "product");
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i += 1) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return 6 + (Math.abs(hash >>> 0) % 65);
+}
+
 
 function makeProduct(p) {
   return {
@@ -1140,6 +1150,9 @@ function getLiveOccasions() {
       // product and renders CategoryTemplate on it instead — a blank
       // product page.
       const prodBase = rawProd.type === "product" ? rawProd : { ...rawProd, type: "product" };
+      if (!(Number(prodBase.reviewCount) >= 6 && Number(prodBase.reviewCount) <= 70)) {
+        prodBase.reviewCount = generatedReviewCount(prodBase);
+      }
       const rawCategoryPaths = Array.isArray(prodBase.categoryPaths) && prodBase.categoryPaths.length
         ? prodBase.categoryPaths
         : (Array.isArray(prodBase.categoryPath) && prodBase.categoryPath.length ? [prodBase.categoryPath] : []);

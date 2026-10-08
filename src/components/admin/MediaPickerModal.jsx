@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getMediaItems, uploadMediaFile, saveMediaItemToCloud } from "../../lib/catalogStore";
 import Icon from "../Icon";
+import ImageCropperModal from "./ImageCropperModal";
 
 export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple = false }) {
   const [activeTab, setActiveTab] = useState("library"); // 'library' | 'upload' | 'url'
@@ -10,9 +11,13 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple =
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
+  const [cropFiles, setCropFiles] = useState([]);
 
   useEffect(() => {
-    if (!isOpen) setSelectedIds([]);
+    if (!isOpen) {
+      setSelectedIds([]);
+      setCropFiles([]);
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -29,19 +34,8 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple =
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setError("");
-    setUploading(true);
-    try {
-      const saved = [];
-      for (const file of files) {
-        saved.push(await uploadMediaFile(file, titleInput || file.name));
-      }
-      onSelect(multiple ? saved.map((item) => item.url) : saved[0].url);
-      onClose();
-    } catch (err) {
-      setError(err.message || "Failed to upload image.");
-    } finally {
-      setUploading(false);
-    }
+    setCropFiles(files);
+    e.target.value = "";
   }
 
   async function handleUrlSubmit(e) {
@@ -99,6 +93,27 @@ export default function MediaPickerModal({ isOpen, onClose, onSelect, multiple =
         </div>
 
         {error && <div className="admin-alert admin-alert--error">{error}</div>}
+
+        <ImageCropperModal
+          isOpen={cropFiles.length > 0}
+          files={cropFiles}
+          recommendedRatio="free"
+          onCancel={() => setCropFiles([])}
+          onComplete={async (croppedFiles) => {
+            setCropFiles([]);
+            setUploading(true);
+            try {
+              const saved = [];
+              for (const file of croppedFiles) saved.push(await uploadMediaFile(file, titleInput || file.name));
+              onSelect(multiple ? saved.map((item) => item.url) : saved[0].url);
+              onClose();
+            } catch (err) {
+              setError(err.message || "Failed to upload image.");
+            } finally {
+              setUploading(false);
+            }
+          }}
+        />
 
         {activeTab === "library" && (
           <div className="admin-media-picker-body">

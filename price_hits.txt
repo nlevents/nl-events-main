@@ -1,0 +1,76 @@
+/mnt/data/price_work/src/lib/cart.js:18:  if (typeof item.originalPrice !== "number") return null;
+/mnt/data/price_work/src/lib/cart.js:19:  return cityPrice(item.originalPrice, item.city);
+/mnt/data/price_work/src/lib/chatbotFlowEngine.js:128:    originalPrice: typeof product.originalPrice === "number" ? cityPriceLabel(product.originalPrice, city) : null,
+/mnt/data/price_work/src/lib/catalogStore.js:1202:      originalPrice: product.originalPrice ? sanitizeNumber(product.originalPrice, 0, 10000000) : null,
+/mnt/data/price_work/src/lib/catalogStore.js:1203:      costPrice: product.costPrice == null || product.costPrice === "" ? null : sanitizeNumber(product.costPrice, 0, 10000000, 0),
+/mnt/data/price_work/src/lib/catalogStore.js:1205:      profitAmount: product.costPrice == null || product.costPrice === "" ? null : sanitizeNumber(product.price, 0, 10000000, 0) - sanitizeNumber(product.costPrice, 0, 10000000, 0),
+/mnt/data/price_work/src/lib/catalogStore.js:1206:      profitMarginPercent: product.costPrice == null || product.costPrice === "" || !(Number(product.price) > 0) ? null : Math.round((((sanitizeNumber(product.price, 0, 10000000, 0) - sanitizeNumber(product.costPrice, 0, 10000000, 0)) / sanitizeNumber(product.price, 0, 10000000, 1)) * 1000)) / 10,
+/mnt/data/price_work/src/data/occasions.js:65:          makeProduct({ slug: "cold-pyro", name: "Cold Pyro", setupType: "SFX", shortDesc: "Indoor-friendly cold spark special effects for entries and stages.", image: IMAGES.showcase7, price: 3499, originalPrice: 4499, includes: ["Cold pyro machines", "Operator", "Setup & takedown"] }),
+/mnt/data/price_work/src/data/occasions.js:66:          makeProduct({ slug: "fog-machine", name: "Fog Machine", setupType: "SFX", shortDesc: "Low-lying or atmospheric fog effects for stage and dance-floor moments.", image: IMAGES.showcase7, price: 3999, originalPrice: 4999, includes: ["Fog machine", "Fog fluid", "Operator"] }),
+/mnt/data/price_work/src/data/occasions.js:67:          makeProduct({ slug: "fireworks", name: "Fireworks", setupType: "SFX", shortDesc: "Celebration fireworks coordinated around your event schedule and venue rules.", image: IMAGES.showcase7, price: 5999, originalPrice: 7499, includes: ["Firework selection", "Professional operator", "Event coordination"] }),
+/mnt/data/price_work/src/data/occasions.js:76:          makeProduct({ slug: "anchor-host", name: "Anchor / Host", setupType: "Artist", shortDesc: "Professional event host for guest engagement and stage flow.", image: IMAGES.galConcert2, price: 9999, originalPrice: 11999, includes: ["Professional anchor", "Event coordination", "Stage hosting"] }),
+/mnt/data/price_work/src/data/occasions.js:77:          makeProduct({ slug: "dance-performance", name: "Dance Performance", setupType: "Artist", shortDesc: "Live dance performance curated for your celebration.", image: IMAGES.galConcert2, price: 8999, originalPrice: 10999, includes: ["Dance performers", "Performance set", "Event coordination"] }),
+/mnt/data/price_work/src/data/occasions.js:86:          makeProduct({ slug: "candid-photography", name: "Candid Photography", setupType: "Photography", shortDesc: "Natural candid coverage focused on people, moments and details.", image: IMAGES.typePhotography, price: 14999, originalPrice: 17999, includes: ["Candid photographer", "Event coverage", "Edited photographs"] }),
+/mnt/data/price_work/src/data/occasions.js:87:          makeProduct({ slug: "cinematic-video", name: "Cinematic Video", setupType: "Photography", shortDesc: "Cinematic event film coverage with polished editing.", image: IMAGES.typePhotography, price: 19999, originalPrice: 23999, includes: ["Cinematic videographer", "Event coverage", "Edited highlight film"] }),
+/mnt/data/price_work/src/data/occasions.js:88:          makeProduct({ slug: "drone-coverage", name: "Drone Coverage", setupType: "Photography", shortDesc: "Aerial event footage where venue and regulations permit.", image: IMAGES.typePhotography, price: 9999, originalPrice: 11999, includes: ["Drone operator", "Aerial footage", "Edited clips"] }),
+/mnt/data/price_work/src/data/occasions.js:97:          makeProduct({ slug: "wedding-games", name: "Wedding Games", setupType: "Wedding Activity", shortDesc: "Interactive games and activities to keep wedding guests engaged.", image: IMAGES.showcase3, price: 6999, originalPrice: 8499, includes: ["Curated games", "Activity coordination", "Host support"] }),
+/mnt/data/price_work/src/data/occasions.js:106:          makeProduct({ slug: "dhol-baraat", name: "Dhol Baraat Entry", setupType: "Baraat", shortDesc: "Energetic dhol-led baraat entry support.", image: IMAGES.themeStageLights, price: 12999, originalPrice: 14999, includes: ["Dhol performers", "Entry coordination", "Procession support"] }),
+/mnt/data/price_work/src/data/occasions.js:107:          makeProduct({ slug: "band-baraat", name: "Band & Baraat Entry", setupType: "Baraat", shortDesc: "Band-led baraat procession with coordinated entry styling.", image: IMAGES.themeStageLights, price: 17999, originalPrice: 20999, includes: ["Band", "Entry coordination", "Procession support"] }),
+/mnt/data/price_work/src/data/occasions.js:134:            originalPrice: 1299,
+/mnt/data/price_work/src/data/occasions.js:144:            originalPrice: 2499,
+/mnt/data/price_work/src/data/occasions.js:186:                    originalPrice: 18999,
+/mnt/data/price_work/src/data/occasions.js:206:                    originalPrice: 16999,
+/mnt/data/price_work/src/data/occasions.js:226:                    originalPrice: 15999,
+/mnt/data/price_work/src/data/occasions.js:266:                originalPrice: 19999,
+/mnt/data/price_work/src/data/occasions.js:278:                originalPrice: 17499,
+/mnt/data/price_work/src/data/occasions.js:298:                originalPrice: 18999,
+/mnt/data/price_work/src/data/occasions.js:310:                originalPrice: 20999,
+/mnt/data/price_work/src/data/occasions.js:332:            originalPrice: 47999,
+/mnt/data/price_work/src/data/occasions.js:344:            originalPrice: 42999,
+/mnt/data/price_work/src/data/occasions.js:364:            originalPrice: 10999,
+/mnt/data/price_work/src/data/occasions.js:376:            originalPrice: 14999,
+/mnt/data/price_work/src/data/occasions.js:1598:  if (!product || !product.originalPrice || product.originalPrice <= product.price) return 0;
+/mnt/data/price_work/src/data/occasions.js:1599:  return Math.round((1 - product.price / product.originalPrice) * 100);
+/mnt/data/price_work/src/data/occasions.js:1841:// expects ({ id, img, name, price, originalPrice, badge, href }) — the one
+/mnt/data/price_work/src/data/occasions.js:1850:    originalPrice: product.originalPrice,
+/mnt/data/price_work/src/pages/PackageDetails.jsx:164:  const originalPrice = typeof product.originalPrice === "number" ? cityPrice(product.originalPrice, city) : null;
+/mnt/data/price_work/src/pages/PackageDetails.jsx:165:  const discount = originalPrice && originalPrice > price ? Math.round((1 - price / originalPrice) * 100) : 0;
+/mnt/data/price_work/src/pages/PackageDetails.jsx:168:    return { id: p.id, img: p.image, name: p.name, price: p.price, originalPrice: p.originalPrice, href: "/package-details?id=" + encodeURIComponent(p.id) };
+/mnt/data/price_work/src/pages/PackageDetails.jsx:195:                {originalPrice ? <s>{fmtINR(originalPrice)}</s> : null}
+/mnt/data/price_work/src/pages/admin/AdminProducts.jsx:319:                          {product.originalPrice && (
+/mnt/data/price_work/src/pages/admin/AdminProducts.jsx:320:                            <span className="admin-mrp-cut">{fmtINR(product.originalPrice)}</span>
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:150:    originalPrice: "",
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:168:    originalPrice: "",
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:169:    costPrice: "",
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:602:        originalPrice: item.originalPrice ? Number(item.originalPrice) : null,
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:603:        costPrice: item.costPrice === "" || item.costPrice == null ? null : Math.max(0, Number(item.costPrice) || 0),
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:605:        profitAmount: item.costPrice === "" || item.costPrice == null ? null : (Number(item.price) || 0) - (Number(item.costPrice) || 0),
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:606:        profitMarginPercent: item.costPrice === "" || item.costPrice == null || !(Number(item.price) > 0) ? null : Math.round((((Number(item.price) || 0) - (Number(item.costPrice) || 0)) / (Number(item.price) || 1)) * 1000) / 10,
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:1369:          <Field label="Selling Price (₹)" required><input type="number" min="1" value={item.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 25000" /></Field>
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:1370:          <Field label="Cost Price (₹)"><input type="number" min="0" value={item.costPrice ?? ""} onChange={(e) => set("costPrice", e.target.value)} placeholder="Your internal cost" /></Field>
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:1375:          <strong>{item.costPrice !== "" && Number(item.price) > 0 ? `${Math.round((((Number(item.price) || 0) - (Number(item.costPrice) || 0)) / (Number(item.price) || 1)) * 1000) / 10}%` : "—"}</strong>
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:1376:          <small>{item.costPrice !== "" && Number(item.price) > 0 ? `Profit ${fmtINR((Number(item.price) || 0) - (Number(item.costPrice) || 0))}` : "Add a cost price to calculate"}</small>
+/mnt/data/price_work/src/pages/admin/AdminCatalog.jsx:1378:        <p className="catalog-field-help">Selling Price is what the customer pays. Cost Price is internal. Margin is calculated automatically.</p>
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:278:    originalPrice: "",
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:324:          originalPrice: p.originalPrice || "",
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:360:    formData.originalPrice && formData.originalPrice > formData.price
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:361:      ? Math.round(((formData.originalPrice - formData.price) / formData.originalPrice) * 100)
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:646:                <label className="admin-form-label">Selling Price (₹) *</label>
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:666:                  value={formData.originalPrice}
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:670:                      originalPrice: e.target.value ? Number(e.target.value) : "",
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:702:                    {discountPercent}% OFF ({fmtINR(formData.originalPrice - formData.price)})
+/mnt/data/price_work/src/pages/admin/AdminProductForm.jsx:1038:                  {formData.originalPrice && <span style={{ textDecoration: "line-through", color: "var(--text-secondary)", fontSize: "14px" }}>{fmtINR(formData.originalPrice)}</span>}
+/mnt/data/price_work/src/pages/admin/AdminAddons.jsx:222:                <td><strong>{product.price != null ? fmtINR(product.price) : "Contact for pricing"}</strong>{product.originalPrice ? <span className="admin-mrp-cut">{fmtINR(product.originalPrice)}</span> : null}</td>
+/mnt/data/price_work/src/components/ProductRail.jsx:62:              const original = typeof p.originalPrice === "number" ? fmtINR(cityPrice(p.originalPrice, city)) : null;
+/mnt/data/price_work/src/components/occasion/ProductCard.jsx:22:  const priceWas = !isQuoteOnly && product.originalPrice ? fmtINR(cityPrice(product.originalPrice, city)) : null;
+/mnt/data/price_work/src/components/occasion/ProductTemplate.jsx:66:        originalPrice: p.originalPrice,
+/mnt/data/price_work/src/components/occasion/ProductTemplate.jsx:78:  const originalPrice = !isQuoteOnly && typeof product.originalPrice === "number"
+/mnt/data/price_work/src/components/occasion/ProductTemplate.jsx:79:    ? cityPrice(product.originalPrice, city)
+/mnt/data/price_work/src/components/occasion/ProductTemplate.jsx:159:                  {originalPrice ? <s>{fmtINR(originalPrice)}</s> : null}
+/mnt/data/price_work/src/components/occasion/ProductTemplate.jsx:272:                {originalPrice ? <s>{fmtINR(originalPrice)}</s> : null}
+/mnt/data/price_work/src/components/chatbot/ChatProductCard.jsx:16:          {product.originalPrice && <span className="chat-product-strike">{product.originalPrice}</span>}
+/mnt/data/price_work/src/components/BookingPanel.jsx:46://   product           { slug|id, name, image, price, originalPrice? } — base
+/mnt/data/price_work/src/components/BookingPanel.jsx:117:  const originalPrice = typeof product.originalPrice === "number" ? cityPrice(product.originalPrice, city) : null;
+/mnt/data/price_work/src/components/BookingPanel.jsx:118:  const discount = originalPrice && originalPrice > basePrice ? Math.round((1 - basePrice / originalPrice) * 100) : 0;
+/mnt/data/price_work/src/components/BookingPanel.jsx:188:      originalPrice: typeof product.originalPrice === "number" ? product.originalPrice : null,
+/mnt/data/price_work/src/components/BookingPanel.jsx:222:        {originalPrice ? <s>{fmtINR(originalPrice)}</s> : null}

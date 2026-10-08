@@ -60,6 +60,9 @@ export default function ProductRail({ title, viewAllHref, items, tone, variant =
             {items.map((p) => {
               const price = typeof p.price === "number" ? fmtINR(cityPrice(p.price, city)) : p.price;
               const original = typeof p.originalPrice === "number" ? fmtINR(cityPrice(p.originalPrice, city)) : null;
+              const discount = typeof p.price === "number" && typeof p.originalPrice === "number" && p.originalPrice > p.price
+                ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
+                : 0;
               return (
                 <Link className="rail-card" to={p.href} key={p.id || p.name}>
                   <div className="rail-card-media">
@@ -72,6 +75,7 @@ export default function ProductRail({ title, viewAllHref, items, tone, variant =
                       <div className="rail-card-price">
                         <b>{price}</b>
                         {original ? <s>{original}</s> : null}
+                        {discount > 0 ? <span className="rail-card-discount">{discount}% OFF</span> : null}
                       </div>
                     ) : null}
                   </div>

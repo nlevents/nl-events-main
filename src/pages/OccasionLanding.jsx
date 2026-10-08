@@ -95,12 +95,25 @@ function Hero({ config, type }) {
 }
 
 function findCatalogPathByLabel(label, rootSlugs = []) {
-  const wanted = String(label || "").trim().toLowerCase();
+  // Landing-page labels sometimes use presentation punctuation (for example
+  // "Get Together") while the catalog node uses a slug-style label ("Get-Together").
+  // Normalize only for lookup so the existing catalog hierarchy remains unchanged.
+  const normalizeLabel = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const normalizeVariants = (value) => {
+    const normalized = normalizeLabel(value);
+    const variants = new Set([normalized]);
+    if (normalized.endsWith("ies") && normalized.length > 3) variants.add(normalized.slice(0, -3) + "y");
+    if (normalized.endsWith("es") && normalized.length > 2) variants.add(normalized.slice(0, -2));
+    if (normalized.endsWith("s") && normalized.length > 1) variants.add(normalized.slice(0, -1));
+    return variants;
+  };
+  const wantedVariants = normalizeVariants(label);
   const roots = listOccasions();
   const preferred = rootSlugs.length ? roots.filter((o) => rootSlugs.includes(o.slug)) : roots;
   function walk(node, trail) {
     if (!node) return null;
-    if (String(node.label || "").trim().toLowerCase() === wanted) return pathFor([...trail, node]);
+    const nodeVariants = normalizeVariants(node.label);
+    if ([...wantedVariants].some((variant) => nodeVariants.has(variant))) return pathFor([...trail, node]);
     for (const child of node.children || []) {
       const found = walk(child, [...trail, node]);
       if (found) return found;

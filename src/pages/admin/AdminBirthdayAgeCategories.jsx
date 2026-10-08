@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Icon from "../../components/Icon";
+import ImageCropperModal from "../../components/admin/ImageCropperModal";
 import usePageMeta from "../../hooks/usePageMeta";
 import {
   getBirthdayAgeCategories,
@@ -25,6 +26,7 @@ export default function AdminBirthdayAgeCategories() {
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cropFiles, setCropFiles] = useState([]);
 
   function refresh() {
     setItems(getBirthdayAgeCategories());
@@ -119,24 +121,35 @@ export default function AdminBirthdayAgeCategories() {
     }
   }
 
-  async function uploadImage(event) {
+  function uploadImage(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setBusy(true);
     setError("");
-    try {
-      const saved = await uploadMediaFile(file, file.name);
-      setEditing((current) => ({ ...current, image: saved.url }));
-    } catch (err) {
-      setError(err.message || "Unable to upload image.");
-    } finally {
-      setBusy(false);
-      event.target.value = "";
-    }
+    setCropFiles([file]);
+    event.target.value = "";
   }
 
   return (
-    <div className="admin-page birthday-age-admin-page">
+    <>
+      <ImageCropperModal
+        isOpen={cropFiles.length > 0}
+        files={cropFiles}
+        recommendedRatio="4:3"
+        onCancel={() => setCropFiles([])}
+        onComplete={async (croppedFiles) => {
+          setCropFiles([]);
+          setBusy(true);
+          try {
+            const saved = await uploadMediaFile(croppedFiles[0], croppedFiles[0].name);
+            setEditing((current) => ({ ...current, image: saved.url }));
+          } catch (err) {
+            setError(err.message || "Unable to upload image.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+      <div className="admin-page birthday-age-admin-page">
       <div className="admin-page-head">
         <div>
           <div className="catalog-breadcrumb">Dashboard <span>›</span> Catalog <span>›</span> Birthday</div>
@@ -228,5 +241,6 @@ export default function AdminBirthdayAgeCategories() {
         </div>
       )}
     </div>
+    </>
   );
 }

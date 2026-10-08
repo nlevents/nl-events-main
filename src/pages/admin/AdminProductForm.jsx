@@ -274,6 +274,8 @@ export default function AdminProductForm() {
     shortDesc: "",
     tagline: "",
     description: "",
+    quantity: "",
+    unit: "",
     price: "",
     originalPrice: "",
     rating: 0,
@@ -331,6 +333,8 @@ export default function AdminProductForm() {
           rating: typeof p.rating === "number" ? p.rating : 4.8,
           reviewCount: typeof p.reviewCount === "number" ? p.reviewCount : 0,
           description: p.description || "",
+          quantity: p.quantity ?? "",
+          unit: p.unit || "",
           addons: Array.isArray(p.addons) ? p.addons : [],
           cities: Array.isArray(p.cities) ? p.cities : ["Ranchi", "Jamshedpur"],
           categoryPath: Array.isArray(p.categoryPath) ? p.categoryPath : (p.categorySlug ? [p.occasionSlug, p.categorySlug] : []),
@@ -613,6 +617,19 @@ export default function AdminProductForm() {
 
             <div className="admin-form-row">
               <div className="admin-form-group">
+                <label className="admin-form-label">Quantity</label>
+                <input type="number" className="admin-input" min="0" step="0.01" placeholder="e.g. 32" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
+              </div>
+              <div className="admin-form-group">
+                <label className="admin-form-label">Unit</label>
+                <select className="admin-select" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })}>
+                  <option value="">Select unit</option><option>Piece</option><option>Set</option><option>Pair</option><option>Pack</option><option>Box</option><option>Unit</option><option>Kg</option><option>Gram</option><option>Litre</option><option>Millilitre</option><option>Meter</option><option>Centimeter</option><option>Square Feet</option><option>Square Meter</option><option>Cubic Feet</option><option>Cubic Meter</option><option>Running Feet</option><option>Hour</option><option>Day</option><option>Person / Guest</option><option>Plate</option><option>Table</option><option>Per Event</option><option>Custom</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="admin-form-row">
+              <div className="admin-form-group">
                 <label className="admin-form-label">Rating (1–5)</label>
                 <input
                   type="number"
@@ -643,7 +660,7 @@ export default function AdminProductForm() {
             <h2>2. Pricing & Commercials</h2>
             <div className="admin-form-row">
               <div className="admin-form-group">
-                <label className="admin-form-label">Selling Price (₹) *</label>
+                <label className="admin-form-label">Discounted Price / Selling Price (₹) *</label>
                 <input
                   type="number"
                   className="admin-input"
@@ -656,7 +673,7 @@ export default function AdminProductForm() {
               </div>
 
               <div className="admin-form-group">
-                <label className="admin-form-label">Original Price / MRP (₹)</label>
+                <label className="admin-form-label">Original MRP (₹)</label>
                 <input
                   type="number"
                   className="admin-input"
@@ -692,7 +709,7 @@ export default function AdminProductForm() {
             {/* Pricing Simulator / Margin Bar */}
             <div className="admin-calc-box">
               <div className="admin-calc-item">
-                <span>Display Price:</span>
+                <span>Discounted Price:</span>
                 <strong>{fmtINR(formData.price)}</strong>
               </div>
               {discountPercent > 0 && (

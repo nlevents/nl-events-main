@@ -218,6 +218,12 @@ export default function PackageDetails() {
               <div className="pd-description" id="pd-description">
                 <h2>Description</h2>
                 <p>{description}</p>
+                {product.quantity != null && product.quantity !== "" && product.unit ? (
+                  <div style={{ marginTop: 18 }}>
+                    <strong>Quantity</strong>
+                    <p style={{ marginTop: 6 }}>{product.quantity} {product.unit}</p>
+                  </div>
+                ) : null}
               </div>
             </div>
 

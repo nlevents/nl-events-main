@@ -140,6 +140,16 @@ function persist(key, value) {
   queueCloudSync(key, value);
 }
 
+function reviewCountForProduct(product) {
+  const key = String(product?.id || product?.slug || product?.name || "product");
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i += 1) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return 6 + (Math.abs(hash >>> 0) % 65);
+}
+
 function uid(prefix = "item") {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -1205,8 +1215,13 @@ export function saveProduct(product) {
       profitAmount: product.costPrice == null || product.costPrice === "" ? null : sanitizeNumber(product.price, 0, 10000000, 0) - sanitizeNumber(product.costPrice, 0, 10000000, 0),
       profitMarginPercent: product.costPrice == null || product.costPrice === "" || !(Number(product.price) > 0) ? null : Math.round((((sanitizeNumber(product.price, 0, 10000000, 0) - sanitizeNumber(product.costPrice, 0, 10000000, 0)) / sanitizeNumber(product.price, 0, 10000000, 1)) * 1000)) / 10,
       rating: sanitizeNumber(product.rating, 1, 5, 4.8),
-      reviewCount: sanitizeNumber(product.reviewCount, 0, 10000, 0),
+      reviewCount: (() => {
+        const count = Number(product.reviewCount);
+        return Number.isFinite(count) && count >= 6 && count <= 70 ? Math.round(count) : reviewCountForProduct(product);
+      })(),
       description: sanitizeText(product.description || ""),
+      quantity: product.quantity == null || product.quantity === "" ? null : sanitizeNumber(product.quantity, 0, 100000000, 0),
+      unit: sanitizeText(product.unit || ""),
       setupRequirements: sanitizeText(product.setupRequirements || ""),
       duration: sanitizeText(product.duration || ""),
       requiresTimeSlot: product.requiresTimeSlot !== false,
@@ -2639,9 +2654,10 @@ export function getServiceScopeOptions() {
     }));
 }
 
-// Returns the actual admin-created service products that are available for a
-// particular occasion/category context. This is the single source used by
-// booking panels; there is deliberately no hardcoded fallback service list.
+// Returns the actual admin-created decoration products and packages that are
+// available for a particular occasion/category context. This is the single
+// source used by the Decor storefront surface; there is deliberately no
+// hardcoded fallback catalog.
 export function getDecorationProductsForContext(contextPath = []) {
   const context = Array.isArray(contextPath)
     ? contextPath.map((part) => sanitizeSlug(part)).filter(Boolean)
@@ -2656,12 +2672,37 @@ export function getDecorationProductsForContext(contextPath = []) {
   };
 
   return getProducts()
-    .filter((product) => product?.catalogKind === "product")
+    // Decor is also the storefront surface for packages placed in the same
+    // occasion/function/theme. Packages use the normal catalog hierarchy, so
+    // they must follow the same context matching as decoration products.
+    .filter((product) => {
+      const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
+        ? product.catalogKinds
+        : [product?.catalogKind || "product"];
+      return kinds.includes("product") || kinds.includes("package");
+    })
     .filter((product) => product?.status !== "archived" && product?.status !== "draft")
     .filter((product) => {
-      const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
-        ? product.categoryPaths
-        : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+      const basePaths = Array.isArray(product?.categoryPaths) ? product.categoryPaths : [];
+      const productPaths = Array.isArray(product?.productCategoryPaths) ? product.productCategoryPaths : [];
+      const packagePaths = Array.isArray(product?.packageCategoryPaths) ? product.packageCategoryPaths : [];
+      const legacyPaths = Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : [];
+      const legacyPackagePaths = product?.catalogKind === "package" && Array.isArray(product?.packageOccasions)
+        ? product.packageOccasions.map((slug) => [slug])
+        : [];
+      const rawPaths = [...basePaths, ...productPaths, ...packagePaths, ...legacyPaths, ...legacyPackagePaths]
+        .filter((path) => Array.isArray(path) && path.length);
+      // Older festival catalog saves could omit the `festivals` wrapper and
+      // store a theme as `festivals-culture/holi`. Treat that legacy path as
+      // the canonical `festivals-culture/festivals/holi` path for storefront
+      // matching. Do not mutate the saved record.
+      const paths = rawPaths.flatMap((path) => {
+        const normalized = path.map((part) => sanitizeSlug(part)).filter(Boolean);
+        if (normalized[0] === "festivals-culture" && normalized[1] && !["festivals", "other-celebrations"].includes(normalized[1])) {
+          return [normalized, ["festivals-culture", "festivals", ...normalized.slice(1)]];
+        }
+        return [normalized];
+      });
 
       // A product can reach Decor either through its normal occasion/category
       // assignment or through an explicit cross-display placement. The latter

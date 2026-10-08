@@ -244,17 +244,49 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
         : null;
       const isAnniversaryType = Boolean(anniversaryTypes?.children?.some((child) => child?.slug === themeFilter));
 
+      const findThemePath = (nodes, slug, trail = []) => {
+        for (const child of nodes || []) {
+          const nextTrail = [...trail, child];
+          if (child?.slug === slug) return nextTrail.map((item) => item.slug);
+          const nested = findThemePath(child?.children || [], slug, nextTrail);
+          if (nested) return nested;
+        }
+        return null;
+      };
+      const canonicalThemePath = findThemePath(
+        contextPath[0] ? childrenOf(getOccasion(contextPath[0])) : [],
+        themeFilter,
+        [],
+      );
       const themeContext = contextPath[0] === "birthday"
         ? (isBirthdayTheme
           ? ["birthday", "birthday-types", "theme-party", themeFilter]
           : ["birthday", "birthday-types", themeFilter])
         : contextPath[0] === "anniversary" && isAnniversaryType
           ? ["anniversary", "anniversary-types", themeFilter]
-          : [...contextPath, themeFilter];
+          : (contextPath[contextPath.length - 1] === themeFilter
+            ? contextPath
+            : (canonicalThemePath ? [contextPath[0], ...canonicalThemePath] : [...contextPath, themeFilter]));
       const matchesThemePath = (product) => {
-        const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
-          ? product.categoryPaths
-          : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+        const basePaths = Array.isArray(product?.categoryPaths) ? product.categoryPaths : [];
+        const productPaths = Array.isArray(product?.productCategoryPaths) ? product.productCategoryPaths : [];
+        const packagePaths = Array.isArray(product?.packageCategoryPaths) ? product.packageCategoryPaths : [];
+        const legacyPaths = Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : [];
+        const legacyPackagePaths = product?.catalogKind === "package" && Array.isArray(product?.packageOccasions)
+          ? product.packageOccasions.map((slug) => [slug])
+          : [];
+        const rawPaths = [...basePaths, ...productPaths, ...packagePaths, ...legacyPaths, ...legacyPackagePaths]
+          .filter((path) => Array.isArray(path) && path.length);
+        // Older festival catalog saves may omit the `festivals` wrapper.
+        // Match those paths to the current canonical festival theme path
+        // without changing the stored catalog record.
+        const paths = rawPaths.flatMap((path) => {
+          const normalized = path.map((part) => String(part || "").toLowerCase().trim()).filter(Boolean);
+          if (normalized[0] === "festivals-culture" && normalized[1] && !["festivals", "other-celebrations"].includes(normalized[1])) {
+            return [normalized, ["festivals-culture", "festivals", ...normalized.slice(1)]];
+          }
+          return [normalized];
+        });
         const categoryMatch = paths.some((rawPath) => {
           const path = rawPath.map((part) => String(part || "").toLowerCase().trim()).filter(Boolean);
           return path.length >= themeContext.length && themeContext.every((part, index) => path[index] === part);

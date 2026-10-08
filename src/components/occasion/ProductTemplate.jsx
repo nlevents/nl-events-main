@@ -168,7 +168,13 @@ export default function ProductTemplate({ node: product, trail }) {
 
               <div className="reveal occ-block" style={{ paddingTop: 28, marginTop: 28 }}>
                 <h2 style={{ fontSize: 22, marginBottom: 12 }}>Description</h2>
-                <p style={{ color: "var(--text-secondary)", maxWidth: "68ch", lineHeight: 1.6 }}>{product.description}</p>
+                <p style={{ color: "var(--text-secondary)", maxWidth: "68ch", lineHeight: 1.6, whiteSpace: "pre-line" }}>{product.description}</p>
+                {product.quantity != null && product.quantity !== "" && product.unit ? (
+                  <div style={{ marginTop: 18 }}>
+                    <strong>Quantity</strong>
+                    <p style={{ color: "var(--text-secondary)", marginTop: 6 }}>{product.quantity} {product.unit}</p>
+                  </div>
+                ) : null}
               </div>
 
               {product.includes.length > 0 && (
@@ -286,7 +292,13 @@ export default function ProductTemplate({ node: product, trail }) {
 
             <div className="pd-market-section pd-description reveal">
               <div className="pd-section-heading"><h2>Description</h2></div>
-              <p>{product.description}</p>
+              <p style={{ whiteSpace: "pre-line" }}>{product.description}</p>
+              {product.quantity != null && product.quantity !== "" && product.unit ? (
+                <div style={{ marginTop: 18 }}>
+                  <strong>Quantity</strong>
+                  <p style={{ marginTop: 6 }}>{product.quantity} {product.unit}</p>
+                </div>
+              ) : null}
             </div>
 
             {!isQuoteOnly && bookingPanel && <div className="pd-booking-inline reveal">{bookingPanel}</div>}

@@ -11,6 +11,7 @@ import {
   getProducts,
 } from "../../lib/catalogStore";
 import Icon from "../../components/Icon";
+import ImageCropperModal from "../../components/admin/ImageCropperModal";
 import usePageMeta from "../../hooks/usePageMeta";
 
 const GALLERY_CATEGORIES = [
@@ -34,6 +35,8 @@ export default function AdminMedia() {
   const [copiedId, setCopiedId] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [cropFiles, setCropFiles] = useState([]);
+  const [cropPurpose, setCropPurpose] = useState("");
 
   // New URL Import State
   const [urlInput, setUrlInput] = useState("");
@@ -60,31 +63,13 @@ export default function AdminMedia() {
     return () => window.removeEventListener("nle-catalog-updated", onUpdate);
   }, []);
 
-  async function handleFileUpload(e) {
+  function handleFileUpload(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setError("");
-    setUploading(true);
-    try {
-      // Upload sequentially to keep browser memory and Cloudinary usage low
-      // on the free tier while still allowing a single multi-select action.
-      const saved = [];
-      for (const file of files) {
-        saved.push(await uploadMediaFile(file));
-      }
-      refresh();
-      setFeedback(
-        saved.length === 1
-          ? `Uploaded "${saved[0].title}".`
-          : `Uploaded ${saved.length} pictures to the Media Library.`
-      );
-      setTimeout(() => setFeedback(""), 3000);
-    } catch (err) {
-      setError(err.message || "Upload failed.");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
+    setCropPurpose("media");
+    setCropFiles(files);
+    e.target.value = "";
   }
 
   async function handleImportUrl(e) {
@@ -217,6 +202,34 @@ export default function AdminMedia() {
 
       {feedback && <div className="admin-alert admin-alert--success">{feedback}</div>}
       {error && <div className="admin-alert admin-alert--error">{error}</div>}
+
+      <ImageCropperModal
+        isOpen={cropFiles.length > 0}
+        files={cropFiles}
+        recommendedRatio={cropPurpose === "gallery" ? 1.18 : "free"}
+        onCancel={() => { setCropFiles([]); setCropPurpose(""); }}
+        onComplete={async (croppedFiles) => {
+          const purpose = cropPurpose;
+          setCropFiles([]);
+          setCropPurpose("");
+          if (purpose === "gallery") {
+            setNewGalFiles(croppedFiles);
+            return;
+          }
+          setUploading(true);
+          try {
+            const saved = [];
+            for (const file of croppedFiles) saved.push(await uploadMediaFile(file));
+            refresh();
+            setFeedback(saved.length === 1 ? `Uploaded "${saved[0].title}".` : `Uploaded ${saved.length} pictures to the Media Library.`);
+            setTimeout(() => setFeedback(""), 3000);
+          } catch (err) {
+            setError(err.message || "Upload failed.");
+          } finally {
+            setUploading(false);
+          }
+        }}
+      />
 
       {activeTab === "media" && (
         <div className="admin-media-layout">
@@ -359,8 +372,11 @@ export default function AdminMedia() {
                     disabled={galleryUploading}
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
-                      setNewGalFiles(files);
-                      if (files.length) setNewGalImg("");
+                      if (files.length) {
+                        setNewGalImg("");
+                        setCropPurpose("gallery");
+                        setCropFiles(files);
+                      }
                       e.target.value = "";
                     }}
                   />
