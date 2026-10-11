@@ -11,7 +11,7 @@ import EventServicesSection from "./EventServicesSection";
 import HeroImageCarousel from "../HeroImageCarousel";
 import ListingControls from "./ListingControls";
 import ProductRail from "../ProductRail";
-import { getBirthdayThemeProducts, getDecorationProductsForContext, getAddonCategoryTree, getAddonProducts, getOccasion, hydrateCatalogFromCloud, serviceProductMatchesContext } from "../../lib/catalogStore";
+import { getBirthdayThemeProducts, getDecorationProductsForContext, getAssignedCatalogCategoryPaths, getAddonCategoryTree, getAddonProducts, getOccasion, hydrateCatalogFromCloud, serviceProductMatchesContext } from "../../lib/catalogStore";
 import { DISPLAY_CATALOGS, normalizeDisplayPlacements } from "../../lib/catalogPlacement";
 import { filterServiceProducts } from "../../lib/serviceContext";
 import { EVENT_SERVICES } from "../../data/eventServices";
@@ -268,14 +268,15 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
             ? contextPath
             : (canonicalThemePath ? [contextPath[0], ...canonicalThemePath] : [...contextPath, themeFilter]));
       const matchesThemePath = (product) => {
-        const basePaths = Array.isArray(product?.categoryPaths) ? product.categoryPaths : [];
-        const productPaths = Array.isArray(product?.productCategoryPaths) ? product.productCategoryPaths : [];
-        const packagePaths = Array.isArray(product?.packageCategoryPaths) ? product.packageCategoryPaths : [];
-        const legacyPaths = Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : [];
+        const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
+          ? product.catalogKinds
+          : [product?.catalogKind || "product"];
+        const requestedKinds = ["product", "package"].filter((kind) => kinds.includes(kind));
+        const assignedPaths = getAssignedCatalogCategoryPaths(product, requestedKinds);
         const legacyPackagePaths = product?.catalogKind === "package" && Array.isArray(product?.packageOccasions)
           ? product.packageOccasions.map((slug) => [slug])
           : [];
-        const rawPaths = [...basePaths, ...productPaths, ...packagePaths, ...legacyPaths, ...legacyPackagePaths]
+        const rawPaths = [...assignedPaths, ...legacyPackagePaths]
           .filter((path) => Array.isArray(path) && path.length);
         // Older festival catalog saves may omit the `festivals` wrapper.
         // Match those paths to the current canonical festival theme path

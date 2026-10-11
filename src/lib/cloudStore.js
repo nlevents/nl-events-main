@@ -30,6 +30,7 @@ export const ADMIN_STATE_KEYS = [
 const ADMIN_SESSION_KEY = "nle-admin-supabase-session";
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const CLOUD_VERSION_PREFIX = "nle_catalog_v2_cloud_version_";
+const CLOUD_SNAPSHOT_PREFIX = "nle_catalog_v2_cloud_snapshot_";
 // Bumped because older builds incorrectly discarded real products whose IDs
 // happened to start with `addon-prod-`. This forces one clean product refresh
 // in browsers that already have the old filtered cache.
@@ -37,6 +38,73 @@ const PRODUCT_CACHE_FORMAT = "products-v2";
 const PRODUCT_CACHE_FORMAT_KEY = "nle_catalog_v2_products_cache_format";
 
 function cloudVersionKey(key) { return `${CLOUD_VERSION_PREFIX}${key}`; }
+function cloudSnapshotKey(key) { return `${CLOUD_SNAPSHOT_PREFIX}${key}`; }
+
+function getCloudSnapshot(key) {
+  try {
+    const raw = localStorage.getItem(cloudSnapshotKey(key));
+    return raw == null ? undefined : JSON.parse(raw);
+  } catch { return undefined; }
+}
+
+function setCloudSnapshot(key, value) {
+  try { localStorage.setItem(cloudSnapshotKey(key), JSON.stringify(value)); } catch { /* cache only */ }
+}
+
+function sameValue(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+}
+
+function itemIdentity(item) {
+  if (!item || typeof item !== "object") return null;
+  for (const field of ["id", "slug", "productId", "key"]) {
+    if (item[field] != null && String(item[field]) !== "") return `${field}:${String(item[field])}`;
+  }
+  return null;
+}
+
+// Three-way merge: apply local changes since the last cloud snapshot on top
+// of the latest server value. Conflicting edits to the same field are rejected
+// rather than silently overwriting either administrator's work.
+function mergeConcurrentState(base, local, remote, path = "catalog") {
+  if (sameValue(local, base)) return remote;
+  if (sameValue(remote, base)) return local;
+  if (sameValue(local, remote)) return local;
+
+  const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  if (isRecord(base) && isRecord(local) && isRecord(remote)) {
+    const result = {};
+    const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)]);
+    for (const key of keys) {
+      const value = mergeConcurrentState(base[key], local[key], remote[key], `${path}.${key}`);
+      if (value !== undefined) result[key] = value;
+    }
+    return result;
+  }
+
+  if (Array.isArray(base) && Array.isArray(local) && Array.isArray(remote)) {
+    const keyedArrays = [base, local, remote].every((items) => {
+      const ids = items.map(itemIdentity);
+      return ids.every(Boolean) && new Set(ids).size === ids.length;
+    });
+    if (keyedArrays) {
+      const baseMap = new Map(base.map((item) => [itemIdentity(item), item]));
+      const localMap = new Map(local.map((item) => [itemIdentity(item), item]));
+      const remoteMap = new Map(remote.map((item) => [itemIdentity(item), item]));
+      const order = [...remote.map(itemIdentity), ...local.map(itemIdentity).filter((id) => !remoteMap.has(id))];
+      const merged = [];
+      for (const id of order) {
+        const value = mergeConcurrentState(baseMap.get(id), localMap.get(id), remoteMap.get(id), `${path}[${id}]`);
+        if (value !== undefined) merged.push(value);
+      }
+      return merged;
+    }
+  }
+
+  throw new Error("This catalog was changed by another admin. Please refresh the Admin Panel and try again.");
+}
 
 function getCloudVersion(key) {
   try { return localStorage.getItem(cloudVersionKey(key)) || ""; } catch { return ""; }
@@ -116,12 +184,10 @@ function enqueueCloudWrite(key, data, { onConflict } = {}) {
           body: JSON.stringify({ key, data, expectedUpdatedAt }),
         });
         setCloudVersion(key, result?.updatedAt || "");
+        setCloudSnapshot(key, data);
         return { ...result, data };
       } catch (error) {
-        // A normal full-catalog edit still reports a real conflict.
-        // Special operations such as deletion can safely rebase their intent
-        // on the newest cloud snapshot instead of resurrecting stale local data.
-        if (error?.status !== 409 || typeof onConflict !== "function") throw error;
+        if (error?.status !== 409) throw error;
 
         const latest = await request(`${API_BASE}/admin/state`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -129,13 +195,44 @@ function enqueueCloudWrite(key, data, { onConflict } = {}) {
         });
         const latestData = latest?.state?.[key];
         const latestVersion = latest?.versions?.[key] || "";
-        const rebasedData = await onConflict(data, latestData);
-        const retry = await request(`${API_BASE}/admin/state`, {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ key, data: rebasedData, expectedUpdatedAt: latestVersion || undefined }),
-        });
+        const baseline = getCloudSnapshot(key);
+        // Deletions and other explicit operations can provide a purpose-built
+        // resolver. All other writes use a field-aware three-way merge.
+        let rebasedData;
+        try {
+          rebasedData = typeof onConflict === "function"
+            ? await onConflict(data, latestData)
+            : baseline === undefined
+              ? (() => { throw new Error("This catalog was changed by another admin. Please refresh the Admin Panel and try again."); })()
+              : mergeConcurrentState(baseline, data, latestData, key);
+        } catch (mergeError) {
+          // Keep a recoverable copy separate from the live cache. A later
+          // hydration can refresh authoritative data without destroying the
+          // administrator's draft. This is storage-only; no UI is added.
+          try {
+            localStorage.setItem(`${CLOUD_SNAPSHOT_PREFIX}conflict_${key}`, JSON.stringify({ data, savedAt: new Date().toISOString() }));
+          } catch { /* best-effort draft preservation */ }
+          throw mergeError;
+        }
+        let retry;
+        try {
+          retry = await request(`${API_BASE}/admin/state`, {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ key, data: rebasedData, expectedUpdatedAt: latestVersion || undefined }),
+          });
+        } catch (retryError) {
+          if (retryError?.status === 409) {
+            try {
+              localStorage.setItem(`${CLOUD_SNAPSHOT_PREFIX}conflict_${key}`, JSON.stringify({ data: rebasedData, savedAt: new Date().toISOString() }));
+            } catch { /* best-effort draft preservation */ }
+          }
+          throw retryError;
+        }
         setCloudVersion(key, retry?.updatedAt || latestVersion);
+        setCloudSnapshot(key, rebasedData);
+        try { localStorage.setItem(key, JSON.stringify(rebasedData)); } catch { /* cache only */ }
+        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("nle-catalog-updated"));
         return { ...retry, data: rebasedData, rebased: true };
       }
     });
@@ -211,6 +308,7 @@ export async function hydratePublicState({ versionsOnly = false } = {}) {
         localStorage.setItem(key, nextRaw);
         changed = true;
       }
+      setCloudSnapshot(key, value);
     } catch { /* cache only */ }
   });
 
@@ -235,6 +333,7 @@ export async function hydratePublicState({ versionsOnly = false } = {}) {
           changed = true;
         }
         localStorage.setItem(PRODUCT_CACHE_FORMAT_KEY, PRODUCT_CACHE_FORMAT);
+        setCloudSnapshot("nle_catalog_v2_products", cleanProducts);
       } catch { /* cache only */ }
     }
   }
@@ -307,6 +406,7 @@ export async function hydrateAdminState() {
         ? removeLegacySeedProducts(value)
         : value;
       try { localStorage.setItem(key, JSON.stringify(nextValue)); } catch { /* cache only */ }
+      setCloudSnapshot(key, nextValue);
       // Clean known legacy seed records out of the durable cloud catalog too.
       if (key === "nle_catalog_v2_products" && JSON.stringify(nextValue) !== JSON.stringify(value)) {
         enqueueCloudWrite(key, nextValue).catch((err) => console.warn("Legacy product cleanup failed:", err?.message || err));

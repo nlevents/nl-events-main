@@ -79,13 +79,40 @@ function AdminProductCategoryMultiPicker({ options, selectedPaths, onToggle }) {
           <input
             type="checkbox"
             checked={checked}
-            disabled={inherited}
             onChange={() => {
               const path = option.path || node.path;
               if (selected.has(node.key)) {
                 onToggle(path);
                 return;
               }
+
+              // A child selected only through an ancestor must still be removable.
+              // Expand that ancestor into its other descendant assignments, excluding
+              // the clicked branch, because the catalog format has no exclusion rules.
+              const inheritedAncestor = (selectedPaths || [])
+                .filter((selectedPath) => {
+                  const ancestorKey = selectedPath.join("/");
+                  return node.key.startsWith(`${ancestorKey}/`);
+                })
+                .sort((a, b) => b.length - a.length)[0];
+              if (inheritedAncestor) {
+                const ancestorKey = inheritedAncestor.join("/");
+                const outsideAncestor = (selectedPaths || []).filter(
+                  (selectedPath) => !ancestorKey.startsWith(`${selectedPath.join("/")}/`) && selectedPath.join("/") !== ancestorKey
+                );
+                const otherDescendantPaths = options
+                  .map((candidate) => candidate.path)
+                  .filter((candidatePath) => {
+                    if (!Array.isArray(candidatePath) || candidatePath.length <= inheritedAncestor.length) return false;
+                    const candidateKey = candidatePath.join("/");
+                    return candidateKey.startsWith(`${ancestorKey}/`) && !candidateKey.startsWith(`${node.key}/`) && candidateKey !== node.key;
+                  });
+                const uniquePaths = new Map();
+                otherDescendantPaths.forEach((candidatePath) => uniquePaths.set(candidatePath.join("/"), candidatePath));
+                onToggle(path, [...outsideAncestor, ...uniquePaths.values()]);
+                return;
+              }
+
               const descendantSet = new Set(descendantKeys(node));
               const withoutDescendants = (selectedPaths || []).filter((selectedPath) => !descendantSet.has(selectedPath.join("/")));
               if (withoutDescendants.length !== (selectedPaths || []).length) {

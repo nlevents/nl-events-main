@@ -130,14 +130,14 @@ function writeStorage(key, value) {
 // writeStorage() used by seed/migration logic below, which must stay local
 // -only so a fresh browser's demo/seed data can never overwrite real cloud
 // data before the admin has even logged in.
-function persist(key, value) {
+function persist(key, value, { syncCloud = true } = {}) {
   const written = writeStorage(key, value);
   if (!written) {
     // If the local write still failed after quota eviction, throw so the
     // calling admin action can surface an error instead of silently losing data.
     throw new Error("Unable to save: local storage is full. Please clear your browser cache and try again.");
   }
-  queueCloudSync(key, value);
+  if (syncCloud) queueCloudSync(key, value);
 }
 
 function reviewCountForProduct(product) {
@@ -1175,7 +1175,7 @@ function normalizeProductCategoryPaths(product, catalogKind) {
   return unique;
 }
 
-export function saveProduct(product) {
+export function saveProduct(product, { syncCloud = true } = {}) {
   const list = getProducts();
   const now = new Date().toISOString();
   const catalogKind = ["product", "package", "service"].includes(product?.catalogKind)
@@ -1294,7 +1294,7 @@ export function saveProduct(product) {
     list.unshift(safeProduct);
   }
 
-  persist(KEYS.products, list);
+  persist(KEYS.products, list, { syncCloud });
   dispatchCatalogUpdate();
   return safeProduct;
 }
@@ -1308,7 +1308,9 @@ export async function saveProductToCloud(product) {
   const existing = product?.id ? getProduct(product.id) : null;
   const previousImageIds = getProductImageAssetIds(existing);
 
-  const saved = saveProduct(product);
+  // This path awaits its durable write below, so suppress persist()'s
+  // background sync to avoid uploading the same full catalog twice.
+  const saved = saveProduct(product, { syncCloud: false });
   const list = getProducts();
 
   // The database write must succeed before any old Cloudinary asset can be
@@ -1370,7 +1372,8 @@ export async function duplicateProduct(idOrSlug) {
     updatedAt: new Date().toISOString(),
   };
 
-  const saved = saveProduct(clone);
+  // Persist locally here, then perform exactly one awaited cloud write.
+  const saved = saveProduct(clone, { syncCloud: false });
   await syncCloudState(KEYS.products, getProducts());
   return saved;
 }
@@ -2654,6 +2657,43 @@ export function getServiceScopeOptions() {
     }));
 }
 
+
+// Return category paths for the catalog types being displayed. Dedicated
+// assignment fields take precedence over the shared legacy categoryPaths field
+// so a package's Wedding assignment cannot leak into Birthday (or vice versa).
+// Shared paths are used only for legacy records that have no dedicated paths.
+export function getAssignedCatalogCategoryPaths(item, requestedKinds = ["product", "package"]) {
+  if (!item || typeof item !== "object") return [];
+  const kinds = Array.isArray(item.catalogKinds) && item.catalogKinds.length
+    ? item.catalogKinds
+    : [item.catalogKind || "product"];
+  const dedicated = {
+    product: Array.isArray(item.productCategoryPaths) ? item.productCategoryPaths : [],
+    package: Array.isArray(item.packageCategoryPaths) ? item.packageCategoryPaths : [],
+    service: Array.isArray(item.serviceCategoryPath) && item.serviceCategoryPath.length
+      ? [item.serviceCategoryPath]
+      : [],
+  };
+  const hasAnyDedicatedPaths = Object.values(dedicated).some((paths) => paths.length > 0);
+  const legacy = Array.isArray(item.categoryPaths) && item.categoryPaths.length
+    ? item.categoryPaths
+    : (Array.isArray(item.categoryPath) && item.categoryPath.length ? [item.categoryPath] : []);
+  const result = [];
+  for (const kind of requestedKinds) {
+    if (!kinds.includes(kind)) continue;
+    if (dedicated[kind]?.length) {
+      result.push(...dedicated[kind]);
+    } else if (!hasAnyDedicatedPaths) {
+      result.push(...legacy);
+    } else if (item.catalogKind === kind && !dedicated[kind]?.length) {
+      // Backward compatibility for single-kind records whose legacy field is
+      // still their only assignment representation.
+      result.push(...legacy);
+    }
+  }
+  return result.filter((path) => Array.isArray(path) && path.length);
+}
+
 // Returns the actual admin-created decoration products and packages that are
 // available for a particular occasion/category context. This is the single
 // source used by the Decor storefront surface; there is deliberately no
@@ -2683,14 +2723,15 @@ export function getDecorationProductsForContext(contextPath = []) {
     })
     .filter((product) => product?.status !== "archived" && product?.status !== "draft")
     .filter((product) => {
-      const basePaths = Array.isArray(product?.categoryPaths) ? product.categoryPaths : [];
-      const productPaths = Array.isArray(product?.productCategoryPaths) ? product.productCategoryPaths : [];
-      const packagePaths = Array.isArray(product?.packageCategoryPaths) ? product.packageCategoryPaths : [];
-      const legacyPaths = Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : [];
+      const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
+        ? product.catalogKinds
+        : [product?.catalogKind || "product"];
+      const requestedKinds = ["product", "package"].filter((kind) => kinds.includes(kind));
+      const assignedPaths = getAssignedCatalogCategoryPaths(product, requestedKinds);
       const legacyPackagePaths = product?.catalogKind === "package" && Array.isArray(product?.packageOccasions)
         ? product.packageOccasions.map((slug) => [slug])
         : [];
-      const rawPaths = [...basePaths, ...productPaths, ...packagePaths, ...legacyPaths, ...legacyPackagePaths]
+      const rawPaths = [...assignedPaths, ...legacyPackagePaths]
         .filter((path) => Array.isArray(path) && path.length);
       // Older festival catalog saves could omit the `festivals` wrapper and
       // store a theme as `festivals-culture/holi`. Treat that legacy path as
@@ -2730,25 +2771,43 @@ export function getBirthdayThemeProducts(themeSlug) {
   const slug = sanitizeSlug(themeSlug);
   if (!slug) return [];
   const WRAPPERS = new Set(["birthday-types", "theme-party", "popular-birthday-themes"]);
+  const selectedThemePath = ["birthday", slug];
   const hit = (rawPath) => {
     const parts = (Array.isArray(rawPath) ? rawPath : []).map((part) => sanitizeSlug(part)).filter(Boolean);
     if (parts[0] !== "birthday") return false;
-    let i = 1;
-    while (i < parts.length && WRAPPERS.has(parts[i])) i += 1;
-    return parts[i] === slug;
+
+    // Older and current catalog records may store the same hierarchy with
+    // structural wrapper nodes present or omitted. Remove those wrappers for
+    // comparison, then include both assignments directly to this theme and
+    // assignments inherited from a parent Birthday category (for example,
+    // Theme Party). This mirrors the parent listing's ancestor matching.
+    const normalized = [parts[0], ...parts.slice(1).filter((part) => !WRAPPERS.has(part))];
+    // A parent-only Birthday assignment must not match every individual theme.
+    // Require the selected theme slug to be present in the normalized path.
+    return normalized.length >= selectedThemePath.length
+      && selectedThemePath.every((part, index) => normalized[index] === part);
   };
   return getProducts()
     .filter((product) => {
       const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
         ? product.catalogKinds
         : [product?.catalogKind || "product"];
-      return (product?.catalogKind === "product" || kinds.includes("product")) && product?.isAddon !== true;
+      // Decor storefront lists products and packages, matching the parent
+      // context. Keep service-only add-ons out unless also catalogued as a
+      // product, as in the existing parent listing.
+      return (product?.catalogKind === "product" || kinds.includes("product") || kinds.includes("package")) && product?.isAddon !== true;
     })
     .filter((product) => product?.status !== "archived" && product?.status !== "draft")
     .filter((product) => {
-      const paths = Array.isArray(product?.categoryPaths) && product.categoryPaths.length
-        ? product.categoryPaths
-        : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
+      // Current admin records store product and package assignments in their
+      // dedicated path fields. Include those alongside shared and legacy paths
+      // so individual Birthday theme pages use the same assignments as the
+      // parent Theme Party listing.
+      const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
+        ? product.catalogKinds
+        : [product?.catalogKind || "product"];
+      const requestedKinds = ["product", "package"].filter((kind) => kinds.includes(kind));
+      const paths = getAssignedCatalogCategoryPaths(product, requestedKinds);
       if (paths.some(hit)) return true;
       return normalizeDisplayPlacements(product?.displayPlacements).some((placement) =>
         (placement.catalog === DISPLAY_CATALOGS.PRODUCTS || placement.catalog === DISPLAY_CATALOGS.SERVICES)
