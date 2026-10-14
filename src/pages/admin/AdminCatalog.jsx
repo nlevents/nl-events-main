@@ -138,6 +138,7 @@ function initialItem(kind = "product") {
     sku: "",
     shortDescription: "",
     description: "",
+    reviewCount: 0,
     image: "",
     occasionSlug: "wedding",
     categoryPath: [],
@@ -582,6 +583,7 @@ export default function AdminCatalog() {
       const legacyPaths = primaryKind === "service" ? servicePath : primaryKind === "package" ? packagePaths : productPaths;
       const saved = await saveProductToCloud({
         ...item,
+        reviewCount: Math.max(0, Math.min(150, Math.floor(Number(item.reviewCount) || 0))),
         catalogKinds: kinds,
         catalogKind: primaryKind,
         slug: sanitizeSlug(item.slug || item.name),
@@ -1345,7 +1347,7 @@ function ItemModal({ modal, setModal, occasions, categoryOptions, onSave, error,
 
     {error && <div className="admin-alert admin-alert--error">{error}</div>}
     <form onSubmit={(e) => { e.preventDefault(); onSave({ ...item, catalogKinds: selectedKinds }); }}>
-      <section className="catalog-form-section"><h3>1. Basic Information</h3><div className="catalog-form-grid two"><Field label="Item Name" required><input value={item.name} onChange={(e) => { const name = e.target.value; setItem((p) => ({ ...p, name, slug: !p.slug ? sanitizeSlug(name) : p.slug })); }} placeholder="e.g. Floral Stage Setup" /></Field><Field label="SKU"><input value={item.sku || ""} onChange={(e) => set("sku", e.target.value)} placeholder="e.g. NLE-DEC-001" /></Field></div><Field label="Short Description" required><textarea rows="2" maxLength={200} value={item.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="A short catchy description shown in list view" /></Field><Field label="Full Description"><textarea rows="4" value={item.description} onChange={(e) => set("description", e.target.value)} placeholder="Write detailed description, dimensions, materials, inclusions, deliverables, etc." /></Field></section>
+      <section className="catalog-form-section"><h3>1. Basic Information</h3><div className="catalog-form-grid two"><Field label="Item Name" required><input value={item.name} onChange={(e) => { const name = e.target.value; setItem((p) => ({ ...p, name, slug: !p.slug ? sanitizeSlug(name) : p.slug })); }} placeholder="e.g. Floral Stage Setup" /></Field><Field label="SKU"><input value={item.sku || ""} onChange={(e) => set("sku", e.target.value)} placeholder="e.g. NLE-DEC-001" /></Field></div><Field label="Short Description" required><textarea rows="2" maxLength={200} value={item.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="A short catchy description shown in list view" /></Field><Field label="Full Description"><textarea rows="4" value={item.description} onChange={(e) => set("description", e.target.value)} placeholder="Write detailed description, dimensions, materials, inclusions, deliverables, etc." /></Field><Field label="Number of Reviews"><input type="number" min="0" max="150" step="1" value={item.reviewCount ?? 0} onChange={(e) => set("reviewCount", e.target.value === "" ? "" : Math.max(0, Math.min(150, Math.floor(Number(e.target.value) || 0))))} placeholder="Enter number of reviews" /><small className="catalog-field-help">Enter the review count to display for this item (0–150).</small></Field></section>
 
       {hasProduct && <section className="catalog-form-section"><h3>2. Product / Element Setup</h3><div className="catalog-form-grid two"><Field label="Occasion" required><select value={item.occasionSlug || selectedOccasion?.slug || "wedding"} onChange={(e) => setItem((p) => ({ ...p, occasionSlug: e.target.value, productCategoryPaths: [] }))}>{occasions.filter((o) => !o.addonOnly).map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}</select></Field><Field label={`Categories / Themes${productCategoryPaths.length ? ` (${productCategoryPaths.length} selected)` : ""}`} required><CategoryMultiPicker options={normalCategoryOptions} selectedPaths={productCategoryPaths} onToggle={(path, forcedNext) => togglePaths("productCategoryPaths", path, forcedNext)} onClear={() => set("productCategoryPaths", [])} occasionLabel={selectedOccasion?.label || item.occasionSlug} /></Field></div></section>}
 

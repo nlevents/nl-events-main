@@ -1341,6 +1341,31 @@ export function resolvePath(slugs) {
   const direct = tryResolveSegments(slugs);
   if (direct) return direct;
 
+  // Backward compatibility for catalog products whose category hierarchy was
+  // changed after their URL was shared. Resolve only the final product slug
+  // within the requested occasion, and only when that slug is unique there.
+  // This keeps the existing URL working without changing page layout or
+  // redirecting to a different product.
+  if (slugs.length >= 2) {
+    const root = findOccasion(slugs[0]);
+    const productSlug = slugs[slugs.length - 1];
+    if (root && productSlug) {
+      const matches = [];
+      const walk = (node, trail) => {
+        if (!node) return;
+        const nextTrail = [...trail, node];
+        if (node.type === "product" && node.slug === productSlug) {
+          matches.push({ node, trail: nextTrail });
+          return;
+        }
+        (node.children || []).forEach((child) => walk(child, nextTrail));
+        (node.products || []).forEach((product) => walk(product, nextTrail));
+      };
+      walk(root, []);
+      if (matches.length === 1) return matches[0];
+    }
+  }
+
   // Backward-compatible URL support for the old flattened birthday tree.
   if (slugs[0] === "birthday" && slugs.length >= 2) {
     const birthdayTypes = new Set([

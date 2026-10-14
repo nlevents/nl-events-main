@@ -1217,7 +1217,7 @@ export function saveProduct(product, { syncCloud = true } = {}) {
       rating: sanitizeNumber(product.rating, 1, 5, 4.8),
       reviewCount: (() => {
         const count = Number(product.reviewCount);
-        return Number.isFinite(count) && count >= 6 && count <= 70 ? Math.round(count) : reviewCountForProduct(product);
+        return Number.isFinite(count) && count >= 0 && count <= 150 ? Math.round(count) : reviewCountForProduct(product);
       })(),
       description: sanitizeText(product.description || ""),
       quantity: product.quantity == null || product.quantity === "" ? null : sanitizeNumber(product.quantity, 0, 100000000, 0),

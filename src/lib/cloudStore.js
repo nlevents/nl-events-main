@@ -74,11 +74,12 @@ function mergeConcurrentState(base, local, remote, path = "catalog") {
   if (sameValue(local, remote)) return local;
 
   const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-  if (isRecord(base) && isRecord(local) && isRecord(remote)) {
+  if ((isRecord(base) || base === undefined) && isRecord(local) && isRecord(remote)) {
+    const baseRecord = isRecord(base) ? base : {};
     const result = {};
-    const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)]);
+    const keys = new Set([...Object.keys(baseRecord), ...Object.keys(local), ...Object.keys(remote)]);
     for (const key of keys) {
-      const value = mergeConcurrentState(base[key], local[key], remote[key], `${path}.${key}`);
+      const value = mergeConcurrentState(baseRecord[key], local[key], remote[key], `${path}.${key}`);
       if (value !== undefined) result[key] = value;
     }
     return result;
@@ -200,11 +201,26 @@ function enqueueCloudWrite(key, data, { onConflict } = {}) {
         // resolver. All other writes use a field-aware three-way merge.
         let rebasedData;
         try {
-          rebasedData = typeof onConflict === "function"
-            ? await onConflict(data, latestData)
-            : baseline === undefined
-              ? (() => { throw new Error("This catalog was changed by another admin. Please refresh the Admin Panel and try again."); })()
-              : mergeConcurrentState(baseline, data, latestData, key);
+          if (typeof onConflict === "function") {
+            rebasedData = await onConflict(data, latestData);
+          } else if (baseline !== undefined) {
+            rebasedData = mergeConcurrentState(baseline, data, latestData, key);
+          } else {
+            // A missing local snapshot should not automatically block every save.
+            // Use an empty structural baseline to merge only unambiguous changes:
+            // independent additions/fields can be retained, while divergent edits
+            // to the same field still throw and preserve a recoverable draft.
+            const emptyBaseline = Array.isArray(data) && Array.isArray(latestData)
+              ? []
+              : data && typeof data === "object" && !Array.isArray(data)
+                && latestData && typeof latestData === "object" && !Array.isArray(latestData)
+                ? {}
+                : undefined;
+            if (emptyBaseline === undefined) {
+              throw new Error("This catalog changed while saving. Your draft has been preserved; reload the catalog before retrying.");
+            }
+            rebasedData = mergeConcurrentState(emptyBaseline, data, latestData, key);
+          }
         } catch (mergeError) {
           // Keep a recoverable copy separate from the live cache. A later
           // hydration can refresh authoritative data without destroying the
