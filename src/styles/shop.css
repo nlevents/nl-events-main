@@ -858,9 +858,9 @@ a.hcard:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(3,2
 }
 @media(max-width:620px){
   .ref-home-container,.ref-home-hero-content{width:min(100% - 28px,1240px)}
-  .ref-home-hero,.ref-home-hero-content{min-height:510px}
+  .ref-home-hero,.ref-home-hero-content{min-height:0}
   .ref-home-hero-overlay{background:linear-gradient(90deg,rgba(3,19,34,.92),rgba(5,27,45,.58) 75%,rgba(3,17,29,.28))}
-  .ref-home-hero-content{padding:42px 0 30px;justify-content:flex-end}
+  .ref-home-hero-content{padding:30px 0 30px;justify-content:flex-end}
   .ref-home-hero-content>span{font-size:8px;letter-spacing:.14em}
   .ref-home-hero-content h1{font-size:39px}
   .ref-home-hero-content p{font-size:12px;margin-top:13px}

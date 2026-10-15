@@ -84,7 +84,7 @@ const HOME_USPS = [
 function HomeHero() {
   return (
     <section className="ref-home-hero">
-      <img src={IMAGES.heroHome} alt="Wedding celebration by Next Level Events" fetchPriority="high" decoding="async" />
+      <img src="/assets/images/hero-home-candlelit.webp" alt="Wedding celebration by Next Level Events" fetchPriority="high" decoding="async" />
       <div className="ref-home-hero-overlay" />
       <div className="ref-home-hero-content">
         <span>WELCOME TO NEXT LEVEL EVENTS</span>
