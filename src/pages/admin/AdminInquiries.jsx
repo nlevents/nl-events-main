@@ -36,6 +36,27 @@ function fmtDateTime(value) {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
+function toLocalDateTimeInputs(value) {
+  if (!value) return { date: "", time: "" };
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return { date: "", time: "" };
+  const pad = (part) => String(part).padStart(2, "0");
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+function localDateTimeToISO(date, time = "09:00") {
+  if (!date) return "";
+  const [year, month, day] = date.split("-").map(Number);
+  const [hours, minutes] = time.split(":").map(Number);
+  const localDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
+  return Number.isNaN(localDate.getTime()) ? "" : localDate.toISOString();
+}
+function localDateTimeInputValue(value) {
+  const { date, time } = toLocalDateTimeInputs(value);
+  return date && time ? `${date}T${time}` : "";
+}
 function sourceDetail(value) {
   const raw = String(value || "").trim();
   return SOURCE_ALIASES[raw.toLowerCase()] || raw || "Inquiry Form";
@@ -320,9 +341,11 @@ export default function AdminInquiries() {
     navigate("/admin/invoices/new", { state: { clientId: client.id, leadId: r.id, documentType: "quotation", lead: r } });
   }
   async function handleScheduleFollowUp(record) {
-    const value = window.prompt("Follow-up date/time (YYYY-MM-DDTHH:mm):", record.nextFollowUp ? String(record.nextFollowUp).slice(0, 16) : "");
+    const value = window.prompt("Follow-up date/time (YYYY-MM-DDTHH:mm):", localDateTimeInputValue(record.nextFollowUp));
     if (value === null || !value.trim()) return;
-    try { await updateAdminInquiry(record.id, { nextFollowUp: new Date(value).toISOString() }); await refresh(); showFeedback("Follow-up scheduled."); }
+    const nextFollowUp = localDateTimeToISO(value.slice(0, 10), value.slice(11, 16));
+    if (!nextFollowUp) { setError("Please enter a valid follow-up date and time."); return; }
+    try { await updateAdminInquiry(record.id, { nextFollowUp }); await refresh(); showFeedback("Follow-up scheduled."); }
     catch (err) { setError(err.message || "Unable to schedule follow-up."); }
   }
   function openEditLead(record) {
@@ -338,11 +361,9 @@ export default function AdminInquiries() {
     setLeadQuickActions({ followUp: Boolean(record.nextFollowUp), whatsapp: true, emailMarketing: false });
     setLeadStatus(record.status || "new_lead");
     if (record.nextFollowUp) {
-      const d = new Date(record.nextFollowUp);
-      if (!Number.isNaN(d.getTime())) {
-        setLeadFollowUpDate(d.toISOString().slice(0, 10));
-        setLeadFollowUpTime(d.toTimeString().slice(0, 5));
-      }
+      const { date, time } = toLocalDateTimeInputs(record.nextFollowUp);
+      setLeadFollowUpDate(date);
+      setLeadFollowUpTime(time);
     } else { setLeadFollowUpDate(""); setLeadFollowUpTime(""); }
     setShowAddLead(true);
   }
@@ -350,8 +371,11 @@ export default function AdminInquiries() {
     e.preventDefault(); setSavingLead(true); setError("");
     try {
       const nextFollowUp = leadQuickActions.followUp && leadFollowUpDate
-        ? `${leadFollowUpDate}T${leadFollowUpTime || "09:00"}`
+        ? localDateTimeToISO(leadFollowUpDate, leadFollowUpTime || "09:00")
         : "";
+      if (leadQuickActions.followUp && leadFollowUpDate && !nextFollowUp) {
+        throw new Error("Please enter a valid follow-up date and time.");
+      }
       const resolvedSource = leadSourceCustom ? customLeadSource.trim() : String(leadForm.source || "").trim();
       if (!resolvedSource) throw new Error("Please enter a custom lead source.");
       const payload = { ...leadForm, source: resolvedSource, leadSource: leadSourceCustom ? resolvedSource : leadForm.leadSource, status: leadStatus, nextFollowUp };
