@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import usePageMeta from "../hooks/usePageMeta";
 import useReveal from "../hooks/useReveal";
 import Icon from "../components/Icon";
@@ -16,6 +16,7 @@ import {
   SORT_OPTIONS,
   PRICE_BUCKETS,
   discountPercent,
+  normalizeCategoryPath,
 } from "../data/occasions";
 import { useLiveEntries } from "../hooks/useLiveCatalog";
 import { onImgError } from "../lib/imageFallback";
@@ -27,6 +28,8 @@ const BANNER_SLIDES = [
   { eyebrow: "Premium", title: "Royal Wedding Experience", sub: "Multi-day staging, celebrity-grade décor", img: IMAGES.pkgRoyalWedding, href: "/package-details?id=royal-wedding", bg: "linear-gradient(135deg,#f1e9ff,#e0d1fb)" },
   { eyebrow: "Corporate", title: "Corporate Excellence", sub: "Stage design, AV & guest management", img: IMAGES.pkgCorporateExcellence, href: "/corporate", bg: "linear-gradient(135deg,#e7f0ff,#cfe2ff)" },
 ];
+
+const WRAPPER_SLUGS = new Set(["wedding-events", "birthday-types", "anniversary-types", "family-celebrations", "festivals", "services"]);
 
 // "On everybody's list" — a small curated strip in the Flipkart homepage
 // style: square image, a coloured pill overlay, then a two-line caption.
@@ -52,12 +55,26 @@ export default function Products() {
     "Browse every décor package and event product in one place — filter by occasion, sort by price or popularity, and book instantly.",
   );
 
-  const [occFilter, setOccFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [subcategoryFilter, setSubcategoryFilter] = useState("all");
-  const [themeFilter, setThemeFilter] = useState("all");
-  const [priceKey, setPriceKey] = useState("all");
-  const [sortKey, setSortKey] = useState("popular");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const occFilter = searchParams.get("occasion") || searchParams.get("occ") || "all";
+  const categoryFilter = searchParams.get("category") || searchParams.get("cat") || "all";
+  const subcategoryFilter = searchParams.get("subcategory") || searchParams.get("subcat") || "all";
+  const themeFilter = searchParams.get("theme") || "all";
+  const priceKey = searchParams.get("price") || "all";
+  const sortKey = searchParams.get("sort") || "popular";
+
+  const updateFilters = (updates) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, val]) => {
+      if (!val || val === "all" || (key === "sort" && val === "popular")) {
+        next.delete(key);
+      } else {
+        next.set(key, val);
+      }
+    });
+    setSearchParams(next, { replace: true });
+  };
 
   const [occasions, setOccasions] = useState(listOccasions);
   const liveEntries = useLiveEntries();
@@ -99,19 +116,65 @@ export default function Products() {
   const facetNodes = (entry) => (Array.isArray(entry?.trail) ? entry.trail.slice(0, -1) : []);
   const nodeSlug = (node) => String(node?.slug || "");
   const nodeLabel = (node) => node?.label || node?.name || nodeSlug(node);
+  const isWrapperNode = (node) => WRAPPER_SLUGS.has(nodeSlug(node).toLowerCase());
   const nodesOfType = (entry, type) => facetNodes(entry).filter((node) => node?.type === type);
-  const firstCategory = (entry) => nodesOfType(entry, "category")[0];
+  const meaningfulCategories = (entry) => nodesOfType(entry, "category").filter((node) => !isWrapperNode(node));
+  const firstCategory = (entry) => meaningfulCategories(entry)[0] || nodesOfType(entry, "category")[0];
   const subcategoryNodes = (entry) => {
-    const categories = nodesOfType(entry, "category");
+    const categories = meaningfulCategories(entry);
     return categories.length > 1 ? categories.slice(1) : [];
+  };
+
+  const matchesOccasion = (entry, slug) => {
+    if (slug === "all") return true;
+    if (entry.occasion?.slug === slug) return true;
+    if (entry.product?.occasionSlug === slug) return true;
+    if (Array.isArray(entry.product?.occasions) && entry.product.occasions.includes(slug)) return true;
+    if (Array.isArray(entry.product?.packageOccasions) && entry.product.packageOccasions.includes(slug)) return true;
+    const norm = normalizeCategoryPath(Array.isArray(entry.product?.categoryPath) ? entry.product.categoryPath : []);
+    return norm[0] === slug;
+  };
+
+  const matchesCategory = (entry, slug) => {
+    if (slug === "all") return true;
+    const first = firstCategory(entry);
+    if (nodeSlug(first) === slug) return true;
+    if (meaningfulCategories(entry).some((node) => nodeSlug(node) === slug)) return true;
+    if (entry.product?.categorySlug === slug) return true;
+    const paths = Array.isArray(entry.product?.categoryPaths) && entry.product.categoryPaths.length
+      ? entry.product.categoryPaths
+      : (Array.isArray(entry.product?.categoryPath) && entry.product.categoryPath.length ? [entry.product.categoryPath] : []);
+    return paths.some((p) => normalizeCategoryPath(p).includes(slug));
+  };
+
+  const matchesSubcategory = (entry, slug) => {
+    if (slug === "all") return true;
+    if (subcategoryNodes(entry).some((node) => nodeSlug(node) === slug)) return true;
+    const paths = Array.isArray(entry.product?.categoryPaths) && entry.product.categoryPaths.length
+      ? entry.product.categoryPaths
+      : (Array.isArray(entry.product?.categoryPath) && entry.product.categoryPath.length ? [entry.product.categoryPath] : []);
+    return paths.some((p) => normalizeCategoryPath(p).includes(slug));
+  };
+
+  const matchesTheme = (entry, slug) => {
+    if (slug === "all") return true;
+    if (nodesOfType(entry, "theme").some((node) => nodeSlug(node) === slug)) return true;
+    if (entry.theme?.slug === slug) return true;
+    const paths = Array.isArray(entry.product?.categoryPaths) && entry.product.categoryPaths.length
+      ? entry.product.categoryPaths
+      : (Array.isArray(entry.product?.categoryPath) && entry.product.categoryPath.length ? [entry.product.categoryPath] : []);
+    return paths.some((p) => {
+      const norm = normalizeCategoryPath(p);
+      return norm[norm.length - 1] === slug;
+    });
   };
 
   const filteredForFacets = useMemo(() => {
     return entries.filter((entry) => {
-      if (occFilter !== "all" && entry.occasion?.slug !== occFilter) return false;
-      if (categoryFilter !== "all" && nodeSlug(firstCategory(entry)) !== categoryFilter) return false;
-      if (subcategoryFilter !== "all" && !subcategoryNodes(entry).some((node) => nodeSlug(node) === subcategoryFilter)) return false;
-      if (themeFilter !== "all" && !nodesOfType(entry, "theme").some((node) => nodeSlug(node) === themeFilter)) return false;
+      if (!matchesOccasion(entry, occFilter)) return false;
+      if (!matchesCategory(entry, categoryFilter)) return false;
+      if (!matchesSubcategory(entry, subcategoryFilter)) return false;
+      if (!matchesTheme(entry, themeFilter)) return false;
       return true;
     });
   }, [entries, occFilter, categoryFilter, subcategoryFilter, themeFilter]);
@@ -129,9 +192,9 @@ export default function Products() {
     // Each facet is built from its parent facets only, not from itself. This
     // keeps the dropdown useful when a value is already selected and lets the
     // user switch directly from one category/theme to another.
-    const occasionScoped = entries.filter((entry) => occFilter === "all" || entry.occasion?.slug === occFilter);
-    const categoryScoped = occasionScoped.filter((entry) => categoryFilter === "all" || nodeSlug(firstCategory(entry)) === categoryFilter);
-    const subcategoryScoped = categoryScoped.filter((entry) => subcategoryFilter === "all" || subcategoryNodes(entry).some((node) => nodeSlug(node) === subcategoryFilter));
+    const occasionScoped = entries.filter((entry) => matchesOccasion(entry, occFilter));
+    const categoryScoped = occasionScoped.filter((entry) => matchesCategory(entry, categoryFilter));
+    const subcategoryScoped = categoryScoped.filter((entry) => matchesSubcategory(entry, subcategoryFilter));
 
     const occasionOptions = unique(entries.map((entry) => entry.occasion).filter(Boolean));
     const categoryOptions = unique(occasionScoped.map(firstCategory).filter(Boolean));
@@ -142,9 +205,13 @@ export default function Products() {
 
   // If a parent facet changes, clear child selections that no longer exist.
   useEffect(() => {
-    if (categoryFilter !== "all" && !facetOptions.categoryOptions.some((o) => o.key === categoryFilter)) setCategoryFilter("all");
-    if (subcategoryFilter !== "all" && !facetOptions.subcategoryOptions.some((o) => o.key === subcategoryFilter)) setSubcategoryFilter("all");
-    if (themeFilter !== "all" && !facetOptions.themeOptions.some((o) => o.key === themeFilter)) setThemeFilter("all");
+    const updates = {};
+    if (categoryFilter !== "all" && !facetOptions.categoryOptions.some((o) => o.key === categoryFilter)) updates.category = "all";
+    if (subcategoryFilter !== "all" && !facetOptions.subcategoryOptions.some((o) => o.key === subcategoryFilter)) updates.subcategory = "all";
+    if (themeFilter !== "all" && !facetOptions.themeOptions.some((o) => o.key === themeFilter)) updates.theme = "all";
+    if (Object.keys(updates).length > 0) {
+      updateFilters(updates);
+    }
   }, [facetOptions, categoryFilter, subcategoryFilter, themeFilter]);
 
   const filtered = useMemo(() => {
@@ -165,11 +232,9 @@ export default function Products() {
   }, [filteredForFacets, bucket, sortKey]);
 
   const resetFilters = () => {
-    setOccFilter("all");
-    setCategoryFilter("all");
-    setSubcategoryFilter("all");
-    setThemeFilter("all");
-    setPriceKey("all");
+    const next = new URLSearchParams();
+    if (sortKey && sortKey !== "popular") next.set("sort", sortKey);
+    setSearchParams(next, { replace: true });
   };
 
   useReveal([occFilter, categoryFilter, subcategoryFilter, themeFilter, priceKey, sortKey]);
@@ -202,13 +267,13 @@ export default function Products() {
         <ListingControls
           resultCount={filtered.length}
           sortKey={sortKey}
-          onSortChange={setSortKey}
+          onSortChange={(val) => updateFilters({ sort: val })}
           filters={[
-            { key: "occasion", label: "Occasion", kind: "select", value: occFilter, onChange: (v) => { setOccFilter(v); setCategoryFilter("all"); setSubcategoryFilter("all"); setThemeFilter("all"); }, options: [{ key: "all", label: "All Occasions" }, ...facetOptions.occasionOptions] },
-            { key: "category", label: "Category", kind: "select", value: categoryFilter, onChange: (v) => { setCategoryFilter(v); setSubcategoryFilter("all"); setThemeFilter("all"); }, options: [{ key: "all", label: "All Categories" }, ...facetOptions.categoryOptions] },
-            { key: "subcategory", label: "Subcategory", kind: "select", value: subcategoryFilter, onChange: (v) => { setSubcategoryFilter(v); setThemeFilter("all"); }, options: [{ key: "all", label: "All Subcategories" }, ...facetOptions.subcategoryOptions] },
-            { key: "theme", label: "Theme", kind: "select", value: themeFilter, onChange: setThemeFilter, options: [{ key: "all", label: "All Themes" }, ...facetOptions.themeOptions] },
-            { key: "price", label: "Price", kind: "select", value: priceKey, onChange: setPriceKey, options: PRICE_BUCKETS.map((b) => ({ key: b.key, label: b.label })) },
+            { key: "occasion", label: "Occasion", kind: "select", value: occFilter, onChange: (v) => updateFilters({ occasion: v, category: "all", subcategory: "all", theme: "all" }), options: [{ key: "all", label: "All Occasions" }, ...facetOptions.occasionOptions] },
+            { key: "category", label: "Category", kind: "select", value: categoryFilter, onChange: (v) => updateFilters({ category: v, subcategory: "all", theme: "all" }), options: [{ key: "all", label: "All Categories" }, ...facetOptions.categoryOptions] },
+            { key: "subcategory", label: "Subcategory", kind: "select", value: subcategoryFilter, onChange: (v) => updateFilters({ subcategory: v, theme: "all" }), options: [{ key: "all", label: "All Subcategories" }, ...facetOptions.subcategoryOptions] },
+            { key: "theme", label: "Theme", kind: "select", value: themeFilter, onChange: (v) => updateFilters({ theme: v }), options: [{ key: "all", label: "All Themes" }, ...facetOptions.themeOptions] },
+            { key: "price", label: "Price", kind: "select", value: priceKey, onChange: (v) => updateFilters({ price: v }), options: PRICE_BUCKETS.map((b) => ({ key: b.key, label: b.label })) },
           ]}
           onReset={resetFilters}
         />

@@ -124,7 +124,7 @@ export default function AdminAddons() {
     flash(`Deleted service card "${label}".`);
   }
 
-  function handleSaveCategory(e) {
+  async function handleSaveCategory(e) {
     e.preventDefault();
     setError("");
     const cat = editingCategory?.cat;

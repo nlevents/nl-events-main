@@ -47,7 +47,13 @@ export default function AdminProducts() {
         p.slug.toLowerCase().includes(search.toLowerCase());
 
       const matchOccasion =
-        occasionFilter === "all" || p.occasionSlug === occasionFilter || p.categorySlug === occasionFilter;
+        occasionFilter === "all" ||
+        p.occasionSlug === occasionFilter ||
+        p.categorySlug === occasionFilter ||
+        (Array.isArray(p.occasions) && p.occasions.includes(occasionFilter)) ||
+        (Array.isArray(p.packageOccasions) && p.packageOccasions.includes(occasionFilter)) ||
+        (Array.isArray(p.categoryPath) && p.categoryPath[0] === occasionFilter) ||
+        (Array.isArray(p.categoryPaths) && p.categoryPaths.some((cp) => Array.isArray(cp) && cp[0] === occasionFilter));
 
       const matchStatus = statusFilter === "all" || p.status === statusFilter;
 

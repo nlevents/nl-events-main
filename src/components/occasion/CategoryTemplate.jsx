@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { PLACEHOLDER_IMAGE } from "../../lib/imageFallback";
 import usePageMeta from "../../hooks/usePageMeta";
 import useReveal from "../../hooks/useReveal";
@@ -13,7 +13,7 @@ import ListingControls from "./ListingControls";
 import ProductRail from "../ProductRail";
 import { getBirthdayThemeProducts, getDecorationProductsForContext, getAssignedCatalogCategoryPaths, getAddonCategoryTree, getAddonProducts, getOccasion, hydrateCatalogFromCloud, serviceProductMatchesContext } from "../../lib/catalogStore";
 import { DISPLAY_CATALOGS, normalizeDisplayPlacements } from "../../lib/catalogPlacement";
-import { filterServiceProducts } from "../../lib/serviceContext";
+import { filterServiceProducts, normalizeServiceSlug, SERVICE_ALIASES } from "../../lib/serviceContext";
 import { EVENT_SERVICES } from "../../data/eventServices";
 import { BirthdayCategories } from "../../pages/Birthday";
 import { useCity } from "../../context/CityContext";
@@ -21,7 +21,7 @@ import { trackEvent } from "../../lib/siteEvents";
 import {
   childrenOf, pathFor, countProducts,
   sortProducts, isAvailableInCity, PRICE_BUCKETS, toRailItem, collectProductEntries,
-  quickLinksFor, allQuickLinksFor, heroGalleryFor, OCCASIONS, findOccasion,
+  quickLinksFor, allQuickLinksFor, heroGalleryFor, OCCASIONS, findOccasion, normalizeCategoryPath,
 } from "../../data/occasions";
 
 const SHOP_REVIEWS = {
@@ -96,16 +96,28 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
   const syncFromUrl = () => {
     try {
       const params = new URLSearchParams(location.search);
-      const context = (params.get("context") || "").split("/").map((part) => part.trim()).filter(Boolean);
-      setServiceFilter(params.get("service") || "");
-      setOccasionFilter(context[0] || "");
-      setFunctionFilter(context.slice(1).join("/") || "");
+      const rawService = params.get("service") || params.get("category") || "";
+      const canonicalService = normalizeServiceSlug(rawService);
+
+      const contextParam = params.get("context") || "";
+      const context = contextParam.split("/").map((part) => part.trim()).filter(Boolean);
+
+      const occasionParam = params.get("occasion") || params.get("occ") || context[0] || "";
+      const functionParam = params.get("function") || params.get("func") || context.slice(1).join("/") || "";
+
+      setServiceFilter(canonicalService);
+      setOccasionFilter(occasionParam);
+      setFunctionFilter(functionParam);
       setThemeFilter(params.get("theme") || "");
+      setPriceFilter(params.get("price") || "all");
+      setSortKey(params.get("sort") || "popular");
     } catch {
       setServiceFilter("");
       setOccasionFilter("");
       setFunctionFilter("");
       setThemeFilter("");
+      setPriceFilter("all");
+      setSortKey("popular");
     }
   };
 
@@ -120,11 +132,32 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
     const nextOccasion = next.occasion !== undefined ? next.occasion : occasionFilter;
     const nextFunction = next.functionPath !== undefined ? next.functionPath : functionFilter;
     const nextTheme = next.theme !== undefined ? next.theme : themeFilter;
-    const params = new URLSearchParams();
+    const nextPrice = next.price !== undefined ? next.price : priceFilter;
+    const nextSort = next.sort !== undefined ? next.sort : sortKey;
+
+    const params = new URLSearchParams(location.search);
     if (nextService) params.set("service", nextService);
+    else params.delete("service");
+
     const context = [nextOccasion, nextFunction].filter(Boolean).join("/");
     if (context) params.set("context", context);
+    else params.delete("context");
+
+    params.delete("occasion");
+    params.delete("occ");
+    params.delete("function");
+    params.delete("func");
+    params.delete("category");
+
     if (nextTheme && nextService === "decor") params.set("theme", nextTheme);
+    else params.delete("theme");
+
+    if (nextPrice && nextPrice !== "all") params.set("price", nextPrice);
+    else params.delete("price");
+
+    if (nextSort && nextSort !== "popular") params.set("sort", nextSort);
+    else params.delete("sort");
+
     navigate({ pathname: "/occasion/event-services", search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
   };
 
@@ -192,36 +225,52 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
   // The service filter is intentionally limited to the same ten canonical
   // top-level services used by every storefront service rail.
   const serviceCategories = useMemo(() => {
-    // When an occasion/function is selected, only expose service categories
-    // that have at least one live product matching that exact context. This
-    // keeps the filter controls aligned with the same scoped product list.
+    // When no occasion is selected (unfiltered browse), all canonical services are available.
+    if (!contextPath.length) {
+      return EVENT_SERVICES.map((service) => ({ path: service.slug, label: service.label }));
+    }
+    // When an occasion/function is selected, expose service categories
+    // that have at least one live product matching that exact context.
     const available = new Set();
     filterServiceProducts(liveProducts, { contextPath }).forEach((product) => {
-      const path = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
-      if (path[0] === "event-services" && path[1]) available.add(path[1]);
+      const paths = [
+        product?.categoryPath,
+        product?.serviceCategoryPath,
+        ...(Array.isArray(product?.categoryPaths) ? product.categoryPaths : []),
+      ];
+      paths.forEach((p) => {
+        if (Array.isArray(p) && p[0] === "event-services" && p[1]) {
+          available.add(normalizeServiceSlug(p[1]));
+        }
+      });
       (Array.isArray(product?.displayPlacements) ? product.displayPlacements : []).forEach((placement) => {
         const placementPath = Array.isArray(placement?.path) ? placement.path : [];
-        if (placement?.catalog === "services" && placementPath[0] === "event-services" && placementPath[1]) available.add(placementPath[1]);
+        if (placement?.catalog === "services" && placementPath[0] === "event-services" && placementPath[1]) {
+          available.add(normalizeServiceSlug(placementPath[1]));
+        }
       });
+      if (product?.serviceCategory) {
+        available.add(normalizeServiceSlug(product.serviceCategory));
+      }
     });
     if (contextPath.length && getDecorationProductsForContext(contextPath).length) available.add("decor");
+    // If user explicitly selected a valid canonical service, keep it available in the dropdown options
+    if (serviceFilter && EVENT_SERVICES.some((s) => s.slug === serviceFilter)) {
+      available.add(serviceFilter);
+    }
     return EVENT_SERVICES
       .filter((service) => available.has(service.slug))
       .map((service) => ({ path: service.slug, label: service.label }));
-  }, [liveProducts, contextPath]);
+  }, [liveProducts, contextPath, serviceFilter]);
 
   useEffect(() => {
-    // If a deep link or a previously selected filter points to a service
-    // category that has no live service in the current context, clear that
-    // stale category selection instead of leaving the catalog in an empty
-    // state. During initial loading, keep the URL untouched until products
-    // have been hydrated.
-    if (!loading && serviceFilter && !serviceCategories.some((item) => item.path === serviceFilter)) {
+    const isValidService = EVENT_SERVICES.some((item) => item.slug === serviceFilter);
+    if (!loading && serviceFilter && !isValidService) {
       const params = new URLSearchParams(location.search);
       params.delete("service");
       navigate({ pathname: "/occasion/event-services", search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
     }
-  }, [loading, serviceFilter, serviceCategories, location.search, navigate]);
+  }, [loading, serviceFilter, location.search, navigate]);
 
   const orderedProducts = useMemo(() => {
     // Once a decoration theme is selected, it is a filter inside the Decor
@@ -354,13 +403,31 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
       if (bucket) list = list.filter((product) => Number(product.price) >= bucket.min && Number(product.price) < bucket.max);
     }
 
-    return sortProducts(list, sortKey).map((product) => ({
-      ...product,
-      __contextPath: contextPath,
-      __trail: product.__decorationContextProduct && Array.isArray(product.categoryPath) && product.categoryPath.length
-        ? [...product.categoryPath.map((slug) => ({ slug, label: slug })), product]
-        : [node, ...(Array.isArray(product.categoryPath) ? product.categoryPath.slice(1).map((slug) => ({ slug, label: slug })) : []), product],
-    }));
+    return sortProducts(list, sortKey).map((product) => {
+      let svcMidSlugs;
+      if (product.__decorationContextProduct && Array.isArray(product.categoryPath) && product.categoryPath.length) {
+        // Decoration products use their own categoryPath (e.g. wedding/haldi/...)
+        // to build the full trail — they are not anchored under event-services.
+        return { ...product, __contextPath: contextPath, __trail: [...product.categoryPath.map((slug) => ({ slug, label: slug })), product] };
+      }
+      // For service products, find the canonical event-services path.
+      // categoryPaths may contain multiple entries (cross-listed products); use
+      // the first one that starts with "event-services" so the generated URL
+      // matches where getLiveOccasions actually placed the product in the tree.
+      const eventServicesCategoryPath = (
+        (Array.isArray(product.categoryPaths) ? product.categoryPaths : [])
+          .find((p) => Array.isArray(p) && p[0] === "event-services")
+        ?? (Array.isArray(product.serviceCategoryPath) && product.serviceCategoryPath[0] === "event-services"
+          ? product.serviceCategoryPath
+          : null)
+        ?? (Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services"
+          ? product.categoryPath
+          : null)
+        ?? (Array.isArray(product.categoryPath) ? product.categoryPath : [])
+      );
+      svcMidSlugs = eventServicesCategoryPath.slice(1).map((slug) => ({ slug, label: slug }));
+      return { ...product, __contextPath: contextPath, __trail: [node, ...svcMidSlugs, product] };
+    });
   }, [liveProducts, serviceFilter, contextPath, themeFilter, priceFilter, sortKey, node]);
 
   // Theme Party is a parent filter, not a product-less browser page.
@@ -511,14 +578,15 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
       label: "Price",
       kind: "chips",
       value: priceFilter,
-      onChange: setPriceFilter,
+      onChange: (value) => { setPriceFilter(value); updateFilters({ price: value }); },
       options: PRICE_BUCKETS.map((bucket) => ({ key: bucket.key, label: bucket.label })),
     },
   ], [serviceFilter, occasionFilter, functionFilter, priceFilter, serviceCategories, occasionOptions, functionOptions]);
 
   function resetFilters() {
     setPriceFilter("all");
-    updateFilters({ service: "", occasion: "", functionPath: "", theme: "" });
+    setSortKey("popular");
+    updateFilters({ service: "", occasion: "", functionPath: "", theme: "", price: "all", sort: "popular" });
   }
 
   return (
@@ -565,7 +633,7 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
           <ListingControls
             resultCount={orderedProducts.length}
             sortKey={sortKey}
-            onSortChange={setSortKey}
+            onSortChange={(val) => { setSortKey(val); updateFilters({ sort: val }); }}
             filters={filterDescriptors}
             onReset={resetFilters}
           />
@@ -611,12 +679,39 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
 export default function CategoryTemplate({ node, trail }) {
   const { city } = useCity();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const topSlug = Array.isArray(trail) && trail.length > 0 ? trail[0].slug : null;
   const isServiceCatalog = topSlug === "event-services";
-  const [sortKey, setSortKey] = useState("popular");
-  const [priceFilter, setPriceFilter] = useState("all");
-  const [cityOnly, setCityOnly] = useState(false);
-  const [topRatedOnly, setTopRatedOnly] = useState(false);
+
+  const sortKey = searchParams.get("sort") || "popular";
+  const priceFilter = searchParams.get("price") || "all";
+  const cityOnly = searchParams.get("city") === "1" || searchParams.get("city") === "true";
+  const topRatedOnly = searchParams.get("rating") === "1" || searchParams.get("rating") === "top" || searchParams.get("rating") === "true";
+
+  const setSortKey = (val) => {
+    const next = new URLSearchParams(searchParams);
+    if (val && val !== "popular") next.set("sort", val);
+    else next.delete("sort");
+    setSearchParams(next, { replace: true });
+  };
+  const setPriceFilter = (val) => {
+    const next = new URLSearchParams(searchParams);
+    if (val && val !== "all") next.set("price", val);
+    else next.delete("price");
+    setSearchParams(next, { replace: true });
+  };
+  const setCityOnly = (val) => {
+    const next = new URLSearchParams(searchParams);
+    if (val) next.set("city", "1");
+    else next.delete("city");
+    setSearchParams(next, { replace: true });
+  };
+  const setTopRatedOnly = (val) => {
+    const next = new URLSearchParams(searchParams);
+    if (val) next.set("rating", "top");
+    else next.delete("rating");
+    setSearchParams(next, { replace: true });
+  };
 
   usePageMeta(
     node.label + " — Shop by Occasion — Next Level Events",
@@ -670,14 +765,10 @@ export default function CategoryTemplate({ node, trail }) {
     const isExactListing = node?.type === "theme" || !hasChildren;
 
     if (isExactListing) {
-      const currentPath = trail.map((item) => item.slug);
+      const currentPath = normalizeCategoryPath(trail.map((item) => item.slug));
       const currentPathKey = currentPath.join("/");
       const candidates = [];
 
-      // A product assigned to a parent category is inherited by every child.
-      // The catalog tree keeps the product on the node where it was assigned,
-      // so collect products from the current node and its ancestors before
-      // applying the hierarchy-aware filter below.
       trail.forEach((trailNode) => {
         (Array.isArray(trailNode?.products) ? trailNode.products : []).forEach((product) => {
           candidates.push(product);
@@ -692,18 +783,22 @@ export default function CategoryTemplate({ node, trail }) {
             : (Array.isArray(product?.categoryPath) && product.categoryPath.length ? [product.categoryPath] : []);
           if (productPathCandidates.length) {
             return productPathCandidates.some((rawPath) => {
-              const productPath = rawPath.filter(Boolean);
+              const productPath = normalizeCategoryPath(rawPath.filter(Boolean));
               if (!productPath.length || productPath[0] !== currentPath[0]) return false;
-              // Parent assignment => inherited by the current descendant.
-              return productPath.length <= currentPath.length &&
-                productPath.every((part, index) => part === currentPath[index]);
+              // For leaf/theme node: ensure exact path match (not parent category leaking in)
+              if (productPath.length < currentPath.length) return false;
+              return currentPath.every((part, index) => part === productPath[index]);
             });
           }
 
-          // Older records may only have categorySlug. Preserve the same
-          // parent-to-child inheritance for those records.
+          // Older records may only have categorySlug.
           const categorySlug = String(product?.categorySlug || "").trim();
-          return !categorySlug || trail.some((item) => item.slug === categorySlug);
+          if (categorySlug) {
+            return categorySlug === node.slug || currentPath[currentPath.length - 1] === categorySlug;
+          }
+
+          // If assigned directly on this node
+          return Array.isArray(node?.products) && node.products.some((p) => (p.id && p.id === product?.id) || (p.slug && p.slug === product?.slug));
         })
         .filter((product) => {
           const key = String(product?.id || product?.slug || product?.name || currentPathKey);
@@ -750,9 +845,11 @@ export default function CategoryTemplate({ node, trail }) {
   }, [contextProducts, priceFilter, cityOnly, topRatedOnly, sortKey, city]);
 
   function resetFilters() {
-    setPriceFilter("all");
-    setCityOnly(false);
-    setTopRatedOnly(false);
+    const next = new URLSearchParams(searchParams);
+    next.delete("price");
+    next.delete("city");
+    next.delete("rating");
+    setSearchParams(next, { replace: true });
   }
 
   const filterDescriptors = useMemo(() => {

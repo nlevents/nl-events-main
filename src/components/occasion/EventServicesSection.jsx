@@ -3,19 +3,43 @@ import { Link } from "react-router-dom";
 import { onImgError } from "../../lib/imageFallback";
 import AutoScrollRail from "../AutoScrollRail";
 import { EVENT_SERVICES, eventServiceHref } from "../../data/eventServices";
+import { SERVICE_ALIASES } from "../../lib/serviceContext";
 import { getServiceProductsForContext, getDecorationProductsForContext, getAddonCategoryTree } from "../../lib/catalogStore";
 import { trackServiceCategoryClick } from "../../lib/siteEvents";
 
 function availableServiceSlugs(contextPath = []) {
   const slugs = new Set();
   try {
+    if (!Array.isArray(contextPath) || !contextPath.length) {
+      EVENT_SERVICES.forEach((service) => slugs.add(service.slug));
+      return slugs;
+    }
     getServiceProductsForContext(contextPath).forEach((product) => {
-      const path = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
-      if (path[0] === "event-services" && path[1]) slugs.add(path[1]);
+      const paths = [
+        product?.categoryPath,
+        product?.serviceCategoryPath,
+        ...(Array.isArray(product?.categoryPaths) ? product.categoryPaths : []),
+      ];
+      paths.forEach((path) => {
+        if (Array.isArray(path) && path[0] === "event-services" && path[1]) {
+          const canonical = SERVICE_ALIASES[path[1]] || path[1];
+          slugs.add(canonical);
+        }
+      });
+      (Array.isArray(product?.displayPlacements) ? product.displayPlacements : []).forEach((placement) => {
+        const placementPath = Array.isArray(placement?.path) ? placement.path : [];
+        if (placement?.catalog === "services" && placementPath[0] === "event-services" && placementPath[1]) {
+          const canonical = SERVICE_ALIASES[placementPath[1]] || placementPath[1];
+          slugs.add(canonical);
+        }
+      });
+      if (product?.serviceCategory) {
+        const canonical = SERVICE_ALIASES[product.serviceCategory] || product.serviceCategory;
+        slugs.add(canonical);
+      }
     });
     // Occasion/function decoration themes are automatically available through
-    // the Décor service. This is derived from the existing catalog hierarchy;
-    // it does not create or duplicate catalog records.
+    // the Décor service.
     if (getDecorationProductsForContext(contextPath).length) slugs.add("decor");
   } catch {
     // Keep the storefront safe if catalog hydration is temporarily unavailable.

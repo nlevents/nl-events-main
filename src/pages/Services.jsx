@@ -1,5 +1,6 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
 export default function Services() {
-  return <Navigate to="/occasion/event-services" replace />;
+  const location = useLocation();
+  return <Navigate to={`/occasion/event-services${location.search}`} replace />;
 }

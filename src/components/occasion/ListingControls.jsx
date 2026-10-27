@@ -10,7 +10,7 @@ import { SORT_OPTIONS } from "../../data/occasions";
 // page so sorting + filtering behaves identically everywhere.
 export default function ListingControls({ resultCount, sortKey, onSortChange, filters, onReset, variant = "default" }) {
   const activeCount = Array.isArray(filters)
-    ? filters.filter((f) => f.kind === "toggle" ? Boolean(f.value) : f.value !== "all").length
+    ? filters.filter((f) => (f.kind === "toggle" ? Boolean(f.value) : Boolean(f.value) && f.value !== "all")).length
     : 0;
 
   return (
