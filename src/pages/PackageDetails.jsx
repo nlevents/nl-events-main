@@ -271,7 +271,7 @@ export default function PackageDetails() {
                   <span>{highlights.length} included</span>
                 </div>
                 <ul className="pd-highlight-list">
-                  {highlights.map((item) => <li key={item}><Icon name="check" /><span>{item}</span></li>)}
+                  {highlights.map((item, index) => <li key={`${item}-${index}`}><Icon name="check" /><span>{item}</span></li>)}
                 </ul>
               </section>
             )}
@@ -292,14 +292,14 @@ export default function PackageDetails() {
             <div className="reveal occ-block pd-market-section" id="pd-included">
               <div className="pd-section-heading"><h2>What's included</h2></div>
               <ul className="included-list">
-                {product.includes.map((item) => <li key={item}><Icon name="check" />{item}</li>)}
+                {product.includes.map((item, index) => <li key={`${item}-${index}`}><Icon name="check" />{item}</li>)}
               </ul>
             </div>
 
             <div className="reveal occ-block pd-market-section" id="pd-not-included">
               <div className="pd-section-heading"><h2>What's not included</h2></div>
               <ul className="not-included-list">
-                {meta.notIncluded.map((item) => <li key={item}><Icon name="close" />{item}</li>)}
+                {meta.notIncluded.map((item, index) => <li key={`${item}-${index}`}><Icon name="close" />{item}</li>)}
               </ul>
             </div>
 

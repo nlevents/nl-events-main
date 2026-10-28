@@ -63,7 +63,7 @@ export default function CategoryNav() {
             return (
               <li
                 key={cat.key}
-                className={"category-nav-item" + (cat.align === "right" ? " align-right" : "")}
+                className={"category-nav-item" + (cat.align === "right" ? " align-right" : "") + (cat.panelAlign === "right" ? " panel-align-right" : "")}
                 onMouseEnter={() => hasPanel && openNow(cat.key)}
                 onMouseLeave={() => hasPanel && closeSoon()}
               >
@@ -137,6 +137,22 @@ export default function CategoryNav() {
                                     </li>
                                   ))}
                                 </ul>
+                              )}
+                              {col.groups && col.groups.length > 0 && (
+                                <div className="mega-subcategory-groups">
+                                  {col.groups.map((group) => (
+                                    <section className="mega-subcategory-group" key={group.href || group.heading}>
+                                      <Link className="mega-subcategory-heading" to={group.href} onClick={() => setOpenKey(null)}>{group.heading}</Link>
+                                      <ul>
+                                        {group.links.map((link) => (
+                                          <li key={link.href}>
+                                            <Link to={link.href} onClick={() => setOpenKey(null)}>{link.label}</Link>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </section>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           ))}

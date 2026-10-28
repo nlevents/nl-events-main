@@ -181,7 +181,7 @@ export default function ProductTemplate({ node: product, trail }) {
                 <div className="reveal occ-block">
                   <h2 style={{ fontSize: 22, marginBottom: 12 }}>What's Included</h2>
                   <ul className="included-list">
-                    {product.includes.map((item) => <li key={item}><Icon name="check" />{item}</li>)}
+                    {product.includes.map((item, index) => <li key={`${item}-${index}`}><Icon name="check" />{item}</li>)}
                   </ul>
                 </div>
               )}
@@ -190,7 +190,7 @@ export default function ProductTemplate({ node: product, trail }) {
                 <div className="reveal occ-block">
                   <h2 style={{ fontSize: 22, marginBottom: 12 }}>What's Not Included</h2>
                   <ul className="not-included-list">
-                    {product.notIncluded.map((item) => <li key={item}><Icon name="close" />{item}</li>)}
+                    {product.notIncluded.map((item, index) => <li key={`${item}-${index}`}><Icon name="close" />{item}</li>)}
                   </ul>
                 </div>
               )}
@@ -309,7 +309,7 @@ export default function ProductTemplate({ node: product, trail }) {
               <div className="pd-market-section reveal">
                 <div className="pd-section-heading"><h2>What's Included</h2></div>
                 <ul className="included-list">
-                  {product.includes.map((item) => <li key={item}><Icon name="check" />{item}</li>)}
+                  {product.includes.map((item, index) => <li key={`${item}-${index}`}><Icon name="check" />{item}</li>)}
                 </ul>
               </div>
             )}
@@ -318,7 +318,7 @@ export default function ProductTemplate({ node: product, trail }) {
               <div className="pd-market-section reveal">
                 <div className="pd-section-heading"><h2>What's Not Included</h2></div>
                 <ul className="not-included-list">
-                  {product.notIncluded.map((item) => <li key={item}><Icon name="close" />{item}</li>)}
+                  {product.notIncluded.map((item, index) => <li key={`${item}-${index}`}><Icon name="close" />{item}</li>)}
                 </ul>
               </div>
             )}

@@ -51,16 +51,12 @@ export default function OccasionBrowser() {
 
   if (isLegacyServiceUrl && resolved && resolved.node?.type !== "product") {
     const service = canonicalServiceSlugs.slice(1).join("/");
-    const searchParams = new URLSearchParams(location.search);
-    searchParams.set("service", service);
-    return <Navigate to={`/occasion/event-services?${searchParams.toString()}`} replace />;
+    return <Navigate to={`/occasion/event-services?service=${encodeURIComponent(service)}${contextQs}`} replace />;
   }
 
   if (isServiceCategoryUrl && resolved && resolved.node?.type !== "product") {
     const service = slugs.slice(1).join("/");
-    const searchParams = new URLSearchParams(location.search);
-    searchParams.set("service", service);
-    return <Navigate to={`/occasion/event-services?${searchParams.toString()}`} replace />;
+    return <Navigate to={`/occasion/event-services?service=${encodeURIComponent(service)}${contextQs}`} replace />;
   }
 
   if (!resolved) return <NotFound />;

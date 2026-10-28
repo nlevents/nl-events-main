@@ -32,7 +32,10 @@ export function normalizeDisplayPlacements(list) {
 export function pathsRelated(a, b) {
   const left = normalizePlacementPath(a);
   const right = normalizePlacementPath(b);
-  if (!left.length || !right.length) return true;
+  // No context requested = unfiltered. A placement with an empty path is
+  // malformed and must not match a specific context.
+  if (!right.length) return true;
+  if (!left.length) return false;
   const shorter = left.length <= right.length ? left : right;
   const longer = left.length <= right.length ? right : left;
   return shorter.every((part, index) => part === longer[index]);

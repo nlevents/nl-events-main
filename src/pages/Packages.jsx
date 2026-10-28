@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { IMAGES } from "../data/images";
 import { useCity } from "../context/CityContext";
 import usePageMeta from "../hooks/usePageMeta";
@@ -11,13 +11,13 @@ import OccasionCard from "../components/occasion/OccasionCard";
 import ProductRail from "../components/ProductRail";
 import {
   listOccasions, listAllProducts, sortProducts, isAvailableInCity,
-  PRICE_BUCKETS, pathFor, toRailItem, normalizeCategoryPath,
+  PRICE_BUCKETS, pathFor, toRailItem, flattenCategoryTree,
 } from "../data/occasions";
 import { useLiveEntries } from "../hooks/useLiveCatalog";
 import { onImgError } from "../lib/imageFallback";
-import { getDisplayPlacementEntries } from "../lib/catalogStore";
+import { getCatalogEntriesForKind } from "../lib/catalogStore";
+import { catalogEntryPath, getCatalogFacetOptions, pathStartsWith } from "../lib/catalogFacets";
 
-const WRAPPER_SLUGS = new Set(["wedding-events", "birthday-types", "anniversary-types", "family-celebrations", "festivals", "services"]);
 
 export default function Packages() {
   usePageMeta(
@@ -25,136 +25,45 @@ export default function Packages() {
     "Browse every wedding, birthday, anniversary, baby shower and event package by Next Level Events, filterable by occasion, theme, city and price.",
   );
   const { city } = useCity();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const sortKey = searchParams.get("sort") || "popular";
-  const occasionFilter = searchParams.get("occasion") || searchParams.get("occ") || "all";
-  const categoryFilter = searchParams.get("category") || searchParams.get("cat") || "all";
-  const subcategoryFilter = searchParams.get("subcategory") || searchParams.get("subcat") || "all";
-  const themeFilter = searchParams.get("theme") || "all";
-  const priceFilter = searchParams.get("price") || "all";
-  const cityOnly = searchParams.get("city") === "1" || searchParams.get("city") === "true";
-  const topRatedOnly = searchParams.get("rating") === "1" || searchParams.get("rating") === "top" || searchParams.get("rating") === "true";
-
-  const updateFilters = (updates) => {
-    const next = new URLSearchParams(searchParams);
-    Object.entries(updates).forEach(([key, val]) => {
-      if (!val || val === "all" || (key === "sort" && val === "popular")) {
-        next.delete(key);
-      } else if (typeof val === "boolean") {
-        if (val) next.set(key, "1");
-        else next.delete(key);
-      } else {
-        next.set(key, val);
-      }
-    });
-    setSearchParams(next, { replace: true });
-  };
-
   const liveEntries = useLiveEntries();
-  const ALL_ENTRIES = useMemo(() => {
-    const base = liveEntries.filter((entry) => entry?.product?.catalogKind === "package");
-    getDisplayPlacementEntries("packages").forEach((entry) => {
-      if (entry?.product) base.push(entry);
-    });
-    return base;
-  }, [liveEntries]);
-
+  const ALL_ENTRIES = useMemo(() => getCatalogEntriesForKind("packages", liveEntries).filter((entry) => {
+    // Event Services is a dedicated service catalog, not a public package occasion.
+    const occasionSlug = String(entry?.occasion?.slug || entry?.trail?.[0]?.slug || "");
+    return occasionSlug !== "event-services" && !entry?.occasion?.addonOnly && !entry?.trail?.[0]?.addonOnly;
+  }), [liveEntries]);
+  const [sortKey, setSortKey] = useState("popular");
+  const [occasionFilter, setOccasionFilter] = useState("all");
+  const [themeFilter, setThemeFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [subcategoryFilter, setSubcategoryFilter] = useState("all");
+  const [priceFilter, setPriceFilter] = useState("all");
+  const [cityOnly, setCityOnly] = useState(false);
+  const [topRatedOnly, setTopRatedOnly] = useState(false);
   const uniquePackageCount = useMemo(() => new Set(ALL_ENTRIES.map((entry) => entry?.product?.id || entry?.product?.slug)).size, [ALL_ENTRIES]);
   useReveal([sortKey, occasionFilter, categoryFilter, subcategoryFilter, themeFilter, priceFilter, cityOnly, topRatedOnly]);
 
-  const facetNodes = (entry) => (Array.isArray(entry?.trail) ? entry.trail.slice(0, -1) : []);
-  const nodeSlug = (node) => String(node?.slug || "");
-  const nodeLabel = (node) => node?.label || node?.name || nodeSlug(node);
-  const isWrapperNode = (node) => WRAPPER_SLUGS.has(nodeSlug(node).toLowerCase());
-  const nodesOfType = (entry, type) => facetNodes(entry).filter((node) => node?.type === type);
-  const meaningfulCategories = (entry) => nodesOfType(entry, "category").filter((node) => !isWrapperNode(node));
-  const firstCategory = (entry) => meaningfulCategories(entry)[0] || nodesOfType(entry, "category")[0];
-  const subcategoryNodes = (entry) => {
-    const categories = meaningfulCategories(entry);
-    return categories.length > 1 ? categories.slice(1) : [];
-  };
-
-  const matchesOccasion = (entry, slug) => {
-    if (slug === "all") return true;
-    if (entry.occasion?.slug === slug) return true;
-    if (entry.product?.occasionSlug === slug) return true;
-    if (Array.isArray(entry.product?.occasions) && entry.product.occasions.includes(slug)) return true;
-    if (Array.isArray(entry.product?.packageOccasions) && entry.product.packageOccasions.includes(slug)) return true;
-    const norm = normalizeCategoryPath(Array.isArray(entry.product?.categoryPath) ? entry.product.categoryPath : []);
-    return norm[0] === slug;
-  };
-
-  const matchesCategory = (entry, slug) => {
-    if (slug === "all") return true;
-    const first = firstCategory(entry);
-    if (nodeSlug(first) === slug) return true;
-    if (meaningfulCategories(entry).some((node) => nodeSlug(node) === slug)) return true;
-    if (entry.product?.categorySlug === slug) return true;
-    const paths = Array.isArray(entry.product?.categoryPaths) && entry.product.categoryPaths.length
-      ? entry.product.categoryPaths
-      : (Array.isArray(entry.product?.categoryPath) && entry.product.categoryPath.length ? [entry.product.categoryPath] : []);
-    return paths.some((p) => normalizeCategoryPath(p).includes(slug));
-  };
-
-  const matchesSubcategory = (entry, slug) => {
-    if (slug === "all") return true;
-    if (subcategoryNodes(entry).some((node) => nodeSlug(node) === slug)) return true;
-    const paths = Array.isArray(entry.product?.categoryPaths) && entry.product.categoryPaths.length
-      ? entry.product.categoryPaths
-      : (Array.isArray(entry.product?.categoryPath) && entry.product.categoryPath.length ? [entry.product.categoryPath] : []);
-    return paths.some((p) => normalizeCategoryPath(p).includes(slug));
-  };
-
-  const matchesTheme = (entry, slug) => {
-    if (slug === "all") return true;
-    if (nodesOfType(entry, "theme").some((node) => nodeSlug(node) === slug)) return true;
-    if (entry.theme?.slug === slug) return true;
-    const paths = Array.isArray(entry.product?.categoryPaths) && entry.product.categoryPaths.length
-      ? entry.product.categoryPaths
-      : (Array.isArray(entry.product?.categoryPath) && entry.product.categoryPath.length ? [entry.product.categoryPath] : []);
-    return paths.some((p) => {
-      const norm = normalizeCategoryPath(p);
-      return norm[norm.length - 1] === slug;
-    });
-  };
+  const taxonomyNodes = useMemo(() => flattenCategoryTree(), [ALL_ENTRIES]);
+  const facetOptions = useMemo(() => getCatalogFacetOptions({
+    occasionFilter,
+    categoryFilter,
+    subcategoryFilter,
+    taxonomyNodes,
+  }), [taxonomyNodes, occasionFilter, categoryFilter, subcategoryFilter]);
+  const occasionOptions = facetOptions.occasionOptions;
 
   const filteredForFacets = useMemo(() => ALL_ENTRIES.filter((entry) => {
-    if (!matchesOccasion(entry, occasionFilter)) return false;
-    if (!matchesCategory(entry, categoryFilter)) return false;
-    if (!matchesSubcategory(entry, subcategoryFilter)) return false;
-    if (!matchesTheme(entry, themeFilter)) return false;
+    const path = catalogEntryPath(entry);
+    if (occasionFilter !== "all" && path[0] !== occasionFilter) return false;
+    if (categoryFilter !== "all" && !pathStartsWith(path, categoryFilter)) return false;
+    if (subcategoryFilter !== "all" && !pathStartsWith(path, subcategoryFilter)) return false;
+    if (themeFilter !== "all" && !pathStartsWith(path, themeFilter)) return false;
     return true;
   }), [ALL_ENTRIES, occasionFilter, categoryFilter, subcategoryFilter, themeFilter]);
 
-  const facetOptions = useMemo(() => {
-    const unique = (items) => {
-      const map = new Map();
-      items.forEach((item) => {
-        const key = nodeSlug(item);
-        if (key && !map.has(key)) map.set(key, { key, label: nodeLabel(item) });
-      });
-      return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
-    };
-    const occasionScoped = ALL_ENTRIES.filter((entry) => matchesOccasion(entry, occasionFilter));
-    const categoryScoped = occasionScoped.filter((entry) => matchesCategory(entry, categoryFilter));
-    const subcategoryScoped = categoryScoped.filter((entry) => matchesSubcategory(entry, subcategoryFilter));
-    return {
-      occasionOptions: unique(ALL_ENTRIES.map((entry) => entry.occasion).filter(Boolean)),
-      categoryOptions: unique(occasionScoped.map(firstCategory).filter(Boolean)),
-      subcategoryOptions: unique(categoryScoped.flatMap(subcategoryNodes)),
-      themeOptions: unique(subcategoryScoped.flatMap((entry) => nodesOfType(entry, "theme"))),
-    };
-  }, [ALL_ENTRIES, occasionFilter, categoryFilter, subcategoryFilter]);
-
   useEffect(() => {
-    const updates = {};
-    if (categoryFilter !== "all" && !facetOptions.categoryOptions.some((o) => o.key === categoryFilter)) updates.category = "all";
-    if (subcategoryFilter !== "all" && !facetOptions.subcategoryOptions.some((o) => o.key === subcategoryFilter)) updates.subcategory = "all";
-    if (themeFilter !== "all" && !facetOptions.themeOptions.some((o) => o.key === themeFilter)) updates.theme = "all";
-    if (Object.keys(updates).length > 0) {
-      updateFilters(updates);
-    }
+    if (categoryFilter !== "all" && !facetOptions.categoryOptions.some((o) => o.key === categoryFilter)) setCategoryFilter("all");
+    if (subcategoryFilter !== "all" && !facetOptions.subcategoryOptions.some((o) => o.key === subcategoryFilter)) setSubcategoryFilter("all");
+    if (themeFilter !== "all" && !facetOptions.themeOptions.some((o) => o.key === themeFilter)) setThemeFilter("all");
   }, [facetOptions, categoryFilter, subcategoryFilter, themeFilter]);
 
   const filteredEntries = useMemo(() => {
@@ -177,56 +86,84 @@ export default function Packages() {
       seen.add(key);
       unique.push(entry);
     });
+    const entryByIdentity = new Map();
+    unique.forEach((entry) => {
+      entryByIdentity.set(String(entry.product.id || entry.product.slug), entry);
+      if (entry.product.slug) entryByIdentity.set(String(entry.product.slug), entry);
+    });
     const order = sortProducts(unique.map((e) => e.product), sortKey);
-    return order.map((p) => unique.find((e) => e.product.slug === p.slug || e.product.id === p.id));
+    return order.map((product) => entryByIdentity.get(String(product.id || product.slug)) || entryByIdentity.get(String(product.slug))).filter(Boolean);
   }, [filteredEntries, sortKey]);
 
   function resetFilters() {
-    const next = new URLSearchParams();
-    if (sortKey && sortKey !== "popular") next.set("sort", sortKey);
-    setSearchParams(next, { replace: true });
+    setOccasionFilter("all");
+    setThemeFilter("all");
+    setCategoryFilter("all");
+    setSubcategoryFilter("all");
+    setPriceFilter("all");
+    setCityOnly(false);
+    setTopRatedOnly(false);
   }
 
   const filterDescriptors = [
-    { key: "occasion", label: "Occasion", kind: "select", value: occasionFilter, onChange: (v) => updateFilters({ occasion: v, category: "all", subcategory: "all", theme: "all" }), options: [{ key: "all", label: "All Occasions" }, ...facetOptions.occasionOptions] },
-    { key: "category", label: "Category", kind: "select", value: categoryFilter, onChange: (v) => updateFilters({ category: v, subcategory: "all", theme: "all" }), options: [{ key: "all", label: "All Categories" }, ...facetOptions.categoryOptions] },
-    { key: "subcategory", label: "Subcategory", kind: "select", value: subcategoryFilter, onChange: (v) => updateFilters({ subcategory: v, theme: "all" }), options: [{ key: "all", label: "All Subcategories" }, ...facetOptions.subcategoryOptions] },
-    { key: "theme", label: "Theme", kind: "select", value: themeFilter, onChange: (v) => updateFilters({ theme: v }), options: [{ key: "all", label: "All Themes" }, ...facetOptions.themeOptions] },
-    { key: "price", label: "Price", kind: "select", value: priceFilter, onChange: (v) => updateFilters({ price: v }), options: PRICE_BUCKETS.map((b) => ({ key: b.key, label: b.label })) },
-    { key: "city", label: "Available in " + city, kind: "toggle", value: cityOnly, onChange: (v) => updateFilters({ city: v }) },
-    { key: "rating", label: "Top Rated (4.7★+)", kind: "toggle", value: topRatedOnly, onChange: (v) => updateFilters({ rating: v }) },
+    { key: "occasion", label: "Occasion", kind: "select", value: occasionFilter, onChange: (v) => { setOccasionFilter(v); setCategoryFilter("all"); setSubcategoryFilter("all"); setThemeFilter("all"); }, options: [{ key: "all", label: "All Occasions" }, ...occasionOptions] },
+    { key: "category", label: "Category", kind: "select", value: categoryFilter, onChange: (v) => { setCategoryFilter(v); setSubcategoryFilter("all"); setThemeFilter("all"); }, options: [{ key: "all", label: "All Categories" }, ...facetOptions.categoryOptions] },
+    { key: "subcategory", label: "Subcategory", kind: "select", value: subcategoryFilter, onChange: (v) => { setSubcategoryFilter(v); setThemeFilter("all"); }, options: [{ key: "all", label: "All Subcategories" }, ...facetOptions.subcategoryOptions] },
+    { key: "theme", label: "Theme", kind: "select", value: themeFilter, onChange: setThemeFilter, options: [{ key: "all", label: "All Themes" }, ...facetOptions.themeOptions] },
+    { key: "price", label: "Price", kind: "select", value: priceFilter, onChange: setPriceFilter, options: PRICE_BUCKETS.map((b) => ({ key: b.key, label: b.label })) },
+    { key: "city", label: "Available in " + city, kind: "toggle", value: cityOnly, onChange: setCityOnly },
+    { key: "rating", label: "Top Rated (4.7★+)", kind: "toggle", value: topRatedOnly, onChange: setTopRatedOnly },
   ];
 
-  const popularRail = useMemo(
-    () => sortProducts(Array.from(new Map(ALL_ENTRIES.filter((e) => e?.product).map((e) => [e.product.id || e.product.slug, e.product])).values()), "popular").slice(0, 8)
-      .map((p) => { const e = ALL_ENTRIES.find((e) => e?.product?.slug === p?.slug); return (e && Array.isArray(e.trail)) ? toRailItem(p, e.trail) : null; })
-      .filter(Boolean),
-    [ALL_ENTRIES],
-  );
   const newestRail = useMemo(
-    () => sortProducts(Array.from(new Map(ALL_ENTRIES.filter((e) => e?.product).map((e) => [e.product.id || e.product.slug, e.product])).values()), "newest").slice(0, 8)
-      .map((p) => { const e = ALL_ENTRIES.find((e) => e?.product?.slug === p?.slug); return (e && Array.isArray(e.trail)) ? toRailItem(p, e.trail) : null; })
-      .filter(Boolean),
+    () => {
+      const entryByIdentity = new Map();
+      const productsByIdentity = new Map();
+      ALL_ENTRIES.forEach((entry) => {
+        const key = String(entry.product.id || entry.product.slug);
+        if (!productsByIdentity.has(key)) productsByIdentity.set(key, entry.product);
+        if (!entryByIdentity.has(key)) entryByIdentity.set(key, entry);
+        if (entry.product.slug && !entryByIdentity.has(String(entry.product.slug))) entryByIdentity.set(String(entry.product.slug), entry);
+      });
+      return sortProducts(Array.from(productsByIdentity.values()), "newest").slice(0, 8)
+        .map((product) => {
+          const entry = entryByIdentity.get(String(product.id || product.slug)) || entryByIdentity.get(String(product.slug));
+          return entry ? toRailItem(product, entry.trail) : null;
+        }).filter(Boolean);
+    },
     [ALL_ENTRIES],
   );
   const cityRail = useMemo(() => {
-    const inCity = ALL_ENTRIES.filter((e) => e?.product && isAvailableInCity(e.product, city));
-    const unique = Array.from(new Map(inCity.map((e) => [e.product.id || e.product.slug, e])).values());
-    return sortProducts(unique.map((e) => e.product), "popular").slice(0, 8)
-      .map((p) => { const e = inCity.find((e) => e?.product?.slug === p?.slug); return (e && Array.isArray(e.trail)) ? toRailItem(p, e.trail) : null; })
-      .filter(Boolean);
+    const inCity = ALL_ENTRIES.filter((entry) => isAvailableInCity(entry.product, city));
+    const unique = Array.from(new Map(inCity.map((entry) => [String(entry.product.id || entry.product.slug), entry])).values());
+    const entryByIdentity = new Map();
+    unique.forEach((entry) => {
+      entryByIdentity.set(String(entry.product.id || entry.product.slug), entry);
+      if (entry.product.slug) entryByIdentity.set(String(entry.product.slug), entry);
+    });
+    return sortProducts(unique.map((entry) => entry.product), "popular").slice(0, 8)
+      .map((product) => {
+        const entry = entryByIdentity.get(String(product.id || product.slug)) || entryByIdentity.get(String(product.slug));
+        return entry ? toRailItem(product, entry.trail) : null;
+      }).filter(Boolean);
   }, [ALL_ENTRIES, city]);
   const recommendedRail = useMemo(() => {
-    const byOccasion = new Map();
-    sortProducts(ALL_ENTRIES.filter((e) => e?.product).map((e) => e.product), "popular").forEach((p) => {
-      const entry = ALL_ENTRIES.find((e) => e?.product?.slug === p?.slug);
-      if (!entry) return;
-      const key = entry.occasion?.slug || entry.product?.occasionSlug || "other";
-      if (!byOccasion.has(key)) byOccasion.set(key, entry);
+    const entryByIdentity = new Map();
+    const uniqueProducts = new Map();
+    ALL_ENTRIES.forEach((entry) => {
+      const key = String(entry.product.id || entry.product.slug);
+      if (!uniqueProducts.has(key)) uniqueProducts.set(key, entry.product);
+      if (!entryByIdentity.has(key)) entryByIdentity.set(key, entry);
+      if (entry.product.slug && !entryByIdentity.has(String(entry.product.slug))) entryByIdentity.set(String(entry.product.slug), entry);
     });
-    return Array.from(byOccasion.values())
-      .filter((e) => e?.product && Array.isArray(e.trail))
-      .map((e) => toRailItem(e.product, e.trail));
+    const byOccasion = new Map();
+    sortProducts(Array.from(uniqueProducts.values()), "popular").forEach((product) => {
+      const entry = entryByIdentity.get(String(product.id || product.slug)) || entryByIdentity.get(String(product.slug));
+      if (!entry) return;
+      const key = String(entry.occasion?.slug || entry.trail?.[0]?.slug || "");
+      if (key && !byOccasion.has(key)) byOccasion.set(key, entry);
+    });
+    return Array.from(byOccasion.values()).map((entry) => toRailItem(entry.product, entry.trail));
   }, [ALL_ENTRIES]);
 
   return (
@@ -247,25 +184,23 @@ export default function Packages() {
         <Breadcrumb items={[{ label: "Packages" }]} />
       </section>
 
-      <ProductRail title="Popular Products" items={popularRail} />
-
       <section className="section-tight container">
         <div className="section-head reveal">
           <h2>Browse All Packages</h2>
-          <p>{uniquePackageCount} packages across {facetOptions.occasionOptions.length} occasions — narrow it down below.</p>
+          <p>{uniquePackageCount} packages across {occasionOptions.length - 1} occasions — narrow it down below.</p>
         </div>
 
         <ListingControls
           resultCount={sortedEntries.length}
           sortKey={sortKey}
-          onSortChange={(val) => updateFilters({ sort: val })}
+          onSortChange={setSortKey}
           filters={filterDescriptors}
           onReset={resetFilters}
         />
 
         <div className="occ-prod-grid reveal">
           {sortedEntries.map((e) => (
-            <ProductCard key={e.product.slug || e.product.id} product={e.product} href={Array.isArray(e.trail) ? pathFor(e.trail) : `/package/${e.product.slug}`} />
+            <ProductCard key={e.product.slug} product={e.product} href={pathFor(e.trail)} />
           ))}
         </div>
         {sortedEntries.length === 0 && (

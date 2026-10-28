@@ -1,68 +1,20 @@
-import { hasDisplayPlacement, DISPLAY_CATALOGS, normalizeDisplayPlacements } from "./catalogPlacement";
-
+import { hasDisplayPlacement, DISPLAY_CATALOGS, normalizePlacementPath } from "./catalogPlacement";
 // Pure, dependency-free service-context matching. Single source of truth for
 // "does this service product belong in this occasion/function context?".
+//
+// Scope modes (product.serviceScopeMode):
+//   "scoped"  -> explicit contexts in serviceScopes; matches ONLY those (and
+//                their descendants). Empty list never matches anything.
+//   "global"  -> admin explicitly made it available everywhere.
+//   (absent)  -> LEGACY record saved before this field existed. Kept visible
+//                with the old behaviour so the live site is not broken, but
+//                it is handled separately and never applies to new saves.
 
 export const SCOPE_MODE = Object.freeze({ SCOPED: "scoped", GLOBAL: "global", LEGACY: "legacy" });
-
-export const SERVICE_ALIASES = Object.freeze({
-  "entry": "entry-concept",
-  "entry-concept": "entry-concept",
-  "entry-concepts": "entry-concept",
-  "entry_concept": "entry-concept",
-  "entry_concepts": "entry-concept",
-  "entry concepts": "entry-concept",
-  "entry concept": "entry-concept",
-  "decor": "decor",
-  "decorations": "decor",
-  "decoration": "decor",
-  "entertainment": "entertainment",
-  "artist": "entertainment",
-  "artists": "entertainment",
-  "dj": "entertainment",
-  "dj-live-bands": "entertainment",
-  "live-band": "entertainment",
-  "live-bands": "entertainment",
-  "sound": "sound-technical",
-  "lighting": "sound-technical",
-  "lights": "sound-technical",
-  "sfx": "sound-technical",
-  "sound-technical": "sound-technical",
-  "sound-and-technical": "sound-technical",
-  "av-technical": "sound-technical",
-  "av": "sound-technical",
-  "tent": "tent-furniture",
-  "furniture": "tent-furniture",
-  "tent-furniture": "tent-furniture",
-  "tent-and-furniture": "tent-furniture",
-  "tent-furnitures": "tent-furniture",
-  "photography": "photography-videography",
-  "videography": "photography-videography",
-  "photo": "photography-videography",
-  "video": "photography-videography",
-  "photography-videography": "photography-videography",
-  "photography-and-videography": "photography-videography",
-  "catering": "catering",
-  "food": "catering",
-  "baraat": "baraat-procession",
-  "brass": "baraat-procession",
-  "baraat-procession": "baraat-procession",
-  "wedding-activity": "wedding-activity",
-  "wedding-activities": "wedding-activity",
-  "activities": "wedding-activity",
-  "other": "other-services",
-  "other-service": "other-services",
-  "other-services": "other-services",
-});
 
 export function slugPart(value) {
   return String(value ?? "").toLowerCase().trim()
     .replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-}
-
-export function normalizeServiceSlug(value) {
-  const clean = slugPart(value);
-  return SERVICE_ALIASES[clean] || clean;
 }
 
 export function normalizePath(value) {
@@ -86,9 +38,6 @@ export function normalizeScopeList(list) {
 function legacyRawScopes(product) {
   if (Array.isArray(product?.serviceScopes)) return product.serviceScopes;
   if (Array.isArray(product?.scopes) && product.scopes.length) return product.scopes;
-  if (Array.isArray(product?.occasions) && product.occasions.length) return product.occasions;
-  if (product?.occasionSlug) return [product.occasionSlug];
-  if (Array.isArray(product?.packageOccasions) && product.packageOccasions.length) return product.packageOccasions;
   return product?.scope && product.scope !== "global" ? [product.scope] : [];
 }
 
@@ -103,6 +52,10 @@ export function getScopeMode(product) {
 // function/category, and its top-level occasion. Conversely, selecting a
 // parent makes the service available to every descendant. Two sibling
 // branches never match.
+//
+// Example: scope [wedding, wedding-events, sangeet, royal-sangeet] matches
+// Wedding, Sangeet and Royal Sangeet, but not Bollywood Sangeet, Reception,
+// Birthday or Anniversary.
 function isHierarchicallyRelated(scope, context) {
   if (!scope.length || !context.length) return false;
   const shorter = scope.length <= context.length ? scope : context;
@@ -124,9 +77,8 @@ export function serviceMatchesContext(product, contextPath) {
   if (!context.length) return true; // no context selected = unfiltered browse
 
   // A cross-listed item may be explicitly assigned to a service context.
+  // This is additive: existing serviceScopes continue to work unchanged.
   if (hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES, context)) return true;
-  if (hasDisplayPlacement(product, DISPLAY_CATALOGS.PRODUCTS, context)) return true;
-  if (hasDisplayPlacement(product, DISPLAY_CATALOGS.PACKAGES, context)) return true;
 
   const mode = getScopeMode(product);
 
@@ -134,12 +86,7 @@ export function serviceMatchesContext(product, contextPath) {
 
   if (mode === SCOPE_MODE.SCOPED) {
     const scopes = normalizeScopeList(product.serviceScopes);
-    if (scopes.some((s) => isHierarchicallyRelated(s.split("/"), context))) return true;
-    const occasions = Array.isArray(product?.occasions)
-      ? product.occasions
-      : (product?.occasionSlug ? [product.occasionSlug] : []);
-    if (occasions.some((occ) => isHierarchicallyRelated([slugPart(occ)], context))) return true;
-    return false;
+    return scopes.some((s) => isHierarchicallyRelated(s.split("/"), context)); // empty => false
   }
 
   // LEGACY (no mode recorded)
@@ -147,83 +94,54 @@ export function serviceMatchesContext(product, contextPath) {
   if (!raw.length) return true; // preserved: old records with no scopes stay visible
   const scopes = normalizeScopeList(raw);
   if (!scopes.length) return false; // only category paths stored -> never global
-  return scopes.some((s) => legacyContains(s.split("/"), context) || isHierarchicallyRelated(s.split("/"), context));
+  return scopes.some((s) => legacyContains(s.split("/"), context));
 }
+
+// Decide the mode to persist on save. Throws if a NEW record has no context.
 
 /**
  * Filter a service collection by the selected service category and event
  * context. Keeping this in the same module as the scope matcher prevents
  * storefront surfaces from implementing slightly different visibility rules.
  */
-export function filterServiceProducts(products, { service = "", explicitServiceCategory = "", contextPath = [], context: contextAlias = [] } = {}) {
-  const rawService = String(service || explicitServiceCategory || "").toLowerCase().trim();
-  const canonicalServiceSlug = normalizeServiceSlug(rawService);
-  const selectedServicePath = normalizePath(canonicalServiceSlug);
-  const rawContext = contextPath && contextPath.length ? contextPath : contextAlias;
-  const context = normalizePath(rawContext);
+export function filterServiceProducts(products, { service = "", contextPath = [] } = {}) {
+  const selectedServicePath = normalizePath(service);
+  const context = normalizePath(contextPath);
   const seen = new Set();
 
   return (Array.isArray(products) ? products : []).filter((product) => {
     if (!product || product.status === "archived" || product.status === "draft") return false;
 
+    const categoryPath = Array.isArray(product.categoryPath)
+      ? product.categoryPath.map(slugPart).filter(Boolean)
+      : [];
+    const serviceCategoryPath = Array.isArray(product.serviceCategoryPath)
+      ? product.serviceCategoryPath.map(slugPart).filter(Boolean)
+      : [];
     const kinds = Array.isArray(product.catalogKinds) && product.catalogKinds.length
       ? product.catalogKinds
       : [product.catalogKind || (product.isAddon ? "service" : "product")];
+    const naturalService = categoryPath[0] === "event-services" || serviceCategoryPath[0] === "event-services" || kinds.includes("service");
+    const explicitServiceCategory = selectedServicePath.length
+      ? hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES, ["event-services", ...selectedServicePath])
+      : hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES);
+    const anyServicePlacement = hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES);
+    if (!naturalService && !anyServicePlacement) return false;
 
-    // Collect all candidate service paths/slugs for this product
-    const candidateServicePaths = [];
-
-    // 1. serviceCategoryPath
-    if (Array.isArray(product.serviceCategoryPath) && product.serviceCategoryPath.length) {
-      const p = product.serviceCategoryPath.map(slugPart).filter(Boolean);
-      candidateServicePaths.push(p[0] === "event-services" ? p.slice(1) : p);
-    }
-    // 2. categoryPath
-    if (Array.isArray(product.categoryPath) && product.categoryPath.length) {
-      const p = product.categoryPath.map(slugPart).filter(Boolean);
-      if (p[0] === "event-services") candidateServicePaths.push(p.slice(1));
-    }
-    // 3. categoryPaths
-    if (Array.isArray(product.categoryPaths)) {
-      product.categoryPaths.forEach((cp) => {
-        if (Array.isArray(cp) && cp.length) {
-          const p = cp.map(slugPart).filter(Boolean);
-          if (p[0] === "event-services") candidateServicePaths.push(p.slice(1));
-        }
-      });
-    }
-    // 4. displayPlacements under services
-    const placements = normalizeDisplayPlacements(product.displayPlacements);
-    placements.forEach((placement) => {
-      if (placement.catalog === DISPLAY_CATALOGS.SERVICES && placement.path.length) {
-        candidateServicePaths.push(placement.path[0] === "event-services" ? placement.path.slice(1) : placement.path);
-      }
-    });
-    // 5. serviceCategory / categorySlug
-    if (product.serviceCategory) {
-      candidateServicePaths.push([slugPart(product.serviceCategory)]);
-    }
-    if ((kinds.includes("service") || product.isAddon) && product.categorySlug) {
-      candidateServicePaths.push([slugPart(product.categorySlug)]);
-    }
-
-    const isServiceItem = candidateServicePaths.length > 0 || kinds.includes("service") || product.isAddon === true;
-    if (!isServiceItem) return false;
-
-    // Normalize candidate parts with SERVICE_ALIASES
-    const normalizedCandidates = candidateServicePaths.map((parts) => parts.map(normalizeServiceSlug).filter(Boolean));
-
-    // If a service filter was requested, verify product belongs to that service category
     if (selectedServicePath.length) {
-      const matchesService = normalizedCandidates.some((cand) => {
-        if (!cand.length) return false;
-        return selectedServicePath.length <= cand.length
-          && selectedServicePath.every((part, idx) => part === cand[idx]);
-      });
-      if (!matchesService) return false;
+      // Category membership only decides WHICH service category the item is
+      // in. It must never bypass the occasion/function context check below,
+      // otherwise a service scoped to Birthday would leak into Wedding.
+      let inSelectedCategory = explicitServiceCategory;
+      if (!inSelectedCategory) {
+        if (!naturalService) return false;
+        const productServicePath = (serviceCategoryPath[0] === "event-services" ? serviceCategoryPath.slice(1) : categoryPath.slice(1));
+        inSelectedCategory = selectedServicePath.length <= productServicePath.length
+          && selectedServicePath.every((part, index) => part === productServicePath[index]);
+      }
+      if (!inSelectedCategory) return false;
     }
 
-    // Context filter check
     if (context.length && !serviceMatchesContext(product, context)) return false;
 
     const key = String(product.id || product.slug || product.name || "");

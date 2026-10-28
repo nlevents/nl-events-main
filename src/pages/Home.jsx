@@ -8,6 +8,7 @@ import { cloudinaryAsset } from "../lib/cloudinaryAssets";
 import usePageMeta from "../hooks/usePageMeta";
 import { listOccasions, weddingFunctionLinks, birthdayThemeLinks } from "../data/occasions";
 import Faq from "../components/Faq";
+import Icon from "../components/Icon";
 import ProductRail from "../components/ProductRail";
 import AutoScrollRail from "../components/AutoScrollRail";
 import EventServicesSection from "../components/occasion/EventServicesSection";
@@ -96,10 +97,15 @@ function HomeHero() {
           <Link to="/gallery" className="ref-home-outline-btn">◉ &nbsp;Explore Our Work</Link>
         </div>
         <div className="ref-home-hero-stats">
-          <span><b>500+</b>Events Planned</span>
-          <span><b>100%</b>Client Satisfaction</span>
-          <span><b>6+ Years</b>of Experience</span>
-          <span><b>End-to-End</b>Event Support</span>
+          <span><i className="rhs-ic"><Icon name="calendar" /></i><b>500+</b><u>Events Planned</u></span>
+          <span><i className="rhs-ic"><Icon name="users" /></i><b>100%</b><u>Client Satisfaction</u></span>
+          <span><i className="rhs-ic"><Icon name="star" /></i><b>6+ Years</b><u>of Experience</u></span>
+          <span>
+            <i className="rhs-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><rect x="3" y="14" width="4" height="6" rx="1.6" /><rect x="17" y="14" width="4" height="6" rx="1.6" /><path d="M19 20c0 1.2-1.3 2-3.5 2H13" /></svg>
+            </i>
+            <b>End-to-End</b><u>Event Support</u>
+          </span>
         </div>
       </div>
     </section>

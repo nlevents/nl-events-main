@@ -2706,9 +2706,30 @@ export function getDecorationProductsForContext(contextPath = []) {
 
   const isRelatedPath = (path) => {
     if (!path.length) return false;
+
+    // Wedding function pages (e.g. Wedding -> Wedding Events -> Mehndi)
+    // must not inherit a generic Wedding-level assignment. Otherwise a product
+    // assigned only to the Wedding parent can appear in every sibling function.
+    // Keep this stricter rule local to the Wedding function catalog; all other
+    // occasions retain the existing hierarchical matching behavior.
+    if (context[0] === "wedding" && context.length > 1 && path.length < context.length) {
+      return false;
+    }
+
     const shorter = path.length <= context.length ? path : context;
     const longer = path.length <= context.length ? context : path;
     return shorter.every((part, index) => part === longer[index]);
+  };
+
+  const isWeddingFunctionPlacementMatch = (path) => {
+    const normalized = Array.isArray(path) ? path.map((part) => sanitizeSlug(part)).filter(Boolean) : [];
+    if (context[0] === "wedding" && context.length > 1) {
+      // For a selected Wedding function, only an assignment at that function
+      // or below it may match. Parent-only and sibling placements are excluded.
+      return normalized.length >= context.length
+        && context.every((part, index) => normalized[index] === part);
+    }
+    return false;
   };
 
   return getProducts()
@@ -2754,6 +2775,13 @@ export function getDecorationProductsForContext(contextPath = []) {
         return normalized[0] !== "event-services" && isRelatedPath(normalized, context);
       });
       if (categoryMatch) return true;
+
+      if (context[0] === "wedding" && context.length > 1) {
+        const placements = Array.isArray(product?.displayPlacements) ? product.displayPlacements : [];
+        return placements.some((placement) =>
+          (placement?.catalog === DISPLAY_CATALOGS.PRODUCTS || placement?.catalog === DISPLAY_CATALOGS.SERVICES)
+          && isWeddingFunctionPlacementMatch(placement?.path));
+      }
 
       return hasDisplayPlacement(product, DISPLAY_CATALOGS.PRODUCTS, context)
         || hasDisplayPlacement(product, DISPLAY_CATALOGS.SERVICES, context);
@@ -2824,13 +2852,19 @@ export function getServiceProductsForContext(contextPath = []) {
       const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
         ? product.catalogKinds
         : [product?.catalogKind || (product?.isAddon ? "service" : "product")];
-      return kinds.includes("service") || product?.isAddon === true;
+      return kinds.includes("service") || product?.catalogKind === "service" || product?.isAddon === true;
     })
     .filter((product) => product?.status !== "archived" && product?.status !== "draft")
     .filter((product) => {
       const categoryPath = Array.isArray(product?.categoryPath) ? product.categoryPath : [];
       const serviceCategoryPath = Array.isArray(product?.serviceCategoryPath) ? product.serviceCategoryPath : [];
-      const naturalService = categoryPath[0] === "event-services" || serviceCategoryPath[0] === "event-services";
+      const kinds = Array.isArray(product?.catalogKinds) && product.catalogKinds.length
+        ? product.catalogKinds
+        : [product?.catalogKind || (product?.isAddon ? "service" : "product")];
+      const naturalService = categoryPath[0] === "event-services"
+        || serviceCategoryPath[0] === "event-services"
+        || kinds.includes("service")
+        || product?.catalogKind === "service";
       const crossListedService = normalizeDisplayPlacements(product?.displayPlacements).some((placement) => placement.catalog === "services");
       if (!naturalService && !crossListedService) return false;
       return serviceProductMatchesContext(product, normalizedContext);
@@ -2951,6 +2985,72 @@ export function getDisplayPlacementOptions() {
   return [...normal, ...services];
 }
 
+// Build complete storefront entries for a catalog kind. The live occasion tree
+// contains legacy/shared categoryPaths, but newer admin records keep separate
+// productCategoryPaths and packageCategoryPaths. Resolve those dedicated paths
+// here so entries assigned to a secondary catalog are not silently omitted.
+export function getCatalogEntriesForKind(kind, existingEntries = []) {
+  if (!["products", "packages"].includes(String(kind))) return [];
+  const catalogKind = kind === "packages" ? "package" : "product";
+  const out = [];
+  const seen = new Set();
+  const add = (entry) => {
+    const product = entry?.product;
+    if (!product || product.status === "archived" || product.status === "draft") return;
+    const kinds = Array.isArray(product.catalogKinds) && product.catalogKinds.length
+      ? product.catalogKinds
+      : [product.catalogKind || (product.isAddon ? "service" : "product")];
+    if (!kinds.includes(catalogKind)) return;
+    const path = Array.isArray(entry.trail)
+      ? entry.trail.slice(0, -1).map((node) => node?.slug).filter(Boolean)
+      : [];
+    const key = `${String(product.id || product.slug || product.name)}:${path.join("/")}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(entry);
+  };
+
+  // Keep existing tree-backed entries (including their canonical trail URLs).
+  (Array.isArray(existingEntries) ? existingEntries : []).forEach(add);
+
+  // Add entries from the dedicated catalog assignments. These are not always
+  // present in listAllProducts(), which is built from the shared legacy tree.
+  getProducts().forEach((product) => {
+    if (!product || product.status === "archived" || product.status === "draft") return;
+    const kinds = Array.isArray(product.catalogKinds) && product.catalogKinds.length
+      ? product.catalogKinds
+      : [product.catalogKind || (product.isAddon ? "service" : "product")];
+    if (!kinds.includes(catalogKind)) return;
+
+    let paths = getAssignedCatalogCategoryPaths(product, [catalogKind]);
+    if (!paths.length && catalogKind === "package" && Array.isArray(product.packageOccasions)) {
+      paths = product.packageOccasions.map((slug) => [slug]);
+    }
+    paths.forEach((rawPath) => {
+      const path = Array.isArray(rawPath) ? rawPath.map(sanitizeSlug).filter(Boolean) : [];
+      if (!path.length) return;
+      const resolved = resolvePath(path);
+      if (!resolved?.trail?.length) return;
+      // If the assignment resolves to a product node rather than a category,
+      // avoid appending a second product to its own trail.
+      const trail = resolved.node?.type === "product"
+        ? resolved.trail
+        : [...resolved.trail, product];
+      add({
+        product,
+        occasion: trail[0],
+        theme: trail[trail.length - 2],
+        trail,
+      });
+    });
+  });
+
+  // Explicit display placements are additive, but must still respect the
+  // catalog kind so a placement cannot bypass type isolation.
+  getDisplayPlacementEntries(kind).forEach(add);
+  return out;
+}
+
 export function getDisplayPlacementEntries(catalog) {
   const wanted = String(catalog || "").toLowerCase();
   if (!["products", "packages"].includes(wanted)) return [];
@@ -2982,6 +3082,7 @@ export function getAddonProducts() {
   return getProducts()
     .filter((p) => p && (
       p.isAddon === true
+      || p.catalogKind === "service"
       || p.occasionSlug === "event-services"
       || (Array.isArray(p.categoryPath) && p.categoryPath[0] === "event-services")
       || (Array.isArray(p.serviceCategoryPath) && p.serviceCategoryPath[0] === "event-services")

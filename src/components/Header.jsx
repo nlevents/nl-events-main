@@ -1,8 +1,10 @@
 import { cloudinaryAsset } from "../lib/cloudinaryAssets";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Icon from "./Icon";
 import { NAV_LINKS, SEARCH_INDEX } from "../data/nav";
+import { flattenCategoryTree, pathFor } from "../data/occasions";
+import { useLiveEntries } from "../hooks/useLiveCatalog";
 import useCategoryNav from "../hooks/useCategoryNav";
 import { waLink } from "../data/images";
 import { useTheme } from "../context/ThemeContext";
@@ -18,6 +20,7 @@ export default function Header() {
   const { theme, toggle } = useTheme();
   const { city, setCity } = useCity();
   const categoryNav = useCategoryNav();
+  const liveEntries = useLiveEntries();
   const CITIES = useActiveCities();
   const cart = useCart();
 
@@ -25,11 +28,13 @@ export default function Header() {
   const [cityOpen, setCityOpen] = useState(false);
   const [citySearch, setCitySearch] = useState("");
   const [query, setQuery] = useState("");
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [openMobileCat, setOpenMobileCat] = useState(null);
   const cityWrapRef = useRef(null);
   const searchWrapRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   function toggleMobileCat(key) {
     setOpenMobileCat((k) => (k === key ? null : key));
@@ -51,43 +56,101 @@ export default function Header() {
       }
       if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
         setSuggestOpen(false);
+        if (!query.trim()) setSearchExpanded(false);
       }
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
-  }, []);
+  }, [query]);
+
+  useEffect(() => {
+    if (searchExpanded) searchInputRef.current?.focus();
+  }, [searchExpanded]);
 
   const filteredCities = CITIES.filter((c) => c.toLowerCase().includes(citySearch.trim().toLowerCase()));
 
-  const matches = query.trim()
-    ? SEARCH_INDEX.filter(
-        (e) => e.label.toLowerCase().includes(query.trim().toLowerCase()) || e.keywords.includes(query.trim().toLowerCase())
-      ).slice(0, 7)
-    : [];
+  // Keep the curated page shortcuts, but augment them with the live category
+  // hierarchy and current catalog entries so admin-managed additions are searchable.
+  const liveSearchIndex = useMemo(() => {
+    const categoryEntries = flattenCategoryTree()
+      .filter((node) => node && !node.addonOnly && node.path?.length && node.path[0] !== "event-services" && node.nodeType !== "product")
+      .map((node) => ({
+        label: node.nodeLabel || node.label || node.path[node.path.length - 1],
+        cat: node.nodeType === "occasion" ? "Occasion" : "Category",
+        href: "/occasion/" + node.path.join("/"),
+        keywords: `${node.label || ""} ${node.path.join(" ")} ${node.parentPath?.join(" ") || ""}`,
+      }));
 
-  function goSearch(href) {
-    trackSiteSearch({ searchTerm: query.trim() });
+    const productEntries = liveEntries.map((entry) => {
+      const product = entry?.product;
+      if (!product?.name) return null;
+      const kind = product.catalogKind || "product";
+      const trail = Array.isArray(entry.trail) ? entry.trail : [];
+      const categoryHref = trail.length ? pathFor(trail) : "/products";
+      const href = kind === "package" && product.id
+        ? `/package-details?id=${encodeURIComponent(product.id)}`
+        : kind === "service"
+          ? "/services"
+          : categoryHref;
+      return {
+        label: product.name,
+        cat: kind === "package" ? "Package" : kind === "service" ? "Service" : "Product",
+        href,
+        image: product.image || product.images?.[0] || product.gallery?.[0] || "",
+        keywords: `${product.slug || ""} ${product.description || ""} ${product.shortDesc || ""} ${trail.map((node) => node?.label || node?.name || "").join(" ")}`,
+      };
+    }).filter(Boolean);
+
+    const seen = new Set();
+    return [...categoryEntries, ...productEntries, ...SEARCH_INDEX].filter((entry) => {
+      const key = `${entry.label.toLowerCase()}|${entry.href}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [liveEntries]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const matches = normalizedQuery
+    ? liveSearchIndex.filter((entry) => {
+        const searchable = `${entry.label} ${entry.cat} ${entry.keywords || ""}`.toLowerCase();
+        return normalizedQuery.split(/\s+/).every((term) => searchable.includes(term));
+      }).slice(0, 7)
+    : [];
+  const suggestions = normalizedQuery ? matches : SEARCH_INDEX.slice(0, 6);
+
+  function openSearch() {
+    setSearchExpanded(true);
+    setSuggestOpen(true);
+    setActiveIndex(-1);
+  }
+
+  function goSearch(href, label = "") {
+    trackSiteSearch({ searchTerm: query.trim() || label });
     setSuggestOpen(false);
+    setSearchExpanded(false);
     setQuery("");
+    setActiveIndex(-1);
     navigate(href);
   }
 
   function onSearchKeyDown(e) {
     if (e.key === "Escape") {
       setSuggestOpen(false);
+      if (!query.trim()) setSearchExpanded(false);
       return;
     }
-    if (!matches.length) return;
+    if (!suggestions.length) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex((i) => (i + 1) % matches.length);
+      setActiveIndex((i) => (i + 1) % suggestions.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIndex((i) => (i - 1 + matches.length) % matches.length);
+      setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const target = activeIndex >= 0 ? matches[activeIndex] : matches[0];
-      if (target) goSearch(target.href);
+      const target = suggestions[activeIndex >= 0 ? activeIndex : 0];
+      if (target) goSearch(target.href, target.label);
     }
   }
 
@@ -184,39 +247,61 @@ export default function Header() {
             </div>
           </div>
 
-          <div className="nav-search" ref={searchWrapRef}>
-            <Icon name="search" />
+          <div className={"nav-search" + (searchExpanded ? " is-expanded" : "")} ref={searchWrapRef}>
+            <button
+              type="button"
+              className="nav-search-trigger"
+              aria-label="Open search"
+              aria-expanded={searchExpanded}
+              onClick={openSearch}
+            >
+              <Icon name="search" />
+            </button>
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search weddings, birthdays, decor…"
               aria-label="Search events"
+              aria-autocomplete="list"
+              aria-controls="nav-search-suggestions"
               autoComplete="off"
               value={query}
-              onChange={(e) => { setQuery(e.target.value); setSuggestOpen(!!e.target.value.trim()); setActiveIndex(-1); }}
-              onFocus={() => { if (query.trim()) setSuggestOpen(true); }}
+              onChange={(e) => { setQuery(e.target.value); setSuggestOpen(true); setActiveIndex(-1); }}
+              onFocus={() => { setSearchExpanded(true); setSuggestOpen(true); }}
               onKeyDown={onSearchKeyDown}
             />
             <button
               type="button"
               className={"nav-search-clear" + (query ? " is-visible" : "")}
               aria-label="Clear search"
-              onClick={() => { setQuery(""); setSuggestOpen(false); }}
+              onClick={() => { setQuery(""); setSuggestOpen(true); setActiveIndex(-1); searchInputRef.current?.focus(); }}
             >
               &times;
             </button>
-            <div className={"nav-search-suggest" + (suggestOpen ? " is-open" : "")} role="listbox">
-              {suggestOpen && matches.length === 0 && (
-                <div className="nav-search-suggest-empty">No results for "{query.trim()}". Try "wedding", "birthday" or "packages".</div>
+            <div id="nav-search-suggestions" className={"nav-search-suggest" + (suggestOpen ? " is-open" : "")} role="listbox" aria-label="Search suggestions">
+              {suggestOpen && normalizedQuery && suggestions.length === 0 && (
+                <div className="nav-search-suggest-empty">No results for “{query.trim()}”. Try “wedding”, “birthday” or “packages”.</div>
               )}
-              {suggestOpen && matches.map((entry, i) => (
+              {suggestOpen && !normalizedQuery && (
+                <div className="nav-search-suggest-heading">Popular searches</div>
+              )}
+              {suggestOpen && suggestions.map((entry, i) => (
                 <button
                   key={entry.label}
                   type="button"
                   className={"nav-search-suggest-item" + (i === activeIndex ? " is-active" : "")}
                   role="option"
-                  onClick={() => goSearch(entry.href)}
+                  aria-selected={i === activeIndex}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => goSearch(entry.href, entry.label)}
                 >
-                  <span className="nssi-icon"><Icon name="search" /></span>
+                  {entry.image ? (
+                    <span className="nssi-thumb">
+                      <img src={entry.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                    </span>
+                  ) : (
+                    <span className="nssi-icon"><Icon name="search" /></span>
+                  )}
                   <span className="nssi-text">
                     <span className="nssi-label">{entry.label}</span>
                     <span className="nssi-cat">{entry.cat}</span>
@@ -288,6 +373,22 @@ export default function Header() {
                                 </li>
                               ))}
                             </ul>
+                          )}
+                          {col.groups && col.groups.length > 0 && (
+                            <div className="mm-subcategory-groups">
+                              {col.groups.map((group) => (
+                                <section className="mm-subcategory-group" key={group.href || group.heading}>
+                                  <Link className="mm-subcategory-heading" to={group.href} onClick={() => setOpenMobileCat(null)}>{group.heading}</Link>
+                                  <ul>
+                                    {group.links.map((link) => (
+                                      <li key={link.href}>
+                                        <Link to={link.href} onClick={() => setOpenMobileCat(null)}>{link.label}</Link>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </section>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ))

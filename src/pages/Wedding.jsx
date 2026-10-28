@@ -194,7 +194,7 @@ function FeaturedPackages() {
                 <p>{active.description || active.tagline || "A complete wedding experience, tailored to your celebration."}</p>
                 <strong className="wedding-package-price">{formatPackagePrice(active.price)}</strong>
                 <ul>
-                  {(Array.isArray(active.includes) ? active.includes : []).slice(0, 6).map((item) => <li key={item}>✓ {item}</li>)}
+                  {(Array.isArray(active.includes) ? active.includes : []).slice(0, 6).map((item, index) => <li key={`${item}-${index}`}>✓ {item}</li>)}
                 </ul>
                 <div className="wedding-package-actions">
                   <Link to={`/package-details?id=${encodeURIComponent(active.id || active.slug)}`} className="wedding-gold-btn">View Package <b>→</b></Link>

@@ -11,30 +11,29 @@ import { AdminAuthProvider } from "./context/AdminAuthContext";
 import { lazyWithRetry } from "./lib/lazyWithRetry";
 import { isAnalyticsPublicPath, trackEvent, trackPageView } from "./lib/siteEvents";
 
-// Route-level code splitting: each page is fetched only when visited,
-// keeping the initial JS payload small.
-import Landing from "./pages/Landing.jsx";
-import Home from "./pages/Home.jsx";
-import Services from "./pages/Services.jsx";
-import Products from "./pages/Products.jsx";
-import Packages from "./pages/Packages.jsx";
-import PackageDetails from "./pages/PackageDetails.jsx";
-import ShopByOccasion from "./pages/ShopByOccasion.jsx";
-import OccasionBrowser from "./pages/OccasionBrowser.jsx";
-import Wedding from "./pages/Wedding.jsx";
-import Birthday from "./pages/Birthday.jsx";
-import OccasionLanding from "./pages/OccasionLanding.jsx";
-import Gallery from "./pages/Gallery.jsx";
-import About from "./pages/About.jsx";
-import Contact from "./pages/Contact.jsx";
-import BookEvent from "./pages/BookEvent.jsx";
-import BookingSuccess from "./pages/BookingSuccess";
-import Cart from "./pages/Cart.jsx";
-import Checkout from "./pages/Checkout.jsx";
-import BookingConfirmation from "./pages/BookingConfirmation";
-import Terms from "./pages/Terms.jsx";
-import Privacy from "./pages/Privacy.jsx";
-import NotFound from "./pages/NotFound.jsx";
+// Public pages are lazy-loaded per route to reduce the initial JavaScript payload.
+const Landing = lazyWithRetry(() => import("./pages/Landing.jsx"));
+const Home = lazyWithRetry(() => import("./pages/Home.jsx"));
+const Services = lazyWithRetry(() => import("./pages/Services.jsx"));
+const Products = lazyWithRetry(() => import("./pages/Products.jsx"));
+const Packages = lazyWithRetry(() => import("./pages/Packages.jsx"));
+const PackageDetails = lazyWithRetry(() => import("./pages/PackageDetails.jsx"));
+const ShopByOccasion = lazyWithRetry(() => import("./pages/ShopByOccasion.jsx"));
+const OccasionBrowser = lazyWithRetry(() => import("./pages/OccasionBrowser.jsx"));
+const Wedding = lazyWithRetry(() => import("./pages/Wedding.jsx"));
+const Birthday = lazyWithRetry(() => import("./pages/Birthday.jsx"));
+const OccasionLanding = lazyWithRetry(() => import("./pages/OccasionLanding.jsx"));
+const Gallery = lazyWithRetry(() => import("./pages/Gallery.jsx"));
+const About = lazyWithRetry(() => import("./pages/About.jsx"));
+const Contact = lazyWithRetry(() => import("./pages/Contact.jsx"));
+const BookEvent = lazyWithRetry(() => import("./pages/BookEvent.jsx"));
+const BookingSuccess = lazyWithRetry(() => import("./pages/BookingSuccess"));
+const Cart = lazyWithRetry(() => import("./pages/Cart.jsx"));
+const Checkout = lazyWithRetry(() => import("./pages/Checkout.jsx"));
+const BookingConfirmation = lazyWithRetry(() => import("./pages/BookingConfirmation"));
+const Terms = lazyWithRetry(() => import("./pages/Terms.jsx"));
+const Privacy = lazyWithRetry(() => import("./pages/Privacy.jsx"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound.jsx"));
 
 
 // Admin panel — not linked from the public navigation.

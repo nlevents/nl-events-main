@@ -51,17 +51,22 @@
     transition:opacity .18s ease, transform .18s ease;
   }
   .mega-panel.is-open{ opacity:1; transform:translateY(0); pointer-events:auto; }
-  .category-nav-item.align-right .mega-panel{ left:auto; right:0; }
+  .category-nav-item.align-right .mega-panel,
+  .category-nav-item.panel-align-right .mega-panel{ left:auto; right:0; }
 
   .mega-panel-inner{
     display:flex; gap:0;
-    min-width:640px; max-width:min(880px, calc(100vw - 40px));
+    width:min(860px, calc(100vw - 32px)); min-width:0;
+    max-width:calc(100vw - 32px); max-height:min(68vh, 520px);
+    overflow:hidden;
   }
   .mega-columns{
-    display:flex; flex:1; gap:0;
-    padding:22px 10px 22px 24px;
+    display:grid;
+    grid-template-columns:minmax(82px,.72fr) minmax(118px,1fr) minmax(190px,1.55fr) minmax(118px,1fr);
+    align-items:start; flex:1; gap:14px; min-width:0; overflow:hidden;
+    padding:18px 14px 18px 20px;
   }
-  .mega-col{ flex:1; min-width:150px; padding-right:18px; }
+  .mega-col{ flex:initial; min-width:0; min-height:0; max-height:min(62vh, 480px); overflow-y:auto; overflow-x:hidden; padding-right:2px; scrollbar-width:thin; }
   .mega-col h4{
     font-family:var(--font-body);
     font-size:11.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
@@ -75,29 +80,33 @@
   }
   .mega-col a:hover{ color:var(--accent-strong); padding-left:3px; }
 
-  /* Dynamic theme list: every theme, one horizontally scrollable row */
-  .mega-col--themes{ flex:2; min-width:0; }
+  /* Subcategories and themes stay grouped vertically under their parent. */
+  .mega-col--themes{ min-width:0; }
   .mega-col .mega-theme-scroll{
-    flex-direction:row; flex-wrap:nowrap; gap:8px; margin-top:12px;
-    overflow-x:auto; overflow-y:hidden; padding-bottom:8px;
-    -webkit-overflow-scrolling:touch; scrollbar-width:thin;
+    flex-direction:column; flex-wrap:nowrap; gap:7px; margin-top:10px;
+    overflow:visible; padding:0;
   }
-  .mega-col .mega-theme-scroll li{ flex:0 0 auto; }
+  .mega-col .mega-theme-scroll li{ flex:initial; min-width:0; }
   .mega-col .mega-theme-scroll a{
-    white-space:nowrap; padding:6px 12px; border-radius:999px;
-    border:1px solid var(--border-soft); font-size:13px;
+    white-space:normal; padding:0; border:0; font-size:13px;
   }
-  .mega-col .mega-theme-scroll a:hover{ padding-left:12px; border-color:var(--accent); }
+  .mega-col .mega-theme-scroll a:hover{ padding-left:3px; border-color:transparent; }
+  .mega-subcategory-groups{ display:flex; flex-direction:column; gap:14px; }
+  .mega-subcategory-group{ min-width:0; padding-bottom:10px; border-bottom:1px solid var(--border-soft); }
+  .mega-subcategory-group:last-child{ border-bottom:0; padding-bottom:0; }
+  .mega-col .mega-subcategory-heading{ display:block; margin-bottom:7px; color:var(--accent-strong); font-size:12px; font-weight:800; line-height:1.35; }
+  .mega-subcategory-group ul{ display:flex; flex-direction:column; gap:7px; }
+  .mega-subcategory-group a{ overflow-wrap:anywhere; }
 
   .mega-featured{
-    flex:0 0 220px;
+    flex:0 0 145px;
     position:relative;
     display:block;
     border-radius:0 16px 16px 0;
     overflow:hidden;
     min-height:100%;
   }
-  .mega-featured img{ width:100%; height:100%; min-height:220px; object-fit:cover; display:block; transition:transform .35s ease; }
+  .mega-featured img{ width:100%; height:100%; min-height:200px; object-fit:cover; display:block; transition:transform .35s ease; }
   .mega-featured:hover img{ transform:scale(1.05); }
   .mega-featured::after{
     content:''; position:absolute; inset:0;
@@ -111,7 +120,7 @@
   .mega-featured-copy small{ color:rgba(245,239,224,.82); font-size:11.5px; }
 
   /* ---------- Simple (single column) panel ---------- */
-  .mega-panel--simple .mega-panel-inner{ min-width:220px; }
+  .mega-panel--simple .mega-panel-inner{ width:auto; min-width:220px; max-width:calc(100vw - 32px); max-height:70vh; }
   .mega-panel--simple .mega-columns{ padding:14px; }
   .mega-panel--simple .mega-col{ padding-right:0; }
 
@@ -186,6 +195,11 @@
   white-space:nowrap; padding:6px 12px; border-radius:999px;
   border:1px solid var(--border-soft); font-size:13px; display:inline-block;
 }
+.mm-subcategory-groups{ display:flex; flex-direction:column; gap:12px; }
+.mm-subcategory-group{ padding:8px 0 10px; border-bottom:1px solid var(--border-soft); }
+.mm-subcategory-group:last-child{ border-bottom:0; }
+.mm-subcategory-heading{ display:inline-block; margin-bottom:6px; color:var(--accent-strong) !important; font-weight:800 !important; }
+.mm-subcategory-group ul{ display:flex; flex-direction:column; gap:8px; }
 
 .mm-acc-cities{
   display:grid; grid-template-columns:repeat(2,1fr); gap:6px; padding-top:10px; max-height:260px; overflow-y:auto;
@@ -196,3 +210,222 @@
 }
 .mm-acc-city svg{ width:13px; height:13px; color:var(--accent); flex-shrink:0; }
 .mm-acc-city.is-selected{ color:var(--accent); font-weight:700; }
+
+/* ---------- Polished category dropdown surfaces ---------- */
+@media (min-width:1180px){
+  .mega-panel{
+    border:1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+    border-radius:20px;
+    box-shadow:0 24px 64px rgba(9,24,42,.17), 0 4px 14px rgba(9,24,42,.06);
+    overflow:hidden;
+    margin-top:8px;
+    transform:translateY(-5px);
+  }
+  .mega-panel.is-open{ transform:translateY(0); }
+  .mega-panel-inner{ background:var(--surface); }
+  .mega-columns{ gap:18px; padding:22px 20px; }
+  .mega-col h4{ color:var(--accent-strong); font-size:10.5px; letter-spacing:.1em; margin-bottom:13px; }
+  .mega-col ul{ gap:5px; }
+  .mega-col li{ min-width:0; }
+  .mega-col a{
+    display:block; padding:7px 9px; margin-left:-9px;
+    border-radius:9px; line-height:1.35;
+    text-decoration:none;
+    transition:color .15s ease, background .15s ease, padding-left .15s ease;
+  }
+  .mega-col a:hover{ padding-left:12px; background:color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  .mega-col .mega-subcategory-heading{ padding:3px 0; }
+  .mega-col .mega-theme-scroll{ gap:3px; }
+  .mega-col .mega-theme-scroll a{ padding:6px 8px; margin-left:-8px; }
+  .mega-col .mega-theme-scroll a:hover{ padding-left:11px; }
+  .mega-featured{ margin:8px; border-radius:14px; min-height:calc(100% - 16px); }
+  .mega-featured img{ border-radius:14px; }
+  .mega-cities{ padding:22px; }
+  .mega-cities-grid{ gap:7px; }
+  .mega-city-btn{ border:1px solid transparent; border-radius:11px; padding:10px; }
+  .mega-city-btn:hover{ border-color:color-mix(in srgb, var(--accent) 20%, transparent); }
+}
+
+/* ===========================================================
+   NAVBAR POLISH — search bar, search suggestions, city dropdown
+   and category mega-menu dropdowns. Scoped to header surfaces only.
+   =========================================================== */
+
+/* ---------- Search bar: shared (all breakpoints) ---------- */
+.nav-search{
+  min-height:42px; box-sizing:border-box;
+  padding:0 8px 0 12px; gap:8px; border-radius:999px;
+  transition:border-color .18s ease, box-shadow .18s ease, background .18s ease, width .22s ease;
+}
+.nav-search:hover{ border-color:color-mix(in srgb, var(--accent) 38%, var(--border-soft)); }
+.nav-search input{ height:40px; font-size:14px; font-weight:500; min-width:0; text-overflow:ellipsis; }
+.nav-search input::-webkit-search-cancel-button{ display:none; }
+.nav-search-trigger{ width:26px; height:26px; flex:0 0 26px; border-radius:50%; }
+.nav-search-clear{ width:24px; height:24px; font-size:17px; }
+
+/* ---------- Search suggestions panel ---------- */
+.nav-search-suggest{
+  top:calc(100% + 10px);
+  padding:8px; border-radius:18px;
+  scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--accent) 40%, transparent) transparent;
+}
+.nav-search-suggest-heading{ padding:8px 10px 8px; margin-bottom:2px; }
+.nav-search-suggest-item,
+.nav-search-suggest-item:hover,
+.nav-search-suggest-item:focus,
+.nav-search-suggest-item:focus-visible,
+.nav-search-suggest-item.is-active{ padding:8px 10px; gap:12px; }
+.nav-search-suggest-item .nssi-thumb{ flex:0 0 46px; width:46px; height:46px; }
+.nav-search-suggest-item .nssi-icon{ flex:0 0 38px; }
+.nav-search-suggest-item .nssi-label{
+  display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.nav-search-suggest-item .nssi-cat{
+  align-self:flex-start; padding:1px 8px; border-radius:999px;
+  font-size:10.5px; font-weight:700; letter-spacing:.02em;
+  color:var(--accent-strong);
+  background:color-mix(in srgb, var(--accent) 11%, transparent);
+}
+.nav-search-suggest-item .nssi-text{ gap:4px; }
+
+/* ---------- Search bar: compact desktop (1180-1319px) ---------- */
+@media (min-width:1180px) and (max-width:1319px){
+  .nav-search:not(.is-expanded){
+    width:42px; min-width:42px; height:42px; min-height:42px; padding:0; margin-left:0;
+    justify-content:center; border-radius:50%;
+  }
+  .nav-search:not(.is-expanded) .nav-search-trigger{ width:100%; height:100%; flex-basis:auto; }
+  .nav-search.is-expanded{
+    right:287px; width:min(380px, calc(100vw - 340px)); min-width:280px;
+    height:46px; padding:0 8px 0 12px; border-radius:999px;
+    border-color:color-mix(in srgb, var(--accent) 60%, var(--border-soft));
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent), 0 12px 30px rgba(12,28,46,.14);
+  }
+  .nav-search-suggest{ left:auto; right:0; width:min(420px, calc(100vw - 40px)); min-width:100%; top:calc(100% + 12px); }
+}
+
+/* ---------- Search bar: wide desktop (>=1320px) — always-visible inline bar ---------- */
+@media (min-width:1320px){
+  .site-header .container{ max-width:1320px; }
+
+  /* Lay brand / city / links / search / actions out on one row so the
+     search bar sits inline instead of overlaying the navbar. */
+  .nav-row{ gap:12px; }
+  .nav-row-top{ display:contents; }
+  .nav-row-top .brand-mark-link{ order:1; }
+  .nav-row-top .city-select-wrap{ order:2; }
+  .nav-row-top .nav-links{ order:3; flex:0 0 auto; gap:clamp(14px, 1.2vw, 22px); margin-left:6px; }
+  .nav-row > .nav-search{ order:4; }
+  .nav-row-top .nav-actions{ order:5; margin-left:0; }
+
+  /* Fluid bar: fills the free space between links and actions, so nothing
+     shifts when it is focused. */
+  .nav-search,
+  .nav-search.is-expanded,
+  .nav-search:not(.is-expanded){
+    position:relative; right:auto; top:auto; transform:none;
+    flex:1 1 240px; min-width:200px; max-width:340px; width:auto;
+    height:44px; min-height:44px; padding:0 8px 0 12px; margin:0 0 0 auto;
+    border-radius:999px; justify-content:flex-start;
+    box-shadow:0 2px 8px rgba(12,28,46,.06), inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .nav-search:focus-within,
+  .nav-search.is-expanded{
+    border-color:color-mix(in srgb, var(--accent) 60%, var(--border-soft));
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent), 0 10px 26px rgba(12,28,46,.10);
+  }
+  .nav-search:not(.is-expanded) input,
+  .nav-search:not(.is-expanded) .nav-search-suggest{ display:block; }
+  .nav-search:not(.is-expanded) .nav-search-clear{ display:none; }
+  .nav-search:not(.is-expanded) .nav-search-clear.is-visible{ display:flex; }
+  .nav-search input{ flex:1; }
+
+  .nav-search-suggest,
+  .nav-search.is-expanded .nav-search-suggest{
+    left:auto; right:0; width:min(420px, calc(100vw - 40px)); min-width:100%;
+    max-height:min(460px, calc(100vh - 120px));
+    top:calc(100% + 12px);
+  }
+}
+
+/* ---------- Search bar: tablet / mobile ---------- */
+@media (max-width:1179px){
+  .nav-search{ min-height:44px; padding:0 10px 0 14px; }
+  .nav-search-suggest{ border-radius:18px; }
+}
+@media (min-width:600px) and (max-width:1179px){
+  .nav-search{ flex:0 1 300px; }
+  .nav-search-suggest{ left:auto; right:0; width:min(400px, calc(100vw - 40px)); min-width:100%; }
+}
+
+/* ---------- City dropdown (navbar) ---------- */
+.city-select{ transition:border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.city-select:hover, .city-select[aria-expanded="true"]{
+  border-color:color-mix(in srgb, var(--accent) 60%, var(--border-soft));
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.city-dropdown{
+  top:calc(100% + 12px);
+  border:1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border-radius:20px; padding:16px;
+  box-shadow:0 24px 64px rgba(9,24,42,.17), 0 4px 14px rgba(9,24,42,.06);
+}
+.city-dropdown-head{ padding:0 2px 12px; }
+.city-search{ border-radius:12px; border:1px solid var(--border-soft); background:var(--surface-secondary); padding:9px 12px; }
+.city-search:focus-within{ border-color:color-mix(in srgb, var(--accent) 60%, var(--border-soft)); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+.city-dropdown-list{ scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--accent) 40%, transparent) transparent; padding-right:2px; }
+.city-dropdown-list button{ border:1px solid transparent; padding:9px 10px; transition:background .15s ease, border-color .15s ease; }
+.city-dropdown-list button:hover{ background:color-mix(in srgb, var(--accent) 8%, var(--surface)); border-color:color-mix(in srgb, var(--accent) 16%, transparent); }
+.city-dropdown-list button.is-selected{ border-color:color-mix(in srgb, var(--accent) 28%, transparent); }
+.city-empty{ padding:18px 8px; }
+
+/* ---------- Category bar + mega menu dropdowns (desktop) ---------- */
+@media (min-width:1180px){
+  .category-nav{ box-shadow:0 1px 0 var(--border-soft); }
+  .category-nav-link{ height:46px; padding:0 14px; font-size:13px; border-bottom-width:3px; }
+  .category-nav-link:hover, .category-nav-link.is-open{ border-bottom-color:var(--accent); }
+
+  .mega-panel{ margin-top:0; padding-top:0; border-radius:18px; top:calc(100% + 1px); }
+  /* invisible bridge so the pointer never drops the menu while crossing the gap */
+  .mega-panel::before{ content:""; position:absolute; left:0; right:0; top:-10px; height:10px; }
+  .mega-panel{ overflow:visible; border:0; background:transparent; box-shadow:none; }
+  .mega-panel > .mega-panel-inner,
+  .mega-panel > .mega-cities{
+    margin-top:8px;
+    background:var(--surface);
+    border:1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+    border-radius:18px; overflow:hidden;
+    box-shadow:0 24px 64px rgba(9,24,42,.17), 0 4px 14px rgba(9,24,42,.06);
+  }
+  .mega-panel > .mega-cities{ width:360px; }
+
+  /* Mega panels anchor to the bar's container edges (never off-screen);
+     the small "More" and "Cities" panels stay under their own button. */
+  .category-nav-inner{ position:relative; }
+  .category-nav-item:has(> .mega-panel:not(.mega-panel--simple):not(.mega-panel--cities)){ position:static; }
+  .category-nav-item:has(> .mega-panel:not(.mega-panel--simple):not(.mega-panel--cities)) > .mega-panel{ left:20px; right:auto; }
+  .category-nav-item.panel-align-right:has(> .mega-panel:not(.mega-panel--simple):not(.mega-panel--cities)) > .mega-panel{ left:auto; right:20px; }
+  .mega-columns{ gap:20px; padding:22px 18px 22px 22px; }
+  .mega-col{ scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--accent) 40%, transparent) transparent; }
+  .mega-col h4{
+    display:flex; align-items:center; gap:8px; margin-bottom:12px; padding-bottom:9px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .mega-col a{ font-size:13.5px; font-weight:600; }
+  .mega-col a:hover{ background:color-mix(in srgb, var(--accent) 9%, var(--surface)); color:var(--accent-strong); }
+  .mega-col .mega-subcategory-heading{ margin-left:0; padding:3px 0; font-size:12px; letter-spacing:.01em; }
+  .mega-subcategory-group{ padding-bottom:12px; }
+
+  .mega-featured{ flex:0 0 170px; margin:10px; border-radius:14px; }
+  .mega-featured-copy span{ font-size:17px; }
+
+  .mega-panel--simple > .mega-panel-inner{ min-width:230px; }
+  .mega-panel--simple .mega-columns{ padding:16px; }
+  .mega-panel--simple .mega-col h4{ border-bottom:0; padding-bottom:0; }
+
+  .mega-cities{ padding:20px; }
+  .mega-cities-grid{ scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--accent) 40%, transparent) transparent; }
+  .mega-city-btn{ font-weight:600; }
+  .mega-city-btn:hover{ background:color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  .mega-city-btn.is-selected{ border-color:color-mix(in srgb, var(--accent) 28%, transparent); }
+}
