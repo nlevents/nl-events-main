@@ -19,6 +19,8 @@ import { getCatalogEntriesForKind } from "../lib/catalogStore";
 import { catalogEntryPath, getCatalogFacetOptions, pathStartsWith } from "../lib/catalogFacets";
 
 
+const isServicesPath = (path) => Array.isArray(path) && path.slice(1).some((slug) => String(slug).toLowerCase() === "services");
+
 export default function Packages() {
   usePageMeta(
     "All Packages — Next Level Events, Ranchi",
@@ -29,7 +31,9 @@ export default function Packages() {
   const ALL_ENTRIES = useMemo(() => getCatalogEntriesForKind("packages", liveEntries).filter((entry) => {
     // Event Services is a dedicated service catalog, not a public package occasion.
     const occasionSlug = String(entry?.occasion?.slug || entry?.trail?.[0]?.slug || "");
-    return occasionSlug !== "event-services" && !entry?.occasion?.addonOnly && !entry?.trail?.[0]?.addonOnly;
+    if (occasionSlug === "event-services" || entry?.occasion?.addonOnly || entry?.trail?.[0]?.addonOnly) return false;
+    // Services have their own page; keep that branch out of Packages.
+    return !isServicesPath(catalogEntryPath(entry));
   }), [liveEntries]);
   const [sortKey, setSortKey] = useState("popular");
   const [occasionFilter, setOccasionFilter] = useState("all");
@@ -42,7 +46,7 @@ export default function Packages() {
   const uniquePackageCount = useMemo(() => new Set(ALL_ENTRIES.map((entry) => entry?.product?.id || entry?.product?.slug)).size, [ALL_ENTRIES]);
   useReveal([sortKey, occasionFilter, categoryFilter, subcategoryFilter, themeFilter, priceFilter, cityOnly, topRatedOnly]);
 
-  const taxonomyNodes = useMemo(() => flattenCategoryTree(), [ALL_ENTRIES]);
+  const taxonomyNodes = useMemo(() => flattenCategoryTree().filter((node) => !isServicesPath(node.path)), [ALL_ENTRIES]);
   const facetOptions = useMemo(() => getCatalogFacetOptions({
     occasionFilter,
     categoryFilter,
@@ -200,7 +204,7 @@ export default function Packages() {
 
         <div className="occ-prod-grid reveal">
           {sortedEntries.map((e) => (
-            <ProductCard key={e.product.slug} product={e.product} href={pathFor(e.trail)} />
+            <ProductCard key={String(e.product.id || e.product.slug)} product={e.product} href={pathFor(e.trail)} />
           ))}
         </div>
         {sortedEntries.length === 0 && (

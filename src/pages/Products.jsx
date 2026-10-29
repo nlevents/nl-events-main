@@ -15,6 +15,8 @@ import { onImgError } from "../lib/imageFallback";
 import { getCatalogEntriesForKind } from "../lib/catalogStore";
 import { catalogEntryPath, getCatalogFacetOptions, pathStartsWith } from "../lib/catalogFacets";
 
+const isServicesPath = (path) => Array.isArray(path) && path.slice(1).some((slug) => String(slug).toLowerCase() === "services");
+
 export default function Products() {
   usePageMeta(
     "Products — Next Level Events",
@@ -32,7 +34,9 @@ export default function Products() {
   const entries = useMemo(() => getCatalogEntriesForKind("products", liveEntries).filter((entry) => {
     // Event Services is a dedicated service catalog, not a public product occasion.
     const occasionSlug = String(entry?.occasion?.slug || entry?.trail?.[0]?.slug || "");
-    return occasionSlug !== "event-services" && !entry?.occasion?.addonOnly && !entry?.trail?.[0]?.addonOnly;
+    if (occasionSlug === "event-services" || entry?.occasion?.addonOnly || entry?.trail?.[0]?.addonOnly) return false;
+    // Services have their own page; keep that branch out of Products.
+    return !isServicesPath(catalogEntryPath(entry));
   }), [liveEntries]);
 
   const bucket = PRICE_BUCKETS.find((b) => b.key === priceKey) || PRICE_BUCKETS[0];
@@ -50,7 +54,7 @@ export default function Products() {
 
   // Cache the live taxonomy once per catalog refresh. Facets include valid
   // categories/themes with no products, which then use the existing empty state.
-  const taxonomyNodes = useMemo(() => flattenCategoryTree(), [entries]);
+  const taxonomyNodes = useMemo(() => flattenCategoryTree().filter((node) => !isServicesPath(node.path)), [entries]);
   const facetOptions = useMemo(() => getCatalogFacetOptions({
     occasionFilter: occFilter,
     categoryFilter,
