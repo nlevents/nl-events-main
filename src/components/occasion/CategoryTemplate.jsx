@@ -352,7 +352,7 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
       __contextPath: contextPath,
       __trail: product.__decorationContextProduct && Array.isArray(product.categoryPath) && product.categoryPath.length
         ? [...product.categoryPath.map((slug) => ({ slug, label: slug })), product]
-        : [node, ...(Array.isArray(product.categoryPath) ? product.categoryPath.slice(1).map((slug) => ({ slug, label: slug })) : []), product],
+        : [node, ...serviceCategorySlugs(product).map((slug) => ({ slug, label: slug })), product],
     }));
   }, [liveProducts, serviceFilter, contextPath, themeFilter, priceFilter, sortKey, node]);
 
@@ -598,6 +598,16 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
       )}
     </>
   );
+}
+
+
+function serviceCategorySlugs(product) {
+  const clean = (path) => (Array.isArray(path) ? path.map((part) => String(part || "").trim()).filter(Boolean) : []);
+  const service = clean(product?.serviceCategoryPath);
+  if (service[0] === "event-services") return service.slice(1);
+  const category = clean(product?.categoryPath);
+  if (category[0] === "event-services") return category.slice(1);
+  return [];
 }
 
 export default function CategoryTemplate({ node, trail }) {
