@@ -331,7 +331,9 @@ function ServiceCatalogContent({ node, serviceContextPath = [] }) {
     // Décor is also the storefront home for the decoration/theme products
     // belonging to the selected occasion/function. Reuse the existing
     // catalog records; never create a second copy just for the service view.
-    if (serviceFilter === "decor" && contextPath.length) {
+    if (serviceFilter === "decor") {
+      // With no occasion selected, an empty context intentionally returns all
+      // eligible occasion-assigned decoration products for the Decor storefront.
       const decorationProducts = getDecorationProductsForContext(contextPath);
       const existingIds = new Set(list.map((product) => String(product?.id || product?.slug || "")));
       decorationProducts.forEach((product) => {

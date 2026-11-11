@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { listProducts, listSimilar } from "../data/products";
 import { useLiveProduct, useLiveProducts } from "../hooks/useLiveCatalog";
@@ -123,6 +123,7 @@ export default function PackageDetails() {
   const allProducts = useLiveProducts();
   const { city } = useCity();
   const isDesktop = useIsDesktop(900);
+  const [showAllPackageAddons, setShowAllPackageAddons] = useState(false);
 
   usePageMeta(
     product ? product.name + " Package — Next Level Events" : "Package Not Found — Next Level Events",
@@ -169,7 +170,7 @@ export default function PackageDetails() {
   }
 
   const highlights = (product.includes || []).slice(0, 5);
-  const addonList = Array.isArray(product.addons) ? product.addons.slice(0, 4) : [];
+  const addonList = Array.isArray(product.addons) ? product.addons : [];
   const description = product.description || product.tagline || "A thoughtfully designed event package, prepared and delivered by the Next Level Events team.";
 
   return (
@@ -333,7 +334,7 @@ export default function PackageDetails() {
                   <h2>Optional add-ons</h2>
                   <span>Customise your package</span>
                 </div>
-                <div className="pd-addon-list">
+                <div className={"pd-addon-list" + (showAllPackageAddons ? " pd-addon-list-expanded" : "")}>
                   {addonList.map((addon) => (
                     <div className="pd-addon-item" key={addon.name}>
                       <div><b>{addon.name}</b><small>Add this service during booking</small></div>
@@ -341,6 +342,17 @@ export default function PackageDetails() {
                     </div>
                   ))}
                 </div>
+                {addonList.length > 5 && (
+                  <button
+                    type="button"
+                    className="addon-show-toggle"
+                    onClick={() => setShowAllPackageAddons((value) => !value)}
+                    aria-expanded={showAllPackageAddons}
+                  >
+                    <span>{showAllPackageAddons ? "Show Less" : `Show All ${addonList.length} Add-ons`}</span>
+                    <span aria-hidden="true" className={"addon-show-chevron" + (showAllPackageAddons ? " is-open" : "")}>⌄</span>
+                  </button>
+                )}
               </section>
             )}
 

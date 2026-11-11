@@ -2,28 +2,30 @@ import { Link, useNavigate } from "react-router-dom";
 import Icon from "../Icon";
 import { useCity } from "../../context/CityContext";
 import { cityPrice, fmtINR } from "../../lib/pricing";
-import { discountPercent, isAvailableInCity } from "../../data/occasions";
+import { discountPercent } from "../../data/occasions";
 import { onImgError } from "../../lib/imageFallback";
 import { trackServiceView } from "../../lib/siteEvents";
+import { useCart } from "../../context/CartContext";
+import { useToast } from "../../context/ToastContext";
 
-// Premium, conversion-focused listing card — image + quick-add, rating
-// badge, price with strike-through + discount, city availability, and a
-// View Details / Book Now action pair. Used by every product grid and
-// every horizontal rail across the Shop-by-Occasion experience, so a
-// single redesign here updates the whole site.
-export default function ProductCard({ product, href, variant = "default" }) {
+// Single marketplace-style listing card (image, rating badge, price with
+// strike-through + discount, circular cart button). Used by every product
+// grid on the site, so one change here updates all of them.
+export default function ProductCard({ product, href }) {
   const { city } = useCity();
   const navigate = useNavigate();
+  const cart = useCart();
+  const showToast = useToast();
 
   const isQuoteOnly = Boolean(product.quoteOnly) || typeof product.price !== "number";
   const discount = isQuoteOnly ? 0 : discountPercent(product);
-  const available = isAvailableInCity(product, city);
   const priceNow = isQuoteOnly ? "Contact for pricing" : fmtINR(cityPrice(product.price, city));
   const priceWas = !isQuoteOnly && product.originalPrice ? fmtINR(cityPrice(product.originalPrice, city)) : null;
 
-  // Every cart line needs full booking details (city, date, time slot,
-  // etc.), so quick-add and Book Now both take the shopper to the product's
-  // own booking panel to configure those — nothing is ever added blind.
+  // Add-to-cart only stores the item. Date, guests, location etc. are
+  // collected later in the cart, before checkout. One line per product+city.
+  const productKey = String(product.slug || product.id || "");
+  const inCart = Boolean(productKey) && Array.isArray(cart?.items) && cart.items.some((it) => String(it.slug) === productKey && it.city === city);
   const serviceCategory = Array.isArray(product.categoryPath) && product.categoryPath[0] === "event-services"
     ? product.categoryPath[1]
     : undefined;
@@ -43,71 +45,61 @@ export default function ProductCard({ product, href, variant = "default" }) {
     e.preventDefault();
     e.stopPropagation();
     trackProductInteraction();
-    navigate(isQuoteOnly ? href : href + "#booking-panel");
-  }
-
-  function bookNow() {
-    trackProductInteraction();
-    navigate(isQuoteOnly ? href : href + "#booking-panel");
+    // Quote-only items have no price to add — keep sending them to the page.
+    if (isQuoteOnly) { navigate(href); return; }
+    if (inCart) { navigate("/cart"); return; }
+    if (!cart || typeof cart.addBooking !== "function" || !productKey) {
+      showToast("Cart is unavailable. Please refresh the page and try again.");
+      return;
+    }
+    cart.addBooking({
+      slug: productKey,
+      name: product.name,
+      image: product.image || product.images?.[0] || null,
+      href,
+      unitPrice: product.price,
+      originalPrice: typeof product.originalPrice === "number" ? product.originalPrice : null,
+      quantity: 1,
+      city,
+      locationType: "",
+      address: "",
+      eventDate: "",
+      timeSlot: "",
+      guestCount: "",
+      eventType: "",
+      addons: [],
+      notes: "",
+    });
+    showToast(product.name + " added to your cart");
   }
 
   return (
-    <article className={"occ-prod-card reveal" + (variant === "occasion-market" ? " occ-prod-card--market" : "")}>
+    <article className="occ-prod-card occ-prod-card--market reveal">
       <div className="occ-prod-media">
         <Link to={href} className="occ-prod-media-link" aria-label={"View " + product.name} onClick={trackProductInteraction}>
           {discount > 0 && <span className="occ-prod-discount">{discount}% OFF</span>}
           <img src={product.image} alt={product.name} loading="lazy" decoding="async"  onError={onImgError}/>
         </Link>
-        {variant !== "occasion-market" && (
-          <button type="button" className="occ-prod-quick" aria-label={(isQuoteOnly ? "Request quote for " : "Book ") + product.name} onClick={quickAdd}>+</button>
-        )}
+        <button type="button" className="occ-prod-quick" aria-label={(isQuoteOnly ? "Request quote for " : inCart ? "Go to cart: " : "Add to cart: ") + product.name} title={isQuoteOnly ? "Request quote" : inCart ? "In cart — view cart" : "Add to cart"} onClick={quickAdd}>
+          <Icon name={inCart && !isQuoteOnly ? "check" : "cart"} />
+        </button>
       </div>
 
       <div className="occ-prod-body">
         <Link to={href} className="occ-prod-title-link" onClick={trackProductInteraction}><h4>{product.name}</h4></Link>
 
-        {variant === "occasion-market" ? (
-          <>
-            {product.rating ? (
-              <div className="occ-prod-rating">
-                <span className="occ-prod-rating-badge">{Number(product.rating).toFixed(1)} <Icon name="star" /></span>
-                {product.reviewCount ? <span className="occ-prod-reviews">{product.reviewCount} reviews</span> : null}
-              </div>
-            ) : null}
+        {product.rating ? (
+          <div className="occ-prod-rating">
+            <span className="occ-prod-rating-badge">{Number(product.rating).toFixed(1)} <Icon name="star" /></span>
+            {product.reviewCount ? <span className="occ-prod-reviews">{product.reviewCount} reviews</span> : null}
+          </div>
+        ) : null}
 
-            <div className="occ-prod-price">
-              <b>{priceNow}</b>
-              {priceWas ? <s>{priceWas}</s> : null}
-              {discount > 0 ? <span className="occ-prod-off">{discount}% OFF</span> : null}
-            </div>
-          </>
-        ) : (
-          <>
-            <p>{product.shortDesc}</p>
-
-            {product.rating ? (
-              <div className="occ-prod-rating">
-                <span className="occ-prod-rating-badge">{Number(product.rating).toFixed(1)} <Icon name="star" /></span>
-                {product.reviewCount ? <span className="occ-prod-reviews">{product.reviewCount} reviews</span> : null}
-              </div>
-            ) : null}
-
-            <div className="occ-prod-price">
-              <b>{priceNow}</b>
-              {priceWas ? <s>{priceWas}</s> : null}
-              {discount > 0 ? <span className="occ-prod-off">{discount}% off</span> : null}
-            </div>
-
-            <div className={"occ-prod-avail" + (available ? " ok" : " limited")}>
-              {available ? "Available in " + city : "Custom quote for " + city + " — ask us"}
-            </div>
-
-            <div className="occ-prod-actions">
-              <Link to={href} className="btn btn-ghost occ-btn-sm" onClick={trackProductInteraction}>View Details</Link>
-              <button type="button" className="btn btn-primary occ-btn-sm" onClick={bookNow}>{isQuoteOnly ? "Request Quote" : "Book Now"}</button>
-            </div>
-          </>
-        )}
+        <div className="occ-prod-price">
+          <b>{priceNow}</b>
+          {priceWas ? <s>{priceWas}</s> : null}
+          {discount > 0 ? <span className="occ-prod-off">{discount}% OFF</span> : null}
+        </div>
       </div>
     </article>
   );

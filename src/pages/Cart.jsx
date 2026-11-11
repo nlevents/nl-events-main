@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import usePageMeta from "../hooks/usePageMeta";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
 import { fmtINR } from "../lib/pricing";
-import { TIME_SLOT_OPTIONS, todayISO } from "../data/booking";
+import { TIME_SLOT_OPTIONS, LOCATION_TYPE_OPTIONS, todayISO } from "../data/booking";
 import Icon from "../components/Icon";
 import {
   itemBasePrice,
@@ -50,9 +50,31 @@ export default function Cart() {
   const originalSubtotal = cartOriginalSubtotal(items);
   const discount = cartDiscount(items);
 
+  // Booking details are collected here (after add-to-cart), not on the card.
+  const [missing, setMissing] = useState({});
+
   function goCheckout() {
     if (!items.length) {
       showToast("Your cart is empty — add a package first.");
+      return;
+    }
+    const next = {};
+    let firstId = null;
+    items.forEach((it) => {
+      const fields = [];
+      if (!it.eventDate) fields.push("eventDate");
+      if (!it.locationType) fields.push("locationType");
+      if (!it.guestCount) fields.push("guestCount");
+      if (fields.length) {
+        next[it.id] = fields;
+        if (!firstId) firstId = it.id + "-" + fields[0];
+      }
+    });
+    setMissing(next);
+    if (firstId) {
+      showToast("Please complete the booking details to continue.");
+      const el = document.getElementById(firstId);
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); try { el.focus({ preventScroll: true }); } catch {} }
       return;
     }
     navigate("/checkout");
@@ -79,7 +101,7 @@ export default function Cart() {
           <div id="packageDetailsGrid">
             <div className="cart-item-list">
               {items.map((it) => (
-                <CartLine key={it.id} item={it} />
+                <CartLine key={it.id} item={it} missing={missing[it.id] || []} onFix={(f) => setMissing((m) => ({ ...m, [it.id]: (m[it.id] || []).filter((x) => x !== f) }))} />
               ))}
             </div>
 
@@ -112,7 +134,7 @@ export default function Cart() {
   );
 }
 
-function CartLine({ item }) {
+function CartLine({ item, missing = [], onFix = () => {} }) {
   const cart = useCart();
   const showToast = useToast();
   const base = itemBasePrice(item);
@@ -125,8 +147,20 @@ function CartLine({ item }) {
     cart.updateItem(item.id, { quantity: next });
   }
 
+  const errStyle = (f) => (missing.includes(f) ? { borderColor: "#d16a5a" } : undefined);
+
   function setDate(value) {
     cart.updateItem(item.id, { eventDate: value });
+    onFix("eventDate");
+  }
+
+  function setLocationType(value) {
+    cart.updateItem(item.id, { locationType: value });
+    onFix("locationType");
+  }
+
+  function setAddress(value) {
+    cart.updateItem(item.id, { address: value.slice(0, 140) });
   }
 
   function setSlot(value) {
@@ -135,6 +169,7 @@ function CartLine({ item }) {
 
   function setGuestCount(value) {
     cart.updateItem(item.id, { guestCount: value });
+    onFix("guestCount");
   }
 
   function remove() {
@@ -166,8 +201,19 @@ function CartLine({ item }) {
 
         <div className="cart-line-edit-row">
           <div className="form-group">
-            <label htmlFor={"date-" + item.id}>Event Date</label>
-            <input type="date" id={"date-" + item.id} min={todayISO()} value={item.eventDate || ""} onChange={(e) => setDate(e.target.value)} />
+            <label htmlFor={item.id + "-eventDate"}>Event Date</label>
+            <input type="date" id={item.id + "-eventDate"} style={errStyle("eventDate")} min={todayISO()} value={item.eventDate || ""} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label htmlFor={item.id + "-locationType"}>Location Type</label>
+            <select id={item.id + "-locationType"} style={errStyle("locationType")} value={item.locationType || ""} onChange={(e) => setLocationType(e.target.value)}>
+              <option value="">Select location type</option>
+              {LOCATION_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor={item.id + "-address"}>Venue / Address <span className="form-optional">(optional)</span></label>
+            <input type="text" id={item.id + "-address"} maxLength={140} placeholder="Venue, hall, hotel, home, etc." value={item.address || ""} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <div className="form-group">
             <label htmlFor={"slot-" + item.id}>Event Time <span className="form-optional">(optional)</span></label>
@@ -177,8 +223,8 @@ function CartLine({ item }) {
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor={"guest-" + item.id}>Guest Count</label>
-            <select id={"guest-" + item.id} value={item.guestCount || ""} onChange={(e) => setGuestCount(e.target.value)}>
+            <label htmlFor={item.id + "-guestCount"}>Guest Count</label>
+            <select id={item.id + "-guestCount"} style={errStyle("guestCount")} value={item.guestCount || ""} onChange={(e) => setGuestCount(e.target.value)}>
               <option value="">Select guest count</option>
               <option>Under 50</option>
               <option>50–150</option>

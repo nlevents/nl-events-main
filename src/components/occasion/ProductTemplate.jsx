@@ -238,10 +238,7 @@ export default function ProductTemplate({ node: product, trail }) {
           </div>
         </section>
         {rails}
-        <div className="bottom-cta">
-          {isQuoteOnly ? <Link to="/book-event" className="btn btn-ghost">Custom Enquiry</Link> : <a href="#booking-panel" className="btn btn-ghost">Custom Enquiry</a>}
-          {isQuoteOnly ? <Link to="/book-event" className="btn btn-primary">Book This Package</Link> : <a href="#booking-panel" className="btn btn-primary">Book This Package</a>}
-        </div>
+        <BottomBar isQuoteOnly={isQuoteOnly} />
       </>
     );
   }
@@ -350,10 +347,27 @@ export default function ProductTemplate({ node: product, trail }) {
 
       {rails}
 
-      <div className="bottom-cta">
-        {isQuoteOnly ? <Link to="/book-event" className="btn btn-ghost">Custom Enquiry</Link> : <a href="#booking-panel" className="btn btn-ghost">Custom Enquiry</a>}
-        {isQuoteOnly ? <Link to="/book-event" className="btn btn-primary">Book This Package</Link> : <a href="#booking-panel" className="btn btn-primary">Book This Package</a>}
-      </div>
+      <BottomBar isQuoteOnly={isQuoteOnly} />
     </>
+  );
+}
+
+// Mobile sticky bar: Add to Cart + WhatsApp enquiry. It triggers the page's
+// BookingPanel (which holds selected services/notes) via window events, so
+// the bar adds exactly what the panel would. Quote-only items keep links.
+function BottomBar({ isQuoteOnly }) {
+  if (isQuoteOnly) {
+    return (
+      <div className="bottom-cta">
+        <Link to="/book-event" className="btn btn-ghost">Custom Enquiry</Link>
+        <Link to="/book-event" className="btn btn-primary">Book This Package</Link>
+      </div>
+    );
+  }
+  return (
+    <div className="bottom-cta">
+      <button type="button" className="btn btn-ghost" onClick={() => window.dispatchEvent(new CustomEvent("nle-bar-whatsapp"))}>WhatsApp Enquiry</button>
+      <button type="button" className="btn btn-primary" onClick={() => window.dispatchEvent(new CustomEvent("nle-bar-add-to-cart"))}>Add to Cart</button>
+    </div>
   );
 }

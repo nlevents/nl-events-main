@@ -2702,7 +2702,7 @@ export function getDecorationProductsForContext(contextPath = []) {
   const context = Array.isArray(contextPath)
     ? contextPath.map((part) => sanitizeSlug(part)).filter(Boolean)
     : String(contextPath || "").split("/").map((part) => sanitizeSlug(part)).filter(Boolean);
-  if (!context.length || context[0] === "event-services") return [];
+  if (context[0] === "event-services") return [];
 
   const isRelatedPath = (path) => {
     if (!path.length) return false;

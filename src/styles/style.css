@@ -683,10 +683,10 @@ h3,.h3{ font-family:var(--font-display); font-weight:500; line-height:1.2; }
 .addon-show-chevron{ font-size:16px; line-height:1; transform:translateY(-1px); transition:transform .2s ease; }
 .addon-show-chevron.is-open{ transform:rotate(180deg) translateY(1px); }
 
-@media (max-width:640px){
-  .addon-list:not(.addon-list-expanded) .addon-item:nth-child(n+6){ display:none; }
-  .addon-show-toggle{ display:flex; }
-}
+/* Product detail service/add-on lists stay compact until expanded. */
+.addon-list:not(.addon-list-expanded) .addon-item:nth-child(n+6){ display:none; }
+.addon-show-toggle{ display:flex; }
+.pd-addon-list:not(.pd-addon-list-expanded) .pd-addon-item:nth-child(n+6){ display:none; }
 
 .summary-box{
   border:1px solid var(--border); border-radius:var(--radius-m); padding:22px;
