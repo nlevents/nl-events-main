@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
-import { resolvePath, findOccasion } from "../data/occasions";
-import { getProducts } from "../lib/catalogStore";
-import { filterServiceProducts } from "../lib/serviceContext";
+import { resolvePath } from "../data/occasions";
 import CategoryTemplate from "../components/occasion/CategoryTemplate";
 import ProductTemplate from "../components/occasion/ProductTemplate";
 import NotFound from "./NotFound";
@@ -50,31 +48,6 @@ export default function OccasionBrowser() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const resolved = useMemo(() => resolvePath(canonicalServiceSlugs), [slugKey, catalogVersion]);
-
-  // servie
-  const serviceFallback = useMemo(() => {
-    if (resolved || slugs[0] !== "event-services" || slugs.length < 2) return null;
-    const slug = slugs[slugs.length - 1];
-    const matches = filterServiceProducts(
-      (getProducts() || []).filter((item) => item && item.slug === slug),
-      {},
-    );
-    if (matches.length !== 1) return null;
-    const product = { ...matches[0], type: "product" };
-    const root = findOccasion("event-services");
-    if (!root) return null;
-    const clean = (path) => (Array.isArray(path) ? path.filter(Boolean) : []);
-    const service = clean(product.serviceCategoryPath);
-    const category = clean(product.categoryPath);
-    const parts = service[0] === "event-services" ? service : (category[0] === "event-services" ? category : ["event-services"]);
-    const parent = resolvePath(parts);
-    return { node: product, trail: [...(parent?.trail || [root]), product] };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved, slugKey, catalogVersion]);
-
-  if (!resolved && serviceFallback) {
-    return <ProductTemplate node={serviceFallback.node} trail={serviceFallback.trail} />;
-  }
 
   if (isLegacyServiceUrl && resolved && resolved.node?.type !== "product") {
     const service = canonicalServiceSlugs.slice(1).join("/");

@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   if (!result.user) return res.status(401).json({ ok: false, error: result.error });
   try {
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
-    const inserted = await writeMissingStates(process.env, req.body?.state || {}, result.user.id, token);
+    const inserted = await writeMissingStates(process.env, req.body?.state && typeof req.body.state === "object" ? req.body.state : {}, result.user.id, token);
     return res.status(200).json({ ok: true, inserted });
   } catch (err) {
     console.error("Admin bootstrap API error:", err);
@@ -15,6 +15,6 @@ export default async function handler(req, res) {
     if (message.includes("Supabase is not configured on the server")) {
       return res.status(503).json({ ok: false, error: "Admin cloud storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Netlify environment variables, then redeploy." });
     }
-    return res.status(500).json({ ok: false, error: message || "Unable to initialize cloud data." });
+    return res.status(500).json({ ok: false, error: "Unable to initialize cloud data." });
   }
 }

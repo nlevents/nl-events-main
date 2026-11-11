@@ -28,6 +28,7 @@ export function getServerSupabase(env, accessToken = "") {
       const endpoint = `${base}/rest/v1/${path}${queryParams ? `?${queryParams}` : ""}`;
 
       const res = await fetch(endpoint, {
+        signal: AbortSignal.timeout(20000),
         method,
         headers: {
           apikey: key,

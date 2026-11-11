@@ -1,6 +1,6 @@
 import { getServerSupabase } from "../shared/supabase/serverClient.js";
 import { notifyInquiry } from "./bookingNotifications.js";
-import { rateLimit, isHoneypotTriggered } from "../shared/utils/security.js";
+import { rateLimit, isHoneypotTriggered, countRecent } from "../shared/utils/security.js";
 
 function clean(value, max) { return String(value ?? "").trim().slice(0, max); }
 const EVENT_TYPES = new Set(["Wedding", "Birthday", "Corporate", "Festive Events", "Others", "Birthday Party", "Wedding Ceremony", "Reception", "Anniversary", "Baby Shower", "Naming Ceremony", "Corporate Event", "Custom Celebration", "Birthday / Kitty Party", "Haldi / Mehendi / Sangeet", "Private Party", "Other"]);
@@ -46,6 +46,16 @@ function detectLeadSource(value) {
 }
 function normalizePhone(value) { return clean(value, 40).replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); }
 function normalizeEmail(value) { return clean(value, 160).toLowerCase(); }
+function isRealDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+function cleanEmail(value) {
+  const email = clean(value, 160);
+  // Invalid addresses are dropped (not rejected) so a form is never blocked by an optional field.
+  return /^[^\s@<>]{1,64}@[^\s@<>]+\.[^\s@<>]{2,}$/.test(email) ? email : "";
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -55,7 +65,7 @@ export default async function handler(req, res) {
       res.setHeader("Retry-After", String(limit.retryAfterSeconds));
       return res.status(429).json({ ok: false, error: "Too many submissions. Please wait a few minutes and try again." });
     }
-    const body = req.body || {};
+    const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {};
     if (isHoneypotTriggered(body.website)) return res.status(400).json({ ok: false, error: "Unable to submit this form." });
     const name = clean(body.name, 80);
     const phone = clean(body.phone, 20);
@@ -84,6 +94,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Please complete all required inquiry details." });
     }
 
+    if (eventDate && !isRealDate(eventDate)) return res.status(400).json({ ok: false, error: "Please enter a valid event date." });
+
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
     if (eventDate && eventDate < today) return res.status(400).json({ ok: false, error: "Event date cannot be in the past." });
 
@@ -95,13 +107,25 @@ export default async function handler(req, res) {
     }
     if (requestId) {
       try {
-        const existing = await db.query(`inquiries?request_id=eq.${encodeURIComponent(requestId)}&select=*`, { method: "GET" });
-        if (existing?.[0]) return res.status(200).json({ ok: true, data: existing[0], duplicate: true });
+        const existing = await db.query(`inquiries?request_id=eq.${encodeURIComponent(requestId)}&select=id`, { method: "GET" });
+        // Only the id is returned: a repeated requestId must never expose stored contact details.
+        if (existing?.[0]) return res.status(200).json({ ok: true, data: { id: existing[0].id }, duplicate: true });
       } catch (requestLookupError) {
         // request_id is an optional migration column. A missing column must
         // never prevent a valid public inquiry from being created.
         console.warn("Inquiry request-id lookup skipped:", requestLookupError?.message || requestLookupError);
       }
+    }
+
+    // Database-backed abuse guard (holds across serverless instances). Runs after the
+    // requestId lookup so a genuine retry of the same submission is never blocked.
+    const [recentSamePhone, recentOverall] = await Promise.all([
+      countRecent(db, "inquiries", `&phone=eq.${encodeURIComponent(phone)}`, 60 * 60 * 1000, 5),
+      countRecent(db, "inquiries", "", 10 * 60 * 1000, 150),
+    ]);
+    if (recentSamePhone >= 5 || recentOverall >= 150) {
+      res.setHeader("Retry-After", "600");
+      return res.status(429).json({ ok: false, error: "Too many submissions. Please wait a few minutes and try again." });
     }
 
     // Duplicate protection is handled primarily by requestId. Avoid scanning
@@ -112,7 +136,7 @@ export default async function handler(req, res) {
     const inquiryPayload = {
       name,
       phone,
-      email: clean(body.email, 160),
+      email: cleanEmail(body.email),
       whatsapp_number: whatsapp,
       city: eventLocation,
       event_type: eventType || "General Inquiry",
@@ -208,7 +232,7 @@ export default async function handler(req, res) {
     if (typeof req.waitUntil === "function") req.waitUntil(notifyTask);
     else void notifyTask;
 
-    return res.status(201).json({ ok: true, data: inquiry });
+    return res.status(201).json({ ok: true, data: { id: inquiry.id } });
   } catch (err) {
     console.error("Inquiry API error:", err);
     return res.status(500).json({ ok: false, error: "Unable to submit your inquiry right now." });

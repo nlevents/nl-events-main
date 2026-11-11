@@ -1342,27 +1342,55 @@ export function resolvePath(slugs) {
   if (direct) return direct;
 
   // Backward compatibility for catalog products whose category hierarchy was
-  // changed after their URL was shared. Resolve only the final product slug
-  // within the requested occasion, and only when that slug is unique there.
-  // This keeps the existing URL working without changing page layout or
-  // redirecting to a different product.
+  // changed after their URL was shared, and for Event Services cards whose
+  // product is stored under another occasion/category (the card links to
+  // /occasion/event-services/<slug>). Resolve only the final product slug.
+  // Search the requested occasion first, then every occasion; the same product
+  // placed at several paths is treated as one match.
   if (slugs.length >= 2) {
+    const productSlug = String(slugs[slugs.length - 1] || "");
     const root = findOccasion(slugs[0]);
-    const productSlug = slugs[slugs.length - 1];
-    if (root && productSlug) {
-      const matches = [];
-      const walk = (node, trail) => {
-        if (!node) return;
-        const nextTrail = [...trail, node];
-        if (node.type === "product" && node.slug === productSlug) {
-          matches.push({ node, trail: nextTrail });
-          return;
-        }
-        (node.children || []).forEach((child) => walk(child, nextTrail));
-        (node.products || []).forEach((product) => walk(product, nextTrail));
+    if (productSlug && /^[a-z0-9][a-z0-9._-]{0,200}$/i.test(productSlug)) {
+      const collect = (occasion) => {
+        const found = [];
+        const walk = (node, trail) => {
+          if (!node) return;
+          const nextTrail = [...trail, node];
+          if (node.type === "product" && node.slug === productSlug) {
+            found.push({ node, trail: nextTrail });
+            return;
+          }
+          (node.children || []).forEach((child) => walk(child, nextTrail));
+          (node.products || []).forEach((product) => walk(product, nextTrail));
+        };
+        walk(occasion, []);
+        return found;
       };
-      walk(root, []);
-      if (matches.length === 1) return matches[0];
+      const pickUnique = (matches) => {
+        const ids = new Set(matches.map((m) => String(m.node.id || m.node.slug)));
+        return matches.length && ids.size === 1 ? matches[0] : null;
+      };
+      if (root) {
+        const inRoot = pickUnique(collect(root));
+        if (inRoot) return inRoot;
+      }
+      // Service links: product lives under a different occasion in the tree.
+      if (slugs[0] === "event-services") {
+        const all = [];
+        getLiveOccasions().forEach((occasion) => {
+          if (occasion?.slug !== "event-services") all.push(...collect(occasion));
+        });
+        const global = pickUnique(all);
+        if (global) return global;
+        // Last resort: sellable service record not placed in any tree node.
+        try {
+          const raw = JSON.parse(localStorage.getItem("nle_catalog_v2_products") || "[]");
+          const rec = Array.isArray(raw)
+            ? raw.find((p) => p && p.slug === productSlug && p.status !== "archived" && p.status !== "draft")
+            : null;
+          if (rec && root) return { node: { ...rec, type: "product" }, trail: [root, { ...rec, type: "product" }] };
+        } catch { /* ignore */ }
+      }
     }
   }
 

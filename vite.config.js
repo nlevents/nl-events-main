@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { createHash } from 'node:crypto'
 
 const API_ROUTES = {
   '/api/catalog': './api/catalog.js',
@@ -76,6 +77,41 @@ function localApiPlugin() {
   }
 }
 
+// Fills the CSP placeholders in dist/_headers after the build. Inline <script>
+// blocks of index.html are allowed by SHA-256 hash (instead of 'unsafe-inline'),
+// so any later edit to those scripts is re-hashed automatically on every build.
+function cspPlugin(getEnv) {
+  return {
+    name: 'nle-csp',
+    apply: 'build',
+    closeBundle() {
+      const dist = path.resolve(process.cwd(), 'dist')
+      const htmlFile = path.join(dist, 'index.html')
+      const headersFile = path.join(dist, '_headers')
+      if (!fs.existsSync(htmlFile) || !fs.existsSync(headersFile)) return
+      const html = fs.readFileSync(htmlFile, 'utf8')
+      const hashes = []
+      for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+        const attrs = match[1] || ''
+        if (/\bsrc\s*=/i.test(attrs)) continue
+        if (/\btype\s*=\s*["']?(?!text\/javascript|module)/i.test(attrs)) continue
+        if (!match[2].trim()) continue
+        hashes.push(`'sha256-${createHash('sha256').update(match[2], 'utf8').digest('base64')}'`)
+      }
+      if (!hashes.length) throw new Error('nle-csp: no inline scripts found to hash; refusing to ship a broken CSP.')
+      let supabaseOrigin = 'https://*.supabase.co'
+      try {
+        const raw = getEnv().VITE_SUPABASE_URL
+        if (raw) supabaseOrigin = `${new URL(raw).origin} https://*.supabase.co`
+      } catch { /* keep wildcard fallback */ }
+      let headers = fs.readFileSync(headersFile, 'utf8')
+      headers = headers.replaceAll('__NLE_SCRIPT_HASHES__', [...new Set(hashes)].join(' ')).replaceAll('__NLE_SUPABASE_ORIGIN__', supabaseOrigin)
+      if (headers.includes('__NLE_')) throw new Error('nle-csp: unresolved placeholder left in dist/_headers.')
+      fs.writeFileSync(headersFile, headers)
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   Object.assign(process.env, env)
@@ -98,7 +134,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_CLOUDINARY_CLOUD_NAME': JSON.stringify(cloudName),
       'import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET': JSON.stringify(uploadPreset),
     },
-    plugins: [react(), localApiPlugin()],
+    plugins: [react(), localApiPlugin(), cspPlugin(() => process.env)],
     build: {
       target: 'es2018',
       cssCodeSplit: true,

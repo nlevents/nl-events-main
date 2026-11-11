@@ -5,9 +5,13 @@ export async function getSupabaseUser(env, authorization) {
   const key = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_SERVICE_ROLE_KEY || "";
   const token = String(authorization || "").replace(/^Bearer\s+/i, "").trim();
   if (!url || !key || !token) return null;
-  const res = await fetch(`${url}/auth/v1/user`, {
-    headers: { apikey: key, Authorization: `Bearer ${token}` },
-  });
+  let res;
+  try {
+    res = await fetch(`${url}/auth/v1/user`, {
+      signal: AbortSignal.timeout(10000),
+      headers: { apikey: key, Authorization: `Bearer ${token}` },
+    });
+  } catch { return null; }
   if (!res.ok) return null;
   try { return await res.json(); } catch { return null; }
 }

@@ -40,7 +40,9 @@ function collectStrings(value, out = []) {
 function isManagedPublicId(publicId) {
   // Only assets uploaded by this application are eligible for automatic
   // cleanup. Static nle-assets and unrelated Cloudinary assets are protected.
-  return /^next-level-events\//.test(publicId);
+  // Strict character set + no traversal: the id is placed inside a signed
+  // parameter string, so characters such as "&" or "=" must never be allowed.
+  return /^next-level-events\/[A-Za-z0-9_\-/.]{1,200}$/.test(publicId) && !publicId.includes("..") && !publicId.includes("//");
 }
 
 function stateReferencesPublicId(state, publicId) {
@@ -73,6 +75,7 @@ async function destroyPublicId(cloudName, apiKey, apiSecret, publicId) {
 
   const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/destroy`, {
     method: "POST",
+    signal: AbortSignal.timeout(15000),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
@@ -149,7 +152,8 @@ export default async function handler(req, res) {
         const result = await destroyPublicId(cloudName, apiKey, apiSecret, publicId);
         results.push({ publicId, status: result?.result === "ok" ? "deleted" : "not_deleted", result: result?.result || null });
       } catch (error) {
-        results.push({ publicId, status: "error", reason: error?.message || "Cloudinary deletion failed." });
+        console.error("Cloudinary deletion failed:", error?.message || error);
+        results.push({ publicId, status: "error", reason: "Cloudinary deletion failed." });
       }
     }
 
@@ -157,6 +161,6 @@ export default async function handler(req, res) {
     return res.status(hasErrors ? 207 : 200).json({ ok: !hasErrors, results });
   } catch (error) {
     console.error("Cloudinary cleanup error:", error);
-    return res.status(500).json({ ok: false, error: error?.message || "Unable to clean up Cloudinary assets." });
+    return res.status(500).json({ ok: false, error: "Unable to clean up Cloudinary assets." });
   }
 }

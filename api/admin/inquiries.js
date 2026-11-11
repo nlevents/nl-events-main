@@ -10,6 +10,12 @@ const EVENT_TYPES = ["Wedding", "Birthday", "Corporate", "Festive Events", "Othe
 function clean(value, max = 1000) { return String(value ?? "").trim().slice(0, max); }
 function normalizePhone(value) { return clean(value, 40).replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); }
 function normalizeEmail(value) { return clean(value, 160).toLowerCase(); }
+const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;
+function isRealDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
 function isValidSource(value) { return Boolean(clean(value, 120)); }
 function cleanSource(value) { return clean(value, 120); }
 const SOURCE_DETAIL_ALIASES = { landing: "Landing Page", contact: "Inquiry Form", inquiry: "Inquiry Form", manual: "CRM", website: "Website", booking: "Booking" };
@@ -60,7 +66,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const body = req.body || {};
+      const body = req.body && typeof req.body === "object" ? req.body : {};
       const name = clean(body.name, 80);
       const phone = clean(body.phone, 20);
       const email = clean(body.email, 160);
@@ -78,7 +84,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: "Please complete the required lead fields." });
       }
       if (!EVENT_TYPES.includes(eventType)) return res.status(400).json({ ok: false, error: "Invalid event type." });
-      if (eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return res.status(400).json({ ok: false, error: "Invalid event date." });
+      if (eventDate && !isRealDate(eventDate)) return res.status(400).json({ ok: false, error: "Invalid event date." });
 
       const duplicate = await findDuplicateLead(db, { phone, email, eventType, eventDate });
       if (duplicate) return res.status(200).json({ ok: true, inquiry: duplicate, duplicate: true });
@@ -113,9 +119,10 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PATCH") {
-      const body = req.body || {};
+      const body = req.body && typeof req.body === "object" ? req.body : {};
       const id = clean(body.id, 80);
       if (!id) return res.status(400).json({ ok: false, error: "Record id is required." });
+      if (!SAFE_ID.test(id)) return res.status(400).json({ ok: false, error: "Invalid record id." });
       const patch = {};
       if (body.status !== undefined) {
         const status = clean(body.status, 40);
@@ -125,7 +132,11 @@ export default async function handler(req, res) {
       if (body.adminNotes !== undefined) patch.admin_notes = clean(body.adminNotes, 2000);
       if (body.quotationId !== undefined) patch.quotation_id = clean(body.quotationId, 100);
       if (body.invoiceId !== undefined) patch.invoice_id = clean(body.invoiceId, 100);
-      if (body.paymentStatus !== undefined) patch.payment_status = clean(body.paymentStatus, 30);
+      if (body.paymentStatus !== undefined) {
+        const paymentStatus = clean(body.paymentStatus, 30);
+        if (!/^[A-Za-z0-9 _-]{0,30}$/.test(paymentStatus)) return res.status(400).json({ ok: false, error: "Invalid payment status." });
+        patch.payment_status = paymentStatus;
+      }
       if (body.leadSource !== undefined) {
         const leadSource = clean(body.leadSource, 120);
         if (!isValidSource(leadSource)) return res.status(400).json({ ok: false, error: "Invalid lead source." });
@@ -146,6 +157,8 @@ export default async function handler(req, res) {
       for (const [field, max] of Object.entries(editableFields)) {
         if (body[field] === undefined) continue;
         const value = clean(body[field], max);
+        if (field === "phone" && value && !/^\+?[0-9\s()\-.]{7,20}$/.test(value)) return res.status(400).json({ ok: false, error: "Enter a valid phone number." });
+        if (field === "eventDate" && value && !isRealDate(value)) return res.status(400).json({ ok: false, error: "Invalid event date." });
         const column = {
           whatsapp: "whatsapp_number", eventType: "event_type", eventDate: "event_date",
           eventTime: "event_time", eventVenue: "event_venue", eventLocation: "event_location",
@@ -161,6 +174,7 @@ export default async function handler(req, res) {
     if (req.method === "DELETE") {
       const id = clean(req.body?.id, 80);
       if (!id) return res.status(400).json({ ok: false, error: "Record id is required." });
+      if (!SAFE_ID.test(id)) return res.status(400).json({ ok: false, error: "Invalid record id." });
       await db.query(`inquiries?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", prefer: "return=minimal" });
       return res.status(200).json({ ok: true });
     }
@@ -168,6 +182,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   } catch (err) {
     console.error("Admin inquiries API error:", err);
-    return res.status(500).json({ ok: false, error: err.message || "Unable to load CRM records." });
+    return res.status(500).json({ ok: false, error: "Unable to complete this CRM request. Please try again." });
   }
 }
