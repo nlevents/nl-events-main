@@ -85,6 +85,8 @@ export default async function handler(req, res) {
       }
       if (!EVENT_TYPES.includes(eventType)) return res.status(400).json({ ok: false, error: "Invalid event type." });
       if (eventDate && !isRealDate(eventDate)) return res.status(400).json({ ok: false, error: "Invalid event date." });
+      const inquiryDate = clean(body.inquiryDate, 10);
+      if (inquiryDate && !isRealDate(inquiryDate)) return res.status(400).json({ ok: false, error: "Invalid inquiry date." });
 
       const duplicate = await findDuplicateLead(db, { phone, email, eventType, eventDate });
       if (duplicate) return res.status(200).json({ ok: true, inquiry: duplicate, duplicate: true });
@@ -113,6 +115,7 @@ export default async function handler(req, res) {
           next_follow_up: clean(body.nextFollowUp, 80) || null,
           assigned_to_name: clean(body.assignedTo, 120),
           request_id: null,
+          ...(inquiryDate ? { created_at: `${inquiryDate}T12:00:00.000Z` } : {}),
         },
       });
       return res.status(201).json({ ok: true, inquiry: rows?.[0] || null });
@@ -165,6 +168,13 @@ export default async function handler(req, res) {
           guestCount: "guest_count", assignedTo: "assigned_to_name", nextFollowUp: "next_follow_up",
         }[field] || field;
         patch[column] = field === "eventDate" || field === "nextFollowUp" ? (value || null) : value;
+      }
+      if (body.inquiryDate !== undefined) {
+        const inquiryDate = clean(body.inquiryDate, 10);
+        if (inquiryDate) {
+          if (!isRealDate(inquiryDate)) return res.status(400).json({ ok: false, error: "Invalid inquiry date." });
+          patch.created_at = `${inquiryDate}T12:00:00.000Z`;
+        }
       }
       patch.updated_at = new Date().toISOString();
       const rows = await db.query(`inquiries?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: patch });

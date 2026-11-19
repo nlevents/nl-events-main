@@ -22,7 +22,7 @@ const DEFAULT_SOURCE_DETAILS = ["Landing Page", "Inquiry Form", "Product Page", 
 const SOURCE_ICONS = { Instagram: "insta", "Google Ads": "search", "Google Search": "search", Referral: "user", Website: "home", WhatsApp: "whatsapp", "Landing Page": "home", "Inquiry Form": "send", LinkedIn: "linkedin", CRM: "user", "Product Page": "package" };
 const SOURCE_ALIASES = { landing: "Landing Page", contact: "Inquiry Form", inquiry: "Inquiry Form", manual: "CRM", website: "Website", booking: "Booking" };
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.key, s.label]));
-const EMPTY_LEAD = { name: "", phone: "", whatsapp: "", email: "", eventType: "", eventDate: "", eventLocation: "", guestCount: "", budget: "", leadSource: "Instagram", source: "Instagram", message: "", assignedTo: "", nextFollowUp: "" };
+const EMPTY_LEAD = { name: "", phone: "", whatsapp: "", email: "", eventType: "", eventDate: "", inquiryDate: "", eventLocation: "", guestCount: "", budget: "", leadSource: "Instagram", source: "Instagram", message: "", assignedTo: "", nextFollowUp: "" };
 const LEAD_SOURCE_OPTIONS = ["Instagram", "Facebook", "Google Ads", "Google Search", "LinkedIn", "WhatsApp", "Referral", "Website", "Landing Page", "Inquiry Form", "Product Page", "CRM", "Other"];
 const LEAD_TAG_OPTIONS = ["Premium", "Immediate", "Repeat Client", "Referral", "Destination", "Corporate", "High Potential"];
 
@@ -355,7 +355,7 @@ export default function AdminInquiries() {
     const isCustom = Boolean(source && !knownSources.includes(source));
     setLeadSourceCustom(isCustom);
     setCustomLeadSource(isCustom ? source : "");
-    setLeadForm({ name: record.name === "Anonymous Client" ? "" : record.name, phone: record.phone || "", whatsapp: record.whatsapp || "", email: record.email || "", eventType: record.eventType || "", eventDate: record.eventDate || "", eventLocation: record.eventLocation || "", guestCount: record.guestCount || "", budget: record.budget || "", leadSource: record.leadSource || "Website", source: isCustom ? "" : source, message: record.message || "", assignedTo: record.assignedTo === "Unassigned" ? "" : record.assignedTo || "", nextFollowUp: record.nextFollowUp || "" });
+    setLeadForm({ name: record.name === "Anonymous Client" ? "" : record.name, phone: record.phone || "", whatsapp: record.whatsapp || "", email: record.email || "", eventType: record.eventType || "", eventDate: record.eventDate || "", inquiryDate: toLocalDateTimeInputs(record.createdAt).date, eventLocation: record.eventLocation || "", guestCount: record.guestCount || "", budget: record.budget || "", leadSource: record.leadSource || "Website", source: isCustom ? "" : source, message: record.message || "", assignedTo: record.assignedTo === "Unassigned" ? "" : record.assignedTo || "", nextFollowUp: record.nextFollowUp || "" });
     setLeadClientType("Individual");
     setLeadTags([]);
     setLeadQuickActions({ followUp: Boolean(record.nextFollowUp), whatsapp: true, emailMarketing: false });
@@ -379,6 +379,7 @@ export default function AdminInquiries() {
       const resolvedSource = leadSourceCustom ? customLeadSource.trim() : String(leadForm.source || "").trim();
       if (!resolvedSource) throw new Error("Please enter a custom lead source.");
       const payload = { ...leadForm, source: resolvedSource, leadSource: leadSourceCustom ? resolvedSource : leadForm.leadSource, status: leadStatus, nextFollowUp };
+      if (editingLead && leadForm.inquiryDate === toLocalDateTimeInputs(editingLead.createdAt).date) delete payload.inquiryDate;
       if (editingLead) await updateAdminInquiry(editingLead.id, payload);
       else await createAdminInquiry(payload);
       await refresh(); setShowAddLead(false); setEditingLead(null); setLeadForm(EMPTY_LEAD); setLeadSourceCustom(false); setCustomLeadSource(""); showFeedback(editingLead ? "Lead updated." : "Lead added.");
@@ -454,7 +455,7 @@ export default function AdminInquiries() {
             <div className="crm-drawer-avatar">{initials}</div>
             <div><h3>{record.name}</h3><p>{record.eventType || "Event"} · {location}</p><span className={`crm-drawer-status status-${record.status}`}>{statusLabel}</span></div>
           </div>
-          <section className="crm-drawer-section"><h3>Customer Information <button type="button" onClick={() => openEditLead(record)}>Edit</button></h3><div className="crm-drawer-rows"><div><span>Phone</span><b>{record.phone || "—"}</b></div><div><span>Email</span><b>{record.email || "—"}</b></div><div><span>WhatsApp</span><b>{record.whatsapp || record.phone || "—"}</b></div></div></section>
+          <section className="crm-drawer-section"><h3>Customer Information <button type="button" onClick={() => openEditLead(record)}>Edit</button></h3><div className="crm-drawer-rows"><div><span>Phone</span><b>{record.phone || "—"}</b></div><div><span>Email</span><b>{record.email || "—"}</b></div><div><span>WhatsApp</span><b>{record.whatsapp || record.phone || "—"}</b></div><div><span>Inquiry Date</span><b>{fmtDate(record.createdAt)}</b></div></div></section>
           <section className="crm-drawer-section"><h3>Event Information <button type="button" onClick={() => openEditLead(record)}>Edit</button></h3><div className="crm-drawer-rows"><div><span>Event</span><b>{record.eventType || "—"}</b></div><div><span>Date</span><b>{fmtDate(record.eventDate)}</b></div><div><span>Location</span><b>{location}</b></div><div><span>Guests</span><b>{record.guestCount || "—"}</b></div><div><span>Budget</span><b>{record.budget || "—"}</b></div></div></section>
           <section className="crm-drawer-section"><h3>Lead Information</h3><div className="crm-drawer-rows"><div><span>Source</span><b>{source}</b></div><div><span>Assigned To</span><b>{record.assignedTo || "Unassigned"}</b></div><div><span>Next Follow-up</span><b>{record.nextFollowUp ? fmtDateTime(record.nextFollowUp) : "—"}</b></div></div></section>
           <section className="crm-drawer-section"><h3>Quick Actions</h3><div className="crm-drawer-actions"><button type="button" onClick={() => window.open(`tel:${record.phone}`)}><Icon name="phone" />Call</button><button type="button" onClick={() => window.open(`https://wa.me/${String(record.whatsapp || record.phone).replace(/\D/g, "")}`, "_blank", "noopener,noreferrer")}><Icon name="whatsapp" />WhatsApp</button><button type="button" onClick={() => handleScheduleFollowUp(record)}><Icon name="calendar" />Follow-up</button><button type="button" onClick={() => createQuotation(record)}><Icon name="send" />Quotation</button></div></section>
@@ -547,7 +548,7 @@ export default function AdminInquiries() {
                 <section className="crm-lead-card">
                   <div className="crm-lead-card-head"><h2>Client Information</h2><button type="button" onClick={() => openEditLead(record)}><Icon name="edit" /> Edit</button></div>
                   <div className="crm-detail-rows">
-                    <div><span>Full Name</span><b>{record.name}</b></div><div><span>Phone</span><b>{phone} {record.phone && <Icon name="whatsapp" />}</b></div><div><span>Email</span><b>{email}</b></div><div><span>Alternate Phone</span><b>{record.whatsapp || "—"}</b></div><div><span>Location</span><b>{location}</b></div><div><span>Address</span><b>{record.eventVenue || "—"}</b></div><div><span>Client Since</span><b>{fmtDate(record.createdAt)}</b></div><div><span>Source</span><b>{source}</b></div><div><span>Lead Owner</span><b>{record.assignedTo}</b></div>
+                    <div><span>Full Name</span><b>{record.name}</b></div><div><span>Phone</span><b>{phone} {record.phone && <Icon name="whatsapp" />}</b></div><div><span>Email</span><b>{email}</b></div><div><span>Alternate Phone</span><b>{record.whatsapp || "—"}</b></div><div><span>Location</span><b>{location}</b></div><div><span>Address</span><b>{record.eventVenue || "—"}</b></div><div><span>Inquiry Date</span><b>{fmtDate(record.createdAt)}</b></div><div><span>Client Since</span><b>{fmtDate(record.createdAt)}</b></div><div><span>Source</span><b>{source}</b></div><div><span>Lead Owner</span><b>{record.assignedTo}</b></div>
                   </div>
                 </section>
                 <section className="crm-lead-card">
@@ -700,6 +701,7 @@ export default function AdminInquiries() {
                   <div className="crm-add-grid">
                     <label>Event Type <b>*</b><div><Icon name="calendar" /><select required value={leadForm.eventType} onChange={(e) => updateLeadField("eventType", e.target.value)}><option value="">Select event</option>{EVENT_TYPES.map((x) => <option key={x}>{x}</option>)}</select></div></label>
                     <label>Event Date<div><Icon name="calendar" /><input type="date" value={leadForm.eventDate} onChange={(e) => updateLeadField("eventDate", e.target.value)} /></div></label>
+                    <label>Inquiry Date<div><Icon name="calendar" /><input type="date" value={leadForm.inquiryDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => updateLeadField("inquiryDate", e.target.value)} /></div></label>
                     <label>Venue / Location<div><Icon name="pin" /><input required value={leadForm.eventLocation} onChange={(e) => updateLeadField("eventLocation", e.target.value)} placeholder="Enter venue or location (e.g. Ranchi)" /></div></label>
                     <label>Guest Count (Expected)<div><Icon name="user" /><input value={leadForm.guestCount} onChange={(e) => updateLeadField("guestCount", e.target.value)} placeholder="Enter guest count" /></div></label>
                     <label>Budget Range<div><Icon name="rupee" /><select value={leadForm.budget} onChange={(e) => updateLeadField("budget", e.target.value)}><option value="">Select budget range</option>{BUDGETS.map((x) => <option key={x}>{x}</option>)}</select></div></label>
