@@ -25,6 +25,7 @@ export const ADMIN_STATE_KEYS = [
   "nle-admin-clients",
   "nle-admin-invoices",
   "nle-admin-settings",
+  "nle-admin-candidates",
 ];
 
 const ADMIN_SESSION_KEY = "nle-admin-supabase-session";

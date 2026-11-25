@@ -57,6 +57,7 @@ const AdminInvoices = lazyWithRetry(() => import("./pages/admin/AdminInvoices"))
 const AdminInvoiceForm = lazyWithRetry(() => import("./pages/admin/AdminInvoiceForm"));
 const AdminInvoiceView = lazyWithRetry(() => import("./pages/admin/AdminInvoiceView"));
 const AdminSettings = lazyWithRetry(() => import("./pages/admin/AdminSettings"));
+const AdminCandidates = lazyWithRetry(() => import("./pages/admin/AdminCandidates"));
 const AdminPlaceholder = lazyWithRetry(() => import("./pages/admin/AdminPlaceholder"));
 
 function HorizontalWheelSupport() {
@@ -212,7 +213,7 @@ export default function App() {
                     <Route path="events" element={<AdminPlaceholder title="All Events" />} />
                     <Route path="tasks" element={<AdminPlaceholder title="Tasks" />} />
                     <Route path="vendors" element={<AdminPlaceholder title="Vendors" />} />
-                    <Route path="candidates" element={<AdminPlaceholder title="Candidates" />} />
+                    <Route path="candidates" element={<AdminCandidates />} />
                     <Route path="team" element={<AdminPlaceholder title="Team" />} />
                     <Route path="attendance" element={<AdminPlaceholder title="Attendance" />} />
                     <Route path="payroll" element={<AdminPlaceholder title="Salary & Payroll" />} />
