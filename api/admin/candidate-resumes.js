@@ -58,9 +58,9 @@ export default async function handler(req, res) {
     if (!publicId) return res.status(400).json({ ok: false, error: "Invalid resume file." });
     const timestamp = Math.floor(Date.now() / 1000);
     const expiresAt = timestamp + 300;
-    const toSign = `expires_at=${expiresAt}&public_id=${publicId}&timestamp=${timestamp}`;
+    const toSign = `expires_at=${expiresAt}&public_id=${publicId}&timestamp=${timestamp}&type=upload`;
     const signature = createHash("sha1").update(`${toSign}${apiSecret}`).digest("hex");
-    const query = new URLSearchParams({ public_id: publicId, timestamp: String(timestamp), expires_at: String(expiresAt), api_key: apiKey, signature });
+    const query = new URLSearchParams({ public_id: publicId, type: "upload", timestamp: String(timestamp), expires_at: String(expiresAt), api_key: apiKey, signature });
     return res.status(200).json({ ok: true, url: `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/raw/download?${query}` });
   }
 
