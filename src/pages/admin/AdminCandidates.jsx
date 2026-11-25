@@ -3,7 +3,7 @@ import Icon from "../../components/Icon";
 import usePageMeta from "../../hooks/usePageMeta";
 import {
   DEPARTMENTS, LIMITS, STATUSES, STATUS_LABEL,
-  csvCell, deleteCandidates, getCandidates, importCandidates, isSafeResumeUrl,
+  cleanupResumes, csvCell, deleteCandidates, getCandidates, importCandidates, isSafeResumeUrl, openResume,
   parseCsv, setCandidatesStatus, upsertCandidate, uploadResume,
 } from "../../lib/candidatesStore";
 import "../../styles/candidates.css";
@@ -80,7 +80,7 @@ const STAT_CARDS = [
 function ResumeLink({ url, name, onAdd }) {
   if (isSafeResumeUrl(url)) {
     return (
-      <a className="cnd-pdf" href={url} target="_blank" rel="noopener noreferrer" title={name || "Open resume"} onClick={(e) => e.stopPropagation()}>
+      <a className="cnd-pdf" href={url} target="_blank" rel="noopener noreferrer" title={name || "Open resume"} onClick={(e) => { e.preventDefault(); e.stopPropagation(); openResume(url); }}>
         <Icon name="file" /><span>PDF</span>
       </a>
     );
@@ -93,7 +93,11 @@ function CandidateForm({ initial, onSave, onCancel }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
+  const uploaded = useRef([]); // resumes uploaded during this form session
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+  const savedUrl = useRef(initial?.resumeUrl || "");
+  // Whenever the form closes (save, cancel, backdrop click), delete uploads that were never saved.
+  useEffect(() => () => { cleanupResumes(uploaded.current.filter((u) => u !== savedUrl.current)); }, []);
 
   async function pickFile(e) {
     const file = e.target.files?.[0];
@@ -102,6 +106,7 @@ function CandidateForm({ initial, onSave, onCancel }) {
     setError(""); setBusy(true);
     try {
       const { url, name } = await uploadResume(file);
+      uploaded.current.push(url);
       setForm((f) => ({ ...f, resumeUrl: url, resumeName: name }));
     } catch (err) { setError(err.message || "Resume upload failed."); }
     finally { setBusy(false); }
@@ -112,13 +117,15 @@ function CandidateForm({ initial, onSave, onCancel }) {
     if (busy) return;
     const result = onSave({ ...form, queryDate: form.queryDate ? new Date(form.queryDate).toISOString() : "" });
     if (result?.error) setError(result.error);
+    else savedUrl.current = form.resumeUrl;
   }
+  const cancel = onCancel;
 
   return (
     <form className="cnd-modal" onSubmit={submit} noValidate>
       <div className="cnd-modal-head">
         <div><h2>{initial?.id ? "Edit Candidate" : "Add Candidate"}</h2><p>Enter candidate details and track them through the hiring pipeline.</p></div>
-        <button type="button" className="cnd-icon-btn" onClick={onCancel} aria-label="Close"><Icon name="close" /></button>
+        <button type="button" className="cnd-icon-btn" onClick={cancel} aria-label="Close"><Icon name="close" /></button>
       </div>
       <div className="cnd-form-grid">
         <label>Candidate Name *<input value={form.name} maxLength={LIMITS.name} onChange={(e) => set("name", e.target.value)} autoFocus placeholder="Full name" /></label>
@@ -144,7 +151,7 @@ function CandidateForm({ initial, onSave, onCancel }) {
             <button type="button" className="cnd-btn cnd-btn--line" disabled={busy} onClick={() => fileRef.current?.click()}><Icon name="upload" /> {busy ? "Uploading…" : form.resumeUrl ? "Replace" : "Upload"}</button>
             {form.resumeUrl && (
               <>
-                <a href={form.resumeUrl} target="_blank" rel="noopener noreferrer" className="cnd-upload-name">{form.resumeName || "resume.pdf"}</a>
+                <a href={form.resumeUrl} className="cnd-upload-name" onClick={(e) => { e.preventDefault(); openResume(form.resumeUrl); }}>{form.resumeName || "resume.pdf"}</a>
                 <button type="button" className="cnd-link-danger" onClick={() => setForm((f) => ({ ...f, resumeUrl: "", resumeName: "" }))}>Remove</button>
               </>
             )}
@@ -154,7 +161,7 @@ function CandidateForm({ initial, onSave, onCancel }) {
       </div>
       {error && <p className="cnd-error" role="alert">{error}</p>}
       <div className="cnd-modal-actions">
-        <button type="button" className="cnd-btn cnd-btn--line" onClick={onCancel}>Cancel</button>
+        <button type="button" className="cnd-btn cnd-btn--line" onClick={cancel}>Cancel</button>
         <button type="submit" className="cnd-btn cnd-btn--dark" disabled={busy}>{initial?.id ? "Save Changes" : "Add Candidate"}</button>
       </div>
     </form>

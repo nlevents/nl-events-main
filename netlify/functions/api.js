@@ -9,6 +9,7 @@ import createBookingHandler from "../../api/create-booking.js";
 import adminBootstrapHandler from "../../api/admin/bootstrap.js";
 import adminInquiriesHandler from "../../api/admin/inquiries.js";
 import adminStateHandler from "../../api/admin/state.js";
+import adminCandidateResumesHandler from "../../api/admin/candidate-resumes.js";
 
 const ROUTES = new Map([
   ["catalog", catalogHandler],
@@ -18,6 +19,7 @@ const ROUTES = new Map([
   ["admin/bootstrap", adminBootstrapHandler],
   ["admin/inquiries", adminInquiriesHandler],
   ["admin/state", adminStateHandler],
+  ["admin/candidate-resumes", adminCandidateResumesHandler],
 ]);
 
 function safeDecode(value) {

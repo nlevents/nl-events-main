@@ -1,4 +1,4 @@
-import { queueCloudSync } from "./cloudStore";
+import { queueCloudSync, waitForCloudWrites } from "./cloudStore";
 
 // Candidates (HR pipeline). localStorage is a cache; every write is also pushed
 // to the admin-only cloud bucket through the authenticated /api/admin/state.
@@ -89,6 +89,43 @@ function persist(list) {
   return true;
 }
 
+// Best-effort removal of resume PDFs that no candidate uses any more. Waits for
+// the cloud save to finish first so the server's "still in use" check is accurate.
+export async function cleanupResumes(urls) {
+  const list = [...new Set((urls || []).filter(isSafeResumeUrl))];
+  if (!list.length) return;
+  try {
+    const token = JSON.parse(sessionStorage.getItem("nle-admin-supabase-session") || "null")?.access_token;
+    if (!token) return;
+    await waitForCloudWrites();
+    await fetch(`${import.meta.env.VITE_API_URL || "/api"}/admin/candidate-resumes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ urls: list }),
+    });
+  } catch { /* cleanup is optional; never block the UI */ }
+}
+
+// Opens a resume in a new tab through a short-lived signed link from the server.
+// Falls back to the direct link if the signed link cannot be created.
+export async function openResume(url) {
+  if (!isSafeResumeUrl(url)) return;
+  const tab = window.open("", "_blank");
+  const go = (target) => { if (tab) tab.location.href = target; else window.open(target, "_blank"); };
+  try {
+    const token = JSON.parse(sessionStorage.getItem("nle-admin-supabase-session") || "null")?.access_token;
+    if (!token) throw new Error("no session");
+    const res = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/admin/candidate-resumes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ mode: "download", url }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !/^https:\/\/api\.cloudinary\.com\//.test(data?.url || "")) throw new Error("no link");
+    go(data.url);
+  } catch { go(url); }
+}
+
 export function upsertCandidate(input) {
   const list = getCandidates();
   const existing = input.id ? list.find((c) => c.id === input.id) : null;
@@ -99,6 +136,7 @@ export function upsertCandidate(input) {
   if (!existing && list.length >= LIMITS.max) return { error: "Candidate limit reached." };
   const next = existing ? list.map((c) => (c.id === record.id ? record : c)) : [record, ...list];
   if (!persist(next)) return { error: "Could not save (browser storage is full)." };
+  if (existing?.resumeUrl && existing.resumeUrl !== record.resumeUrl) cleanupResumes([existing.resumeUrl]);
   return { record };
 }
 
@@ -111,7 +149,10 @@ export function setCandidatesStatus(ids, status) {
 
 export function deleteCandidates(ids) {
   const set = new Set(ids);
-  return persist(getCandidates().filter((c) => !set.has(c.id)));
+  const all = getCandidates();
+  const ok = persist(all.filter((c) => !set.has(c.id)));
+  if (ok) cleanupResumes(all.filter((c) => set.has(c.id)).map((c) => c.resumeUrl));
+  return ok;
 }
 
 // Bulk add (CSV import). Skips invalid rows and duplicates (same phone digits or email).
